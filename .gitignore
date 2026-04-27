@@ -1,0 +1,15 @@
+# Compiled binaries
+/pkn/pkn
+/kps/kps
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Go build artifacts (any test binaries)
+*.test
