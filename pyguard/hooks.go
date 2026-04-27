@@ -5,10 +5,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"golang.org/x/term"
 )
+
+// pyguardBinary returns the absolute path to the pyguard binary for the given project root.
+func pyguardBinary(root string) string {
+	name := "pyguard"
+	if runtime.GOOS == "windows" {
+		name = "pyguard.exe"
+	}
+	return filepath.Join(root, "tools", "pyguard", name)
+}
 
 // toolOption represents a selectable AI tool in the setup menu.
 type toolOption struct {
@@ -48,8 +58,8 @@ func runHooks(root string) int {
 		if err := generateCopilotHook(root); err != nil {
 			fmt.Printf("  [FAIL] Copilot hook: %v\n", err)
 		} else {
-			fmt.Println("  [OK]   .github/hooks/kps-check.json (Copilot PostToolUse)")
-			fmt.Println("  [OK]   .vscode/tasks.json (kps check + kps fix tasks)")
+			fmt.Println("  [OK]   .github/hooks/pyguard-check.json (Copilot PostToolUse)")
+			fmt.Println("  [OK]   .vscode/tasks.json (pyguard check + pyguard fix tasks)")
 			generated++
 		}
 	}
@@ -69,6 +79,7 @@ func runHooks(root string) int {
 		} else {
 			fmt.Println("  [OK]   .codex/hooks.json (PostToolUse)")
 			fmt.Println("  [OK]   AGENTS.md (project instructions)")
+			fmt.Println("         Note: Codex hooks are currently disabled on Windows.")
 			generated++
 		}
 	}
@@ -77,7 +88,7 @@ func runHooks(root string) int {
 		if err := generateOpenCodePlugin(root); err != nil {
 			fmt.Printf("  [FAIL] OpenCode plugin: %v\n", err)
 		} else {
-			fmt.Println("  [OK]   .opencode/plugins/kps/index.ts")
+			fmt.Println("  [OK]   .opencode/plugins/pyguard/index.ts")
 			fmt.Println("  [OK]   opencode.json")
 			generated++
 		}
@@ -222,17 +233,27 @@ func promptText() map[string]bool {
 }
 
 func generateClaudeHook(root string) error {
-	// kapso/ is inside the repo, .claude/ is at the repo root (parent of kapso/)
+	pyguardBin := pyguardBinary(root)
 	settingsDir := filepath.Join(root, "..", ".claude")
 	path := filepath.Join(settingsDir, "settings.local.json")
 
-	kpsPath := filepath.Join(root, "tools", "kps", "kps")
+	var hookCmd string
+	if runtime.GOOS == "windows" {
+		escaped := strings.ReplaceAll(pyguardBin, `\`, `\\`)
+		hookCmd = fmt.Sprintf(`if ($env:CLAUDE_TOOL_OUTPUT_PATH -match '\\.py$') { & '%s' check }`, escaped)
+	} else {
+		hookCmd = fmt.Sprintf(`case "$CLAUDE_TOOL_OUTPUT_PATH" in *.py) '%s' check ;; esac`, pyguardBin)
+	}
+
+	// Escape for JSON string embedding
+	pyguardBinJSON := strings.ReplaceAll(pyguardBin, `\`, `\\`)
+	hookCmdJSON := strings.ReplaceAll(hookCmd, `"`, `\"`)
+
 	content := fmt.Sprintf(`{
   "permissions": {
     "allow": [
-      "Bash(kps check:*)",
-      "Bash(kps fix:*)",
-      "Bash(kps doctor:*)"
+      "Bash(%s check:*)",
+      "Bash(%s fix:*)"
     ]
   },
   "hooks": {
@@ -242,93 +263,99 @@ func generateClaudeHook(root string) error {
         "hooks": [
           {
             "type": "command",
-            "command": "case \"$CLAUDE_TOOL_OUTPUT_PATH\" in *.ts|*.tsx) %s check ;; esac"
+            "command": "%s"
           }
         ]
       }
     ]
   }
 }
-`, kpsPath)
+`, pyguardBinJSON, pyguardBinJSON, hookCmdJSON)
 	return writeHookFile(path, content)
 }
 
 func generateCopilotHook(root string) error {
+	pyguardBin := pyguardBinary(root)
+	// .github/hooks/pyguard-check.json
 	hooksDir := filepath.Join(root, "..", ".github", "hooks")
 	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
 		return err
 	}
-	hookContent := `{
+	hookContent := fmt.Sprintf(`{
   "hooks": {
     "PostToolUse": [
       {
         "type": "command",
-        "command": "kps check --if-typescript",
+        "command": "%s check --if-python",
         "timeout": 120
       }
     ]
   }
 }
-`
-	if err := writeHookFile(filepath.Join(hooksDir, "kps-check.json"), hookContent); err != nil {
+`, strings.ReplaceAll(pyguardBin, `\`, `\\`))
+	if err := writeHookFile(filepath.Join(hooksDir, "pyguard-check.json"), hookContent); err != nil {
 		return err
 	}
 
+	// .vscode/tasks.json
 	vscodeDir := filepath.Join(root, "..", ".vscode")
 	if err := os.MkdirAll(vscodeDir, 0o755); err != nil {
 		return err
 	}
-	tasksContent := `{
+	pyguardBinJSON := strings.ReplaceAll(pyguardBin, `\`, `\\`)
+	tasksContent := fmt.Sprintf(`{
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "kps check",
+      "label": "pyguard check",
       "type": "shell",
-      "command": "kps check",
+      "command": "%s check",
       "group": { "kind": "test", "isDefault": true },
       "presentation": { "reveal": "always", "panel": "shared" },
       "problemMatcher": []
     },
     {
-      "label": "kps fix",
+      "label": "pyguard fix",
       "type": "shell",
-      "command": "kps fix",
+      "command": "%s fix",
       "presentation": { "reveal": "always", "panel": "shared" },
       "problemMatcher": []
     }
   ]
 }
-`
+`, pyguardBinJSON, pyguardBinJSON)
 	return writeHookFile(filepath.Join(vscodeDir, "tasks.json"), tasksContent)
 }
 
 func generateCursorHook(root string) error {
+	pyguardBin := pyguardBinary(root)
 	cursorDir := filepath.Join(root, "..", ".cursor")
 	if err := os.MkdirAll(cursorDir, 0o755); err != nil {
 		return err
 	}
-	content := `{
+	content := fmt.Sprintf(`{
   "version": 1,
   "hooks": {
     "afterFileEdit": [
       {
         "type": "command",
-        "command": "kps check --if-typescript",
+        "command": "%s check --if-python",
         "timeout": 120
       }
     ]
   }
 }
-`
+`, strings.ReplaceAll(pyguardBin, `\`, `\\`))
 	return writeHookFile(filepath.Join(cursorDir, "hooks.json"), content)
 }
 
 func generateCodexHook(root string) error {
+	pyguardBin := pyguardBinary(root)
 	codexDir := filepath.Join(root, "..", ".codex")
 	if err := os.MkdirAll(codexDir, 0o755); err != nil {
 		return err
 	}
-	hookContent := `{
+	hookContent := fmt.Sprintf(`{
   "hooks": {
     "PostToolUse": [
       {
@@ -336,7 +363,7 @@ func generateCodexHook(root string) error {
         "hooks": [
           {
             "type": "command",
-            "command": "kps check --if-typescript",
+            "command": "%s check --if-python",
             "timeout": 120,
             "statusMessage": "Running quality gates"
           }
@@ -345,52 +372,30 @@ func generateCodexHook(root string) error {
     ]
   }
 }
-`
+`, strings.ReplaceAll(pyguardBin, `\`, `\\`))
 	if err := writeHookFile(filepath.Join(codexDir, "hooks.json"), hookContent); err != nil {
 		return err
 	}
 
-	agentsContent := `# Project: kapso
-
-After editing TypeScript files, run ` + "`kps check`" + ` to validate quality gates.
-If checks fail, fix the issues before committing.
-
-Quality gate commands:
-- ` + "`kps check`" + `      — full gate (lint, types, coverage, security)
-- ` + "`kps fix`" + `        — auto-format
-- ` + "`kps lint`" + `       — lint only (ultracite check)
-- ` + "`kps types`" + `      — type check only
-- ` + "`kps coverage`" + `   — tests + coverage
-- ` + "`kps complexity`" + ` — complexity analysis
-`
+	agentsContent := fmt.Sprintf("# Python Quality Gates\n\nAfter editing Python files, run `%s check` to validate quality gates.\nIf checks fail, fix the issues before committing.\n\nQuality gate commands:\n- `%s check`    — full gate (lint, types, complexity, tests, security)\n- `%s fix`      — auto-format\n- `%s ruff`     — lint only\n- `%s mypy`     — type check only\n- `%s coverage` — tests + coverage\n", pyguardBin, pyguardBin, pyguardBin, pyguardBin, pyguardBin, pyguardBin)
 	return writeHookFile(filepath.Join(root, "..", "AGENTS.md"), agentsContent)
 }
 
 func generateOpenCodePlugin(root string) error {
-	pluginDir := filepath.Join(root, "..", ".opencode", "plugins", "kps")
+	pyguardBin := pyguardBinary(root)
+	pluginDir := filepath.Join(root, "..", ".opencode", "plugins", "pyguard")
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		return err
 	}
 
-	tsContent := `import type { Plugin } from "@opencode-ai/plugin"
-
-export const KpsPlugin: Plugin = async ({ $ }) => {
-  return {
-    "file.edited": async (input: { filePath: string }) => {
-      if (input.filePath.endsWith(".ts") || input.filePath.endsWith(".tsx")) {
-        await $` + "`kps check`" + `
-      }
-    },
-  }
-}
-`
+	tsContent := fmt.Sprintf("import type { Plugin } from \"@opencode-ai/plugin\"\n\nexport const PknPlugin: Plugin = async ({ $ }) => {\n  return {\n    \"file.edited\": async (input: { filePath: string }) => {\n      if (input.filePath.endsWith(\".py\")) {\n        await $`%s check`\n      }\n    },\n  }\n}\n", pyguardBin)
 	if err := writeHookFile(filepath.Join(pluginDir, "index.ts"), tsContent); err != nil {
 		return err
 	}
 
 	opencodeContent := `{
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [".opencode/plugins/kps"]
+  "plugin": [".opencode/plugins/pyguard"]
 }
 `
 	return writeHookFile(filepath.Join(root, "..", "opencode.json"), opencodeContent)
@@ -400,16 +405,23 @@ func generatePreCommit(root string) error {
 	repoRoot := filepath.Join(root, "..")
 	path := filepath.Join(repoRoot, ".pre-commit-config.yaml")
 
-	content := `repos:
+	// Relative path keeps the committed config portable (pre-commit runs from repo root).
+	binName := "pyguard"
+	if runtime.GOOS == "windows" {
+		binName = "pyguard.exe"
+	}
+	entry := filepath.ToSlash(filepath.Join("tools", "pyguard", binName))
+
+	content := fmt.Sprintf(`repos:
   - repo: local
     hooks:
-      - id: kps-check
-        name: kps check
-        entry: kps check
+      - id: pyguard-check
+        name: pyguard check
+        entry: %s check
         language: system
-        types: [ts]
+        types: [python]
         pass_filenames: false
-`
+`, entry)
 	return writeHookFile(path, content)
 }
 

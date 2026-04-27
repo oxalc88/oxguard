@@ -9,7 +9,7 @@ import (
 // runCheck runs the full quality gate: ruff → mypy → radon → coverage → security.
 // Sequential, fail-fast: stops at first failure.
 func runCheck(r *Runner, dirs []string) int {
-	fmt.Println("pkn check")
+	fmt.Println("pyguard check")
 	fmt.Println("─────────")
 
 	steps := []struct {
@@ -38,7 +38,7 @@ func runCheck(r *Runner, dirs []string) int {
 
 // runFix runs auto-formatters: ruff check --fix then ruff format.
 func runFix(r *Runner, dirs []string) int {
-	fmt.Println("pkn fix")
+	fmt.Println("pyguard fix")
 	args1 := append([]string{"uv", "run", "ruff", "check", "--fix"}, dirs...)
 	res1 := r.Run("ruff check --fix", args1...)
 
@@ -54,7 +54,7 @@ func runFix(r *Runner, dirs []string) int {
 // runAudit runs informational analysis: criticality + dead-code + deps.
 // Never fails (exit 0 always) — these are advisory.
 func runAudit(r *Runner, dirs []string) int {
-	fmt.Println("pkn audit (informational)")
+	fmt.Println("pyguard audit (informational)")
 	runCriticality(r)
 	runDeadCode(r, dirs)
 	runDeps(r)
@@ -140,7 +140,7 @@ func runSecrets(r *Runner, cfg config) int {
 	baseline := filepath.Join(r.root, ".secrets.baseline")
 
 	if cfg.initFlag {
-		// pkn secrets --init: create baseline explicitly
+		// pyguard secrets --init: create baseline explicitly
 		fmt.Print("  Creating .secrets.baseline...")
 		out, err := RunCapture(r.root, "uv", "run", "detect-secrets", "scan")
 		if err != nil {
@@ -157,7 +157,7 @@ func runSecrets(r *Runner, cfg config) int {
 
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
 		fmt.Println("  [FAIL] secrets — .secrets.baseline not found")
-		fmt.Println("         Run: pkn secrets --init")
+		fmt.Println("         Run: pyguard secrets --init")
 		return 1
 	}
 

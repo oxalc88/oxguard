@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-// acquireLock creates .kps.pid at root. Returns (release, nil) on success.
-// Returns (nil, err) if another live kps instance is detected.
+// acquireLock creates .tsguard.pid at root. Returns (release, nil) on success.
+// Returns (nil, err) if another live tsguard instance is detected.
 // Stale locks (dead pid) are removed and retried once automatically.
 func acquireLock(root string) (func(), error) {
-	lockPath := filepath.Join(root, ".kps.pid")
+	lockPath := filepath.Join(root, ".tsguard.pid")
 	return acquireLockAt(lockPath)
 }
 
@@ -32,7 +32,7 @@ func acquireLockAt(lockPath string) (func(), error) {
 			_ = os.Remove(lockPath)
 			continue
 		}
-		return nil, fmt.Errorf("another kps instance is already running (pid %d); refusing to start", pid)
+		return nil, fmt.Errorf("another tsguard instance is already running (pid %d); refusing to start", pid)
 	}
 	return nil, fmt.Errorf("cannot acquire lock at %s after retry", lockPath)
 }

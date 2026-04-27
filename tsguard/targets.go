@@ -10,7 +10,7 @@ import (
 // runCheck runs the full quality gate: lint → complexity → fta → types → coverage → security.
 // Sequential, fail-fast: stops at first failure.
 func runCheck(r *Runner, dirs []string, ftaCap int) int {
-	fmt.Println("kps check")
+	fmt.Println("tsguard check")
 	fmt.Println("─────────")
 
 	steps := []struct {
@@ -38,7 +38,7 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 
 // runFix runs auto-formatter: ultracite fix (biome format + lint --fix).
 func runFix(r *Runner) int {
-	fmt.Println("kps fix")
+	fmt.Println("tsguard fix")
 	res := r.Run("ultracite fix", "npx", "ultracite", "fix")
 	if !res.ok {
 		return 1
@@ -138,7 +138,7 @@ func runSecrets(r *Runner, initFlag bool) int {
 	baseline := filepath.Join(r.root, ".secrets.baseline")
 
 	if initFlag {
-		// kps secrets --init: create baseline explicitly
+		// tsguard secrets --init: create baseline explicitly
 		fmt.Print("  Creating .secrets.baseline...")
 		out, err := RunCapture(r.root, "detect-secrets", "scan")
 		if err != nil {
@@ -161,7 +161,7 @@ func runSecrets(r *Runner, initFlag bool) int {
 
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
 		fmt.Println("  [FAIL] secrets — .secrets.baseline not found")
-		fmt.Println("         Run: kps secrets --init")
+		fmt.Println("         Run: tsguard secrets --init")
 		return 1
 	}
 
@@ -175,7 +175,7 @@ func runSecrets(r *Runner, initFlag bool) int {
 // runAudit runs informational analysis: dead-code + duplicates.
 // Never fails (exit 0 always) — these are advisory.
 func runAudit(r *Runner, dirs []string) int {
-	fmt.Println("kps audit (informational)")
+	fmt.Println("tsguard audit (informational)")
 	runDeadCode(r)
 	runDuplicates(r, dirs)
 	return 0

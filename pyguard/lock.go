@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-// acquireLock creates .pkn.pid at root. Returns (release, nil) on success.
-// Returns (nil, err) if another live pkn instance is detected.
+// acquireLock creates .pyguard.pid at root. Returns (release, nil) on success.
+// Returns (nil, err) if another live pyguard instance is detected.
 // Stale locks (dead pid) are removed and retried once automatically.
 func acquireLock(root string) (func(), error) {
-	lockPath := filepath.Join(root, ".pkn.pid")
+	lockPath := filepath.Join(root, ".pyguard.pid")
 	return acquireLockAt(lockPath)
 }
 
@@ -34,7 +34,7 @@ func acquireLockAt(lockPath string) (func(), error) {
 			_ = os.Remove(lockPath) // stale lock from a previous crash or unreadable file
 			continue
 		}
-		return nil, fmt.Errorf("another pkn instance is already running (pid %d); refusing to start", pid)
+		return nil, fmt.Errorf("another pyguard instance is already running (pid %d); refusing to start", pid)
 	}
 	return nil, fmt.Errorf("cannot acquire lock at %s after retry", lockPath)
 }

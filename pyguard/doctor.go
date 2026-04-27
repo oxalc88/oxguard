@@ -10,7 +10,7 @@ import (
 
 // runDoctor checks the full toolchain and reports status without making changes.
 func runDoctor(root string) int {
-	fmt.Println("pkn doctor")
+	fmt.Println("pyguard doctor")
 	fmt.Println("──────────")
 
 	failures := 0
@@ -28,7 +28,7 @@ func runDoctor(root string) int {
 	// .venv
 	venv := filepath.Join(root, ".venv")
 	if _, err := os.Stat(venv); os.IsNotExist(err) {
-		fmt.Println("  [FAIL] .venv — not found. Run: pkn setup")
+		fmt.Println("  [FAIL] .venv — not found. Run: pyguard setup")
 		failures++
 	} else {
 		fmt.Println("  [OK]   .venv")
@@ -55,16 +55,16 @@ func runDoctor(root string) int {
 	// .secrets.baseline
 	baseline := filepath.Join(root, ".secrets.baseline")
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
-		fmt.Println("  [FAIL] .secrets.baseline — not found. Run: pkn secrets --init")
+		fmt.Println("  [FAIL] .secrets.baseline — not found. Run: pyguard secrets --init")
 		failures++
 	} else {
 		fmt.Println("  [OK]   .secrets.baseline")
 	}
 
-	// AWS CLI (optional, for pkn invoke)
+	// AWS CLI (optional, for pyguard invoke)
 	out, _, err := RunSilent("", "aws", "--version")
 	if err != nil {
-		fmt.Println("  [SKIP] aws cli — not found (optional, needed for pkn invoke)")
+		fmt.Println("  [SKIP] aws cli — not found (optional, needed for pyguard invoke)")
 	} else {
 		version := strings.TrimSpace(strings.Split(out, "\n")[0])
 		fmt.Printf("  [OK]   aws cli (%s)\n", version)
@@ -74,7 +74,7 @@ func runDoctor(root string) int {
 	if failures == 0 {
 		fmt.Println("  All checks passed.")
 	} else {
-		fmt.Printf("  %d issue(s) found. Run pkn setup to fix.\n", failures)
+		fmt.Printf("  %d issue(s) found. Run pyguard setup to fix.\n", failures)
 		return 1
 	}
 	return 0
@@ -110,7 +110,7 @@ func checkPython() bool {
 func checkUV() bool {
 	out, _, err := RunSilent("", "uv", "--version")
 	if err != nil {
-		fmt.Println("  [FAIL] uv — not found. Run: pkn setup")
+		fmt.Println("  [FAIL] uv — not found. Run: pyguard setup")
 		return false
 	}
 	fmt.Printf("  [OK]   uv (%s)\n", strings.TrimSpace(out))

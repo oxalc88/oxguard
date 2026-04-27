@@ -1,4 +1,4 @@
-// pkn — cross-platform quality gate runner for pakatnamu.
+// pyguard — cross-platform quality gate runner for Python projects.
 // Replaces GNU Make as the task runner, works natively on Windows, Linux, macOS.
 package main
 
@@ -9,32 +9,32 @@ import (
 	"strings"
 )
 
-const usage = `pkn — pakatnamu quality gate runner
+const usage = `pyguard — Python quality gate runner
 
 Quality gates (replaces make):
-  pkn check          full gate: ruff + mypy + radon + types + coverage + security
-  pkn fix            auto-format: ruff --fix + ruff format
-  pkn audit          informational: criticality + dead-code + deps
-  pkn security       security only: bandit + pip-audit + secrets
-  pkn ruff           lint + format check
-  pkn mypy           type checking
-  pkn radon          complexity analysis (fails if CC > 10)
-  pkn types          type-annotation complexity (fails if depth>2 or length>40)
-  pkn coverage       run tests with coverage
-  pkn bandit         security scan
-  pkn pip-audit      dependency vulnerability scan
-  pkn secrets        credential scan
-  pkn criticality    call-graph criticality analysis
-  pkn dead-code      detect dead code
-  pkn deps           dependency hygiene
+  pyguard check          full gate: ruff + mypy + radon + types + coverage + security
+  pyguard fix            auto-format: ruff --fix + ruff format
+  pyguard audit          informational: criticality + dead-code + deps
+  pyguard security       security only: bandit + pip-audit + secrets
+  pyguard ruff           lint + format check
+  pyguard mypy           type checking
+  pyguard radon          complexity analysis (fails if CC > 10)
+  pyguard types          type-annotation complexity (fails if depth>2 or length>40)
+  pyguard coverage       run tests with coverage
+  pyguard bandit         security scan
+  pyguard pip-audit      dependency vulnerability scan
+  pyguard secrets        credential scan
+  pyguard criticality    call-graph criticality analysis
+  pyguard dead-code      detect dead code
+  pyguard deps           dependency hygiene
 
 Environment setup (replaces mise):
-  pkn setup          install uv, run uv sync, configure AI tool hooks
-  pkn doctor         verify toolchain (read-only)
+  pyguard setup          install uv, run uv sync, configure AI tool hooks
+  pyguard doctor         verify toolchain (read-only)
 
 Testing (replaces jq):
-  pkn invoke <fn> <payload>   aws lambda invoke + parse response
-  pkn test <fn> <client>      invoke test harness + parse summary
+  pyguard invoke <fn> <payload>   aws lambda invoke + parse response
+  pyguard test <fn> <client>      invoke test harness + parse summary
 
 Flags:
   --dirs <d1,d2>    override target directories (default: functions,cdk)
@@ -44,9 +44,9 @@ Flags:
   --if-python       only run check if stdin context indicates a .py file was edited
   --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)
 
-Note: never pipe pkn through an external tail (pkn check 2>&1 | tail -50).
-      Use pkn check --tail 50 or pkn check --log-file /tmp/pkn.log --tail 50.
-      For heavy gates (check, security, coverage) pkn refuses to run when
+Note: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).
+      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.
+      For heavy gates (check, security, coverage) pyguard refuses to run when
       stdout is a pipe; use --allow-pipe to override.
       Lighter commands warn on piped stdout but still run.
 `
@@ -74,7 +74,7 @@ func main() {
 	root, err := findProjectRoot()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Run pkn from inside the pakatnamu project directory.\n")
+		fmt.Fprintf(os.Stderr, "Run pyguard from inside a Python project directory.\n")
 		os.Exit(exitUnknown)
 	}
 
@@ -90,11 +90,11 @@ func main() {
 		os.Exit(runDoctor(root))
 	}
 
-	// Instance lock — prevents concurrent pkn runs from stacking up.
+	// Instance lock — prevents concurrent pyguard runs from stacking up.
 	// Retries from Claude Code or other tools see exit 4 and stop spawning new wrappers.
 	release, lockErr := acquireLock(root)
 	if lockErr != nil {
-		fmt.Fprintf(os.Stderr, "pkn: %v\n", lockErr)
+		fmt.Fprintf(os.Stderr, "pyguard: %v\n", lockErr)
 		os.Exit(exitLocked)
 	}
 
@@ -108,13 +108,13 @@ func dispatch(cmd string, args []string, cfg config, root string) int {
 		if info, err := os.Stdout.Stat(); err == nil && info.Mode()&os.ModeNamedPipe != 0 {
 			if heavyGates[cmd] {
 				fmt.Fprintln(os.Stderr,
-					"pkn: stdout is a pipe for a long-running gate. Piping through\n"+
-						"     tail/head can wedge the PTY (see pakatnamu/CLAUDE.md).\n"+
+					"pyguard: stdout is a pipe for a long-running gate. Piping through\n"+
+						"     tail/head can wedge the PTY (see project CLAUDE.md).\n"+
 						"     Use --tail N or --log-file, or pass --allow-pipe to override.")
 				return exitPipeRefused
 			}
 			fmt.Fprintln(os.Stderr,
-				"pkn: warning — stdout is a pipe. For long commands prefer\n"+
+				"pyguard: warning — stdout is a pipe. For long commands prefer\n"+
 					"     --tail N or --log-file to avoid PTY wedge risk.")
 		}
 	}
@@ -175,7 +175,7 @@ func dispatch(cmd string, args []string, cfg config, root string) int {
 
 const (
 	exitUnknown     = 3 // unknown command
-	exitLocked      = 4 // another pkn instance is running
+	exitLocked      = 4 // another pyguard instance is running
 	exitPipeRefused = 5 // heavy gate invoked with piped stdout
 )
 
@@ -189,7 +189,7 @@ type config struct {
 	dirs      []string
 	timeout   int
 	ifPython  bool
-	initFlag  bool   // --init for pkn secrets
+	initFlag  bool   // --init for pyguard secrets
 	logFile   string // --log-file path
 	tailLines int    // --tail N
 	allowPipe bool   // --allow-pipe
@@ -233,18 +233,15 @@ func parseFlags(args []string) config {
 	return cfg
 }
 
-// findProjectRoot walks up from cwd looking for pyproject.toml containing name = "pakatnamu".
+// findProjectRoot walks up from cwd looking for pyproject.toml.
 func findProjectRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
 	for {
-		candidate := filepath.Join(dir, "pyproject.toml")
-		if data, err := os.ReadFile(candidate); err == nil {
-			if strings.Contains(string(data), `name = "pakatnamu"`) {
-				return dir, nil
-			}
+		if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err == nil {
+			return dir, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -252,5 +249,5 @@ func findProjectRoot() (string, error) {
 		}
 		dir = parent
 	}
-	return "", fmt.Errorf("pakatnamu project root not found (no pyproject.toml with name = \"pakatnamu\")")
+	return "", fmt.Errorf("Python project root not found (no pyproject.toml in parent directories)")
 }

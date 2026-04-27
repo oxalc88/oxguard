@@ -213,7 +213,7 @@ func findFilePath(m map[string]interface{}) string {
 }
 
 // cappedBuf is a thread-safe write buffer that keeps only the most recent maxBytes.
-// Prevents runaway subprocess output from growing kps's own RSS without bound.
+// Prevents runaway subprocess output from growing tsguard's own RSS without bound.
 const defaultBufCap = 2 * 1024 * 1024 // 2 MB
 
 type cappedBuf struct {

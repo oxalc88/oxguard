@@ -1,4 +1,4 @@
-module github.com/applying/pakatnamu/pkn
+module github.com/oxDevelop/oxguard/pyguard
 
 go 1.26.1
 

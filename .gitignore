@@ -1,6 +1,6 @@
 # Compiled binaries
-/pkn/pkn
-/kps/kps
+/pyguard/pyguard
+/tsguard/tsguard
 
 # Python
 __pycache__/

@@ -9,7 +9,7 @@ import (
 
 // runDoctor checks the full toolchain and reports status without making changes.
 func runDoctor(root string) int {
-	fmt.Println("kps doctor")
+	fmt.Println("tsguard doctor")
 	fmt.Println("──────────")
 
 	failures := 0
@@ -30,7 +30,7 @@ func runDoctor(root string) int {
 	// node_modules
 	nodeModules := filepath.Join(root, "node_modules")
 	if _, err := os.Stat(nodeModules); os.IsNotExist(err) {
-		fmt.Println("  [FAIL] node_modules — not found. Run: kps setup")
+		fmt.Println("  [FAIL] node_modules — not found. Run: tsguard setup")
 		failures++
 	} else {
 		fmt.Println("  [OK]   node_modules")
@@ -46,7 +46,7 @@ func runDoctor(root string) int {
 	} {
 		out, _, err := RunSilent(root, "npx", tool.cmd, "--version")
 		if err != nil {
-			fmt.Printf("  [FAIL] %s — not found. Run: kps setup\n", tool.name)
+			fmt.Printf("  [FAIL] %s — not found. Run: tsguard setup\n", tool.name)
 			failures++
 		} else {
 			version := strings.TrimSpace(strings.Split(out, "\n")[0])
@@ -61,7 +61,7 @@ func runDoctor(root string) int {
 	} {
 		out, _, err := RunSilent(root, "npx", tool.cmd, "--version")
 		if err != nil {
-			fmt.Printf("  [SKIP] %s — not installed (optional, needed for kps audit)\n", tool.name)
+			fmt.Printf("  [SKIP] %s — not installed (optional, needed for tsguard audit)\n", tool.name)
 		} else {
 			version := strings.TrimSpace(strings.Split(out, "\n")[0])
 			fmt.Printf("  [OK]   %s (%s)\n", tool.name, version)
@@ -82,7 +82,7 @@ func runDoctor(root string) int {
 	// .secrets.baseline
 	baseline := filepath.Join(root, ".secrets.baseline")
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
-		fmt.Println("  [FAIL] .secrets.baseline — not found. Run: kps secrets --init")
+		fmt.Println("  [FAIL] .secrets.baseline — not found. Run: tsguard secrets --init")
 		failures++
 	} else {
 		fmt.Println("  [OK]   .secrets.baseline")
@@ -92,7 +92,7 @@ func runDoctor(root string) int {
 	if failures == 0 {
 		fmt.Println("  All checks passed.")
 	} else {
-		fmt.Printf("  %d issue(s) found. Run kps setup to fix.\n", failures)
+		fmt.Printf("  %d issue(s) found. Run tsguard setup to fix.\n", failures)
 		return 1
 	}
 	return 0

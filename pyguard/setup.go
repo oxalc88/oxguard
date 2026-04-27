@@ -18,9 +18,9 @@ import (
 
 // runSetup bootstraps the full dev environment (idempotent).
 func runSetup(root string) int {
-	fmt.Println("pkn setup")
+	fmt.Println("pyguard setup")
 	fmt.Println("─────────")
-	repoPkn := pknBinary(root)
+	repoPkn := pyguardBinary(root)
 
 	// Step 1: Require Python >= 3.13
 	fmt.Println("  [1/7] Python 3.13...")
@@ -71,8 +71,8 @@ func runSetup(root string) int {
 		fmt.Println("exists")
 	}
 
-	// Step 5: Ensure the repo-local pkn binary exists before hooks reference it.
-	fmt.Print("  [5/7] repo-local pkn... ")
+	// Step 5: Ensure the repo-local pyguard binary exists before hooks reference it.
+	fmt.Print("  [5/7] repo-local pyguard... ")
 	repoStatus, err := ensureRepoPknBinary(root)
 	if err != nil {
 		fmt.Printf("failed\n  [FAIL] %v\n", err)
@@ -80,8 +80,8 @@ func runSetup(root string) int {
 	}
 	fmt.Println(repoStatus)
 
-	// Step 6: Optionally add pkn to PATH on Unix, without replacing an existing install.
-	fmt.Print("  [6/7] pkn on PATH... ")
+	// Step 6: Optionally add pyguard to PATH on Unix, without replacing an existing install.
+	fmt.Print("  [6/7] pyguard on PATH... ")
 	pathReady, pathStatus := installPkn(root)
 	fmt.Println(pathStatus)
 
@@ -94,8 +94,8 @@ func runSetup(root string) int {
 	fmt.Println("  Setup complete!")
 	fmt.Printf("  Repo-local binary: %s\n", repoPkn)
 	if pathReady || repoPknOnPath(repoPkn) {
-		fmt.Println("  Run: pkn doctor    (verify environment)")
-		fmt.Println("  Run: pkn check     (run quality gates)")
+		fmt.Println("  Run: pyguard doctor    (verify environment)")
+		fmt.Println("  Run: pyguard check     (run quality gates)")
 	} else {
 		fmt.Printf("  Run: %s doctor\n", repoPkn)
 		fmt.Printf("  Run: %s check\n", repoPkn)
@@ -103,9 +103,9 @@ func runSetup(root string) int {
 	return 0
 }
 
-// ensureRepoPknBinary builds the repo-local pkn binary when it is missing.
+// ensureRepoPknBinary builds the repo-local pyguard binary when it is missing.
 func ensureRepoPknBinary(root string) (string, error) {
-	dst := pknBinary(root)
+	dst := pyguardBinary(root)
 	if _, err := os.Stat(dst); err == nil {
 		return "ready", nil
 	}
@@ -114,9 +114,9 @@ func ensureRepoPknBinary(root string) (string, error) {
 		return "", fmt.Errorf("repo-local binary missing at %s and Go is not on PATH", dst)
 	}
 
-	buildDir := filepath.Join(root, "tools", "pkn")
+	buildDir := filepath.Join(root, "tools", "pyguard")
 	if err := RunStreaming(buildDir, "go", "build", "-o", filepath.Base(dst), "."); err != nil {
-		return "", fmt.Errorf("could not build repo-local pkn at %s: %w", dst, err)
+		return "", fmt.Errorf("could not build repo-local pyguard at %s: %w", dst, err)
 	}
 
 	if _, err := os.Stat(dst); err != nil {
@@ -129,17 +129,17 @@ func ensureRepoPknBinary(root string) (string, error) {
 // It never replaces an existing non-matching install.
 func installPkn(root string) (bool, string) {
 	if runtime.GOOS == "windows" {
-		return false, "skipped (hooks use repo-local pkn.exe)"
+		return false, "skipped (hooks use repo-local pyguard.exe)"
 	}
 
-	src := pknBinary(root)
+	src := pyguardBinary(root)
 	if _, err := os.Stat(src); os.IsNotExist(err) {
 		return false, fmt.Sprintf("skipped (repo-local binary missing at %s)", src)
 	}
 
 	home, _ := os.UserHomeDir()
 	localBin := filepath.Join(home, ".local", "bin")
-	dst := filepath.Join(localBin, "pkn")
+	dst := filepath.Join(localBin, "pyguard")
 
 	if err := os.MkdirAll(localBin, 0o755); err != nil {
 		return false, fmt.Sprintf("skipped (cannot create dir: %v)", err)
@@ -152,11 +152,11 @@ func installPkn(root string) (bool, string) {
 				return true, "already linked"
 			}
 			if resolveErr != nil && errors.Is(resolveErr, os.ErrNotExist) {
-				return false, "skipped (existing pkn symlink is broken; not replacing automatically)"
+				return false, "skipped (existing pyguard symlink is broken; not replacing automatically)"
 			}
-			return false, "skipped (existing pkn symlink points elsewhere; not replacing)"
+			return false, "skipped (existing pyguard symlink points elsewhere; not replacing)"
 		}
-		return false, "skipped (existing ~/.local/bin/pkn is not managed by setup)"
+		return false, "skipped (existing ~/.local/bin/pyguard is not managed by setup)"
 	}
 
 	if err := os.Symlink(src, dst); err != nil {
@@ -166,7 +166,7 @@ func installPkn(root string) (bool, string) {
 }
 
 func repoPknOnPath(repoPkn string) bool {
-	pathPkn, err := exec.LookPath("pkn")
+	pathPkn, err := exec.LookPath("pyguard")
 	if err != nil {
 		return false
 	}

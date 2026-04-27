@@ -6,9 +6,9 @@ are Go binaries derived from
 
 ## Tools
 
-### `pkn` — Python quality gate
+### `pyguard` — Python quality gate
 
-`pkn/` is the CLI for Python projects. Runs:
+`pyguard/` is the CLI for Python projects. Runs:
 
 | Gate | Tool | What it enforces |
 |---|---|---|
@@ -32,23 +32,23 @@ Informational (advisory, never fails gate):
 | Criticality analysis | pyan3 + networkx → CRITICALITY.md |
 
 ```bash
-cd pkn && go build -o pkn .
+cd pyguard && go build -o pyguard .
 
-pkn check        # full gate (ruff → mypy → radon → types → coverage → security)
-pkn fix          # auto-format (ruff format + lint --fix)
-pkn audit        # informational: criticality + dead code + deps
-pkn security     # security gates only
-pkn types        # type-annotation complexity only
+pyguard check        # full gate (ruff → mypy → radon → types → coverage → security)
+pyguard fix          # auto-format (ruff format + lint --fix)
+pyguard audit        # informational: criticality + dead code + deps
+pyguard security     # security gates only
+pyguard types        # type-annotation complexity only
 ```
 
-The `pkn/analysis/` directory holds the Python helper scripts invoked by pkn at
+The `pyguard/analysis/` directory holds the Python helper scripts invoked by pyguard at
 runtime. These scripts must be present in the consuming project's
-`tools/analysis/` directory — pkn calls them project-relative, e.g.
+`tools/analysis/` directory — pyguard calls them project-relative, e.g.
 `uv run python tools/analysis/check_halstead.py`.
 
-### `kps` — TypeScript quality gate
+### `tsguard` — TypeScript quality gate
 
-`kps/` is the CLI for TypeScript projects. Runs:
+`tsguard/` is the CLI for TypeScript projects. Runs:
 
 | Gate | Tool | What it enforces |
 |---|---|---|
@@ -69,28 +69,28 @@ Informational:
 | Duplicate code | jscpd |
 
 ```bash
-cd kps && go build -o kps .
+cd tsguard && go build -o tsguard .
 
-kps check        # full gate (lint → complexity → fta → types → coverage → security)
-kps fix          # auto-format (ultracite fix)
-kps audit        # informational: dead code + duplicates
-kps security     # security gates only
-kps fta          # FTA score gate only
+tsguard check        # full gate (lint → complexity → fta → types → coverage → security)
+tsguard fix          # auto-format (ultracite fix)
+tsguard audit        # informational: dead code + duplicates
+tsguard security     # security gates only
+tsguard fta          # FTA score gate only
 ```
 
 ## Per-language idiomatic asymmetry
 
-pkn and kps enforce the same quality goals but reach them with different idioms:
+pyguard and tsguard enforce the same quality goals but reach them with different idioms:
 
-- **Complexity**: pkn uses radon (per-function CC + Halstead — three thresholds).
-  kps uses fta-cli (per-file FTA score — single normalized threshold). Both bound
+- **Complexity**: pyguard uses radon (per-function CC + Halstead — three thresholds).
+  tsguard uses fta-cli (per-file FTA score — single normalized threshold). Both bound
   complexity; the granularity and metric differ because the ecosystems differ.
 
-- **Security**: pkn uses bandit (Python-specific). kps uses semgrep
+- **Security**: pyguard uses bandit (Python-specific). tsguard uses semgrep
   (language-agnostic, JS/TS rules). Same class of problems caught.
 
-- **Dead code**: pkn uses vulture (Python AST). kps uses knip (TypeScript-aware,
-  also catches unused deps). kps additionally runs jscpd for copy-paste detection.
+- **Dead code**: pyguard uses vulture (Python AST). tsguard uses knip (TypeScript-aware,
+  also catches unused deps). tsguard additionally runs jscpd for copy-paste detection.
 
 ## Status
 
@@ -98,7 +98,7 @@ This repo is currently a **snapshot** of the vendored copies. Both pakatnamu and
 kapso still ship their own vendored CLIs (`pakatnamu/tools/pkn/`,
 `kapso/tools/kps/`). Future work:
 
-- Embed the Python analysis scripts in the pkn binary (`go:embed`) so consumers
+- Embed the Python analysis scripts in the pyguard binary (`go:embed`) so consumers
   don't need to vendor `tools/analysis/` separately.
 - Wire oxguard into oxStack's install verb so `oxstack install-quality python|typescript`
   builds and places the binary in `~/.local/bin/`.

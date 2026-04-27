@@ -1,4 +1,4 @@
-module github.com/applying/kapso/kps
+module github.com/oxDevelop/oxguard/tsguard
 
 go 1.25.0
 

@@ -10,7 +10,7 @@ import (
 
 // runSetup bootstraps the full dev environment (idempotent).
 func runSetup(root string) int {
-	fmt.Println("kps setup")
+	fmt.Println("tsguard setup")
 	fmt.Println("─────────")
 
 	// Step 1: Require Node.js >= 22
@@ -56,8 +56,8 @@ func runSetup(root string) int {
 
 	fmt.Println()
 	fmt.Println("  Setup complete!")
-	fmt.Println("  Run: kps doctor    (verify environment)")
-	fmt.Println("  Run: kps check     (run quality gates)")
+	fmt.Println("  Run: tsguard doctor    (verify environment)")
+	fmt.Println("  Run: tsguard check     (run quality gates)")
 	return 0
 }
 

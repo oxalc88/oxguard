@@ -11,7 +11,7 @@ import (
 // lambdaInvoke runs aws lambda invoke, writing the response to a temp file.
 // Returns the temp file path, a cleanup function, and an exit code (0 = success).
 func lambdaInvoke(fnName, payload string) (string, func(), int) {
-	tmp, err := os.CreateTemp("", "pkn-lambda-*.json")
+	tmp, err := os.CreateTemp("", "pyguard-lambda-*.json")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: could not create temp file: %v\n", err)
 		return "", func() {}, 1
@@ -38,11 +38,11 @@ func lambdaInvoke(fnName, payload string) (string, func(), int) {
 // runInvoke wraps `aws lambda invoke` and pretty-prints the JSON response.
 // Replaces: aws lambda invoke ... out.json && cat out.json | jq '.body | fromjson'
 //
-// Usage: pkn invoke <function-name> '<json-payload>'
+// Usage: pyguard invoke <function-name> '<json-payload>'
 func runInvoke(args []string) int {
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: pkn invoke <function-name> '<json-payload>'")
-		fmt.Fprintln(os.Stderr, "example: pkn invoke my-fn-dev '{\"client_id\":\"sergio\",\"message\":\"Hola\"}'")
+		fmt.Fprintln(os.Stderr, "usage: pyguard invoke <function-name> '<json-payload>'")
+		fmt.Fprintln(os.Stderr, "example: pyguard invoke my-fn-dev '{\"client_id\":\"sergio\",\"message\":\"Hola\"}'")
 		return 3
 	}
 
@@ -55,11 +55,11 @@ func runInvoke(args []string) int {
 }
 
 // runTest invokes the testing harness Lambda and prints the summary.
-// Usage: pkn test <function-name> <client-id>
+// Usage: pyguard test <function-name> <client-id>
 func runTest(args []string) int {
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: pkn test <function-name> <client-id>")
-		fmt.Fprintln(os.Stderr, "example: pkn test my-fn-testing sergio")
+		fmt.Fprintln(os.Stderr, "usage: pyguard test <function-name> <client-id>")
+		fmt.Fprintln(os.Stderr, "example: pyguard test my-fn-testing sergio")
 		return 3
 	}
 
