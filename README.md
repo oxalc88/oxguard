@@ -82,6 +82,55 @@ tsguard security     # security gates only
 tsguard fta          # FTA score gate only
 ```
 
+## Adding to a project
+
+**1. Copy the source and build the binary**
+
+```bash
+# Python project
+cp -r {oxguard}/pyguard {your-project}/pyguard
+cd {your-project}/pyguard && go build -o ../tools/pyguard/pyguard .
+
+# TypeScript project
+cp -r {oxguard}/tsguard {your-project}/tsguard
+cd {your-project}/tsguard && go build -o ../tools/tsguard/tsguard .
+```
+
+**2. (pyguard only) Copy the analysis scripts**
+
+pyguard calls Python helpers at runtime and expects them at `tools/analysis/`:
+
+```bash
+mkdir -p tools/analysis
+cp pyguard/analysis/*.py tools/analysis/
+```
+
+**3. Run setup — one time**
+
+```bash
+tools/pyguard/pyguard setup    # Python
+tools/tsguard/tsguard setup    # TypeScript
+```
+
+`setup` installs dependencies (`uv sync` / `npm install`), creates `.secrets.baseline`,
+generates `.pre-commit-config.yaml`, and offers to wire your AI tool's PostToolUse hook
+(Claude Code, Cursor, Copilot, Codex, OpenCode) so the gate runs automatically after
+every file edit.
+
+**4. Verify**
+
+```bash
+tools/pyguard/pyguard doctor   # checks Python, uv, .venv, ruff, mypy, radon, …
+tools/tsguard/tsguard doctor   # checks Node.js, npm, tsc, vitest, biome, fta-cli, …
+```
+
+**5. Run**
+
+```bash
+tools/pyguard/pyguard check
+tools/tsguard/tsguard check
+```
+
 ## Per-language idiomatic asymmetry
 
 pyguard and tsguard enforce the same quality goals but reach them with different idioms:
