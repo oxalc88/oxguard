@@ -4,32 +4,36 @@ Centralized quality-gate CLIs for Python and TypeScript projects. Both tools
 are Go binaries derived from
 [tortastudios/python-ai-guardrails-template](https://github.com/tortastudios/python-ai-guardrails-template).
 
+The core problem: AI generates code faster than humans can review it. oxguard
+enforces quality standards on every edit — human or machine — so nothing
+slips through.
+
 ## Tools
 
 ### `pyguard` — Python quality gate
 
 `pyguard/` is the CLI for Python projects. Runs:
 
-| Gate | Tool | What it enforces |
+| Gate | Tool | What it catches |
 |---|---|---|
-| Lint + format | ruff | Style, imports, common bugs |
-| Types | mypy (strict) | Full annotation coverage |
-| Cyclomatic complexity | radon cc | CC grade ≤ C (max 10) per function |
-| Maintainability index | radon mi | MI grade ≥ B per file |
-| Halstead complexity | radon hal + check_halstead.py | effort ≤ 50k, difficulty ≤ 30, bugs ≤ 0.4 per function |
-| Type annotation complexity | check_type_complexity.py | nesting depth ≤ 2, length ≤ 40 chars |
-| Coverage | pytest + coverage | Threshold in pyproject.toml |
-| Security — static | bandit | eval(), shell=True, weak crypto, etc. |
-| Security — CVEs | pip-audit | Known vulnerabilities in deps |
-| Security — secrets | detect-secrets | Credential leaks vs baseline |
+| Lint + format | ruff | Style drift, bad imports, common mistake patterns |
+| Types | mypy (strict) | Missing or wrong type annotations |
+| Cyclomatic complexity | radon cc | Functions too branchy to safely modify |
+| Maintainability index | radon mi | Files that have grown too tangled to maintain |
+| Halstead complexity | radon hal + check_halstead.py | Functions with too many distinct concepts — error-prone to reason about |
+| Type annotation complexity | check_type_complexity.py | Type hints that hide structure behind deep nesting |
+| Coverage | pytest + coverage | Untested code paths |
+| Security — static | bandit | `eval()`, shell injection, weak crypto, insecure defaults |
+| Security — CVEs | pip-audit | Known CVEs in dependencies |
+| Security — secrets | detect-secrets | Credentials accidentally committed |
 
 Informational (advisory, never fails gate):
 
-| Audit | Tool |
-|---|---|
-| Dead code | vulture |
-| Dependency hygiene | deptry |
-| Criticality analysis | pyan3 + networkx → CRITICALITY.md |
+| Audit | Tool | What it finds |
+|---|---|---|
+| Dead code | vulture | Unreachable functions, unused variables |
+| Dependency hygiene | deptry | Unused or missing package dependencies |
+| Criticality analysis | pyan3 + networkx → CRITICALITY.md | Load-bearing functions (high fan-in, bottlenecks) — tells AI where to apply stricter standards |
 
 ```bash
 cd pyguard && go build -o pyguard .
@@ -50,23 +54,23 @@ runtime. These scripts must be present in the consuming project's
 
 `tsguard/` is the CLI for TypeScript projects. Runs:
 
-| Gate | Tool | What it enforces |
+| Gate | Tool | What it catches |
 |---|---|---|
-| Lint + format | ultracite (biome) | Style, common bugs |
-| Cyclomatic complexity | biome cognitive complexity | Per-file |
-| Halstead / FTA score | fta-cli | FTA score ≤ 60 per file |
-| Types | tsc --noEmit | Full TypeScript type checking |
-| Coverage | vitest + coverage | Threshold in vitest.config.ts |
-| Security — static | semgrep | XSS, eval, path traversal, etc. (skips if not installed) |
-| Security — CVEs | npm audit | Moderate+ vulnerabilities |
-| Security — secrets | detect-secrets | Credential leaks vs baseline (skips if not installed) |
+| Lint + format | ultracite (biome) | Style drift, common JS/TS mistake patterns |
+| Cyclomatic complexity | biome cognitive complexity | Functions too complex to safely modify |
+| Maintainability (FTA) | fta-cli | Files too complex to maintain — catches what cyclomatic alone misses |
+| Types | tsc --noEmit | Type errors |
+| Coverage | vitest + coverage | Untested code paths |
+| Security — static | semgrep | XSS, `eval()`, path traversal, insecure patterns (skips if not installed) |
+| Security — CVEs | npm audit | Known vulnerabilities in dependencies |
+| Security — secrets | detect-secrets | Credentials accidentally committed (skips if not installed) |
 
 Informational:
 
-| Audit | Tool |
-|---|---|
-| Dead code + unused deps | knip |
-| Duplicate code | jscpd |
+| Audit | Tool | What it finds |
+|---|---|---|
+| Dead code + unused deps | knip | Unreachable exports, unused dependencies |
+| Duplicate code | jscpd | Copy-pasted blocks that should be abstracted |
 
 ```bash
 cd tsguard && go build -o tsguard .
@@ -82,25 +86,12 @@ tsguard fta          # FTA score gate only
 
 pyguard and tsguard enforce the same quality goals but reach them with different idioms:
 
-- **Complexity**: pyguard uses radon (per-function CC + Halstead — three thresholds).
-  tsguard uses fta-cli (per-file FTA score — single normalized threshold). Both bound
-  complexity; the granularity and metric differ because the ecosystems differ.
+- **Complexity**: pyguard splits complexity into three separate gates (cyclomatic per-function,
+  Halstead per-function, maintainability index per-file). tsguard combines all three into a
+  single FTA score per file. See [docs/metrics.md](docs/metrics.md) for what each measures.
 
 - **Security**: pyguard uses bandit (Python-specific). tsguard uses semgrep
   (language-agnostic, JS/TS rules). Same class of problems caught.
 
 - **Dead code**: pyguard uses vulture (Python AST). tsguard uses knip (TypeScript-aware,
   also catches unused deps). tsguard additionally runs jscpd for copy-paste detection.
-
-## Status
-
-This repo is currently a **snapshot** of the vendored copies. Both pakatnamu and
-kapso still ship their own vendored CLIs (`pakatnamu/tools/pkn/`,
-`kapso/tools/kps/`). Future work:
-
-- Embed the Python analysis scripts in the pyguard binary (`go:embed`) so consumers
-  don't need to vendor `tools/analysis/` separately.
-- Wire oxguard into oxStack's install verb so `oxstack install-quality python|typescript`
-  builds and places the binary in `~/.local/bin/`.
-- Delete the vendored copies from pakatnamu and kapso once oxguard is the sole
-  development home.
