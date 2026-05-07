@@ -4,11 +4,21 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/oxDevelop/oxguard/pyguard/internal/hooks"
 	"golang.org/x/term"
 )
+
+func pyguardBinary(root string) string {
+	name := "pyguard"
+	if runtime.GOOS == "windows" {
+		name = "pyguard.exe"
+	}
+	return filepath.Join(root, "tools", "pyguard", name)
+}
 
 type toolOption struct {
 	key   string
