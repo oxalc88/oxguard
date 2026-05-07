@@ -100,26 +100,33 @@ func ensurePythonHelperTools(cfg config) {
 	}
 }
 
-// ensureSinglePythonTool attempts to install a single Python tool via uv tool
-// install → pipx install without prompting. Returns true if the tool is
-// available after the attempt. Used by runtime gates to self-heal a missing
-// tool instead of silently skipping the security check.
+// ensureSinglePythonTool ensures the tool is available, installing it if missing.
+// Returns true if available after the attempt. Runtime gates call this directly
+// so a drifted environment self-heals instead of silently passing the security gate.
 func ensureSinglePythonTool(tool string) bool {
-	fmt.Printf("  [..] %s — installing...\n", tool)
-	if toolAvailable("uv") {
+	if toolAvailable(tool) {
+		return true
+	}
+	uvOk := toolAvailable("uv")
+	pipxOk := toolAvailable("pipx")
+	if !uvOk && !pipxOk {
+		fmt.Printf("  [SKIP] %s — install manually: uv tool install %s\n", tool, tool)
+		return false
+	}
+	fmt.Printf("  [..]   %s — installing...\n", tool)
+	if uvOk {
 		if err := RunStreaming("", "uv", "tool", "install", tool); err == nil {
 			fmt.Printf("  [OK]   %s (via uv)\n", tool)
 			return true
 		}
 	}
-	if toolAvailable("pipx") {
+	if pipxOk {
 		if err := RunStreaming("", "pipx", "install", tool); err == nil {
 			fmt.Printf("  [OK]   %s (via pipx)\n", tool)
 			return true
 		}
 	}
-	fmt.Printf("  [SKIP] %s — install manually:\n", tool)
-	fmt.Printf("         uv tool install %s   # or: pipx install %s\n", tool, tool)
+	fmt.Printf("  [SKIP] %s — install manually:\n         uv tool install %s   # or: pipx install %s\n", tool, tool, tool)
 	return false
 }
 

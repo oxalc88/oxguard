@@ -113,10 +113,8 @@ func runSecurity(r *Runner, initFlag bool) int {
 }
 
 func runSemgrep(r *Runner) int {
-	if !toolAvailable("semgrep") {
-		if !ensureSinglePythonTool("semgrep") {
-			return 0
-		}
+	if !ensureSinglePythonTool("semgrep") {
+		return 0
 	}
 	res := r.Run("semgrep", "semgrep", "--config=p/javascript", "--config=p/typescript",
 		"--error", "--quiet", ".")
@@ -155,10 +153,8 @@ func runSecrets(r *Runner, initFlag bool) int {
 		return 0
 	}
 
-	if !toolAvailable("detect-secrets") {
-		if !ensureSinglePythonTool("detect-secrets") {
-			return 0
-		}
+	if !ensureSinglePythonTool("detect-secrets") {
+		return 0
 	}
 
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
