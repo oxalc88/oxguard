@@ -82,54 +82,69 @@ tsguard security     # security gates only
 tsguard fta          # FTA score gate only
 ```
 
+## Install
+
+```bash
+# TypeScript project
+curl -fsSL https://github.com/oxDevelop/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
+
+# Python project
+curl -fsSL https://github.com/oxDevelop/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
+```
+
+Windows (PowerShell):
+
+```powershell
+& ([scriptblock]::Create((iwr -useb https://github.com/oxDevelop/oxguard/releases/latest/download/install.ps1))) tsguard
+& ([scriptblock]::Create((iwr -useb https://github.com/oxDevelop/oxguard/releases/latest/download/install.ps1))) pyguard
+```
+
+The install script detects OS and architecture, downloads the right binary from
+GitHub Releases, verifies the SHA256 checksum, and installs to `~/.local/bin`
+(or `%LOCALAPPDATA%\Programs\oxguard` on Windows).
+
 ## Adding to a project
 
-**1. Copy the source and build the binary**
+**1. Run setup — one time**
 
 ```bash
-# Python project
-cp -r {oxguard}/pyguard {your-project}/pyguard
-cd {your-project}/pyguard && go build -o ../tools/pyguard/pyguard .
-
-# TypeScript project
-cp -r {oxguard}/tsguard {your-project}/tsguard
-cd {your-project}/tsguard && go build -o ../tools/tsguard/tsguard .
+tsguard setup    # TypeScript
+pyguard setup    # Python
 ```
 
-**2. (pyguard only) Copy the analysis scripts**
+`setup` adds all required dev dependencies to `package.json` / `pyproject.toml`,
+runs `npm install` / `uv sync`, deploys pyguard's analysis helper scripts to
+`tools/analysis/`, creates `.secrets.baseline`, and offers to wire your AI
+tool's PostToolUse hook (Claude Code, Cursor, Copilot, Codex, OpenCode) so
+the gate runs automatically after every file edit.
 
-pyguard calls Python helpers at runtime and expects them at `tools/analysis/`:
+Pass `--yes` to skip interactive prompts (for CI or non-interactive shells):
 
 ```bash
-mkdir -p tools/analysis
-cp pyguard/analysis/*.py tools/analysis/
+tsguard setup --yes
+pyguard setup --yes
 ```
 
-**3. Run setup — one time**
+**2. Verify**
 
 ```bash
-tools/pyguard/pyguard setup    # Python
-tools/tsguard/tsguard setup    # TypeScript
+tsguard doctor   # checks Node.js, npm, tsc, vitest, biome, fta-cli, …
+pyguard doctor   # checks Python, uv, .venv, ruff, mypy, radon, …
 ```
 
-`setup` installs dependencies (`uv sync` / `npm install`), creates `.secrets.baseline`,
-generates `.pre-commit-config.yaml`, and offers to wire your AI tool's PostToolUse hook
-(Claude Code, Cursor, Copilot, Codex, OpenCode) so the gate runs automatically after
-every file edit.
-
-**4. Verify**
+**3. Run**
 
 ```bash
-tools/pyguard/pyguard doctor   # checks Python, uv, .venv, ruff, mypy, radon, …
-tools/tsguard/tsguard doctor   # checks Node.js, npm, tsc, vitest, biome, fta-cli, …
+tsguard check
+pyguard check
 ```
 
-**5. Run**
+## Install via AI agent
 
-```bash
-tools/pyguard/pyguard check
-tools/tsguard/tsguard check
-```
+If you use Claude Code, Cursor, Codex, or OpenCode, you can paste a one-shot
+prompt and let your agent handle the full install + setup flow.
+
+→ See [docs/AI_INSTALL.md](docs/AI_INSTALL.md) for copy-paste prompts.
 
 ## Per-language idiomatic asymmetry
 
