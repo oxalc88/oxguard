@@ -82,8 +82,11 @@ Report a concise summary: gates passed, gates failed, any install issues.
 - **setup is idempotent** — it adds only what's missing. Re-running it on an
   existing project is safe and produces no diff if everything is already in place.
 - **semgrep and detect-secrets** are Python tools. For tsguard, setup installs
-  them via `uv tool install` or `pipx install`. If neither is available, those
-  two security gates will skip gracefully — the rest of the gate still runs.
+  them via `uv tool install` or `pipx install`. If the tools are missing when
+  `tsguard check` runs, tsguard will attempt to install them on-the-fly before
+  running the gate. If neither `uv` nor `pipx` is available, the gate prints
+  `[SKIP]` and continues — install them manually with
+  `uv tool install semgrep detect-secrets` to make the gate hard.
 - **pyguard's analysis scripts** (`tools/analysis/*.py`) should be committed to
   your project repo alongside pyproject.toml — they are runtime helpers that
   pyguard invokes during checks.
