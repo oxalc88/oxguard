@@ -5,10 +5,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"golang.org/x/term"
 )
+
+// tsguardBinary returns the absolute path to the tsguard binary for the given project root.
+func tsguardBinary(root string) string {
+	name := "tsguard"
+	if runtime.GOOS == "windows" {
+		name = "tsguard.exe"
+	}
+	return filepath.Join(root, "tools", "tsguard", name)
+}
 
 // toolOption represents a selectable AI tool in the setup menu.
 type toolOption struct {
@@ -226,13 +236,25 @@ func generateClaudeHook(root string) error {
 	settingsDir := filepath.Join(root, "..", ".claude")
 	path := filepath.Join(settingsDir, "settings.local.json")
 
-	tsguardPath := filepath.Join(root, "tools", "tsguard", "tsguard")
+	tsguardBin := tsguardBinary(root)
+
+	var hookCmd string
+	if runtime.GOOS == "windows" {
+		escaped := strings.ReplaceAll(tsguardBin, `\`, `\\`)
+		hookCmd = fmt.Sprintf(`if ($env:CLAUDE_TOOL_OUTPUT_PATH -match '\.(ts|tsx)$') { & '%s' check }`, escaped)
+	} else {
+		hookCmd = fmt.Sprintf(`case "$CLAUDE_TOOL_OUTPUT_PATH" in *.ts|*.tsx) '%s' check ;; esac`, tsguardBin)
+	}
+
+	tsguardBinJSON := strings.ReplaceAll(tsguardBin, `\`, `\\`)
+	hookCmdJSON := strings.ReplaceAll(hookCmd, `"`, `\"`)
+
 	content := fmt.Sprintf(`{
   "permissions": {
     "allow": [
-      "Bash(tsguard check:*)",
-      "Bash(tsguard fix:*)",
-      "Bash(tsguard doctor:*)"
+      "Bash(%s check:*)",
+      "Bash(%s fix:*)",
+      "Bash(%s doctor:*)"
     ]
   },
   "hooks": {
@@ -242,14 +264,14 @@ func generateClaudeHook(root string) error {
         "hooks": [
           {
             "type": "command",
-            "command": "case \"$CLAUDE_TOOL_OUTPUT_PATH\" in *.ts|*.tsx) %s check ;; esac"
+            "command": "%s"
           }
         ]
       }
     ]
   }
 }
-`, tsguardPath)
+`, tsguardBinJSON, tsguardBinJSON, tsguardBinJSON, hookCmdJSON)
 	return writeHookFile(path, content)
 }
 
