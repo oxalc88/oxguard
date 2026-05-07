@@ -77,21 +77,28 @@ tsguard security     # security gates only
 tsguard fta          # FTA score gate only
 ```
 
+The security gate (`semgrep`, `detect-secrets`) requires Python tooling. `tsguard setup`
+installs both automatically via `uv tool install` (falling back to `pipx`). If the
+tools are missing when `tsguard check` runs, tsguard will attempt to install them
+on-the-fly before running the gate. If neither `uv` nor `pipx` is available, the gate
+prints `[SKIP]` and continues — install them manually with
+`uv tool install semgrep detect-secrets` to make the gate hard.
+
 ## Install
 
 ```bash
 # TypeScript project
-curl -fsSL https://github.com/oxDevelop/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
+curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
 
 # Python project
-curl -fsSL https://github.com/oxDevelop/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
+curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
 ```
 
 Windows (PowerShell):
 
 ```powershell
-& ([scriptblock]::Create((iwr -useb https://github.com/oxDevelop/oxguard/releases/latest/download/install.ps1))) tsguard
-& ([scriptblock]::Create((iwr -useb https://github.com/oxDevelop/oxguard/releases/latest/download/install.ps1))) pyguard
+& ([scriptblock]::Create((iwr -useb https://github.com/oxalc88/oxguard/releases/latest/download/install.ps1))) tsguard
+& ([scriptblock]::Create((iwr -useb https://github.com/oxalc88/oxguard/releases/latest/download/install.ps1))) pyguard
 ```
 
 The install script detects OS and architecture, downloads the right binary from

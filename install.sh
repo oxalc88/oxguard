@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 # oxguard install script — installs pyguard or tsguard from GitHub Releases.
-# Usage: curl -fsSL https://github.com/oxDevelop/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
-#        curl -fsSL https://github.com/oxDevelop/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
+# Usage: curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
+#        curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
 set -eu
 
-REPO="oxDevelop/oxguard"
+REPO="oxalc88/oxguard"
 INSTALL_DIR="${OXGUARD_INSTALL_DIR:-$HOME/.local/bin}"
 
 # ── helpers ─────────────────────────────────────────────────────────────────

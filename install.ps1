@@ -1,7 +1,7 @@
 # oxguard install script for Windows (PowerShell)
 # Usage:
-#   & ([scriptblock]::Create((iwr -useb https://github.com/oxDevelop/oxguard/releases/latest/download/install.ps1))) pyguard
-#   & ([scriptblock]::Create((iwr -useb https://github.com/oxDevelop/oxguard/releases/latest/download/install.ps1))) tsguard
+#   & ([scriptblock]::Create((iwr -useb https://github.com/oxalc88/oxguard/releases/latest/download/install.ps1))) pyguard
+#   & ([scriptblock]::Create((iwr -useb https://github.com/oxalc88/oxguard/releases/latest/download/install.ps1))) tsguard
 param(
     [Parameter(Position = 0)]
     [string]$Tool = ""
@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$Repo    = "oxDevelop/oxguard"
+$Repo    = "oxalc88/oxguard"
 $InstallDir = if ($env:OXGUARD_INSTALL_DIR) {
     $env:OXGUARD_INSTALL_DIR
 } else {
