@@ -145,7 +145,7 @@ func dispatch(cmd string, cfg config, root string) int {
 	case "audit":
 		return runAudit(r, cfg.dirs)
 	case "setup":
-		return runSetup(root)
+		return runSetup(root, cfg)
 	case "hooks":
 		return runHooks(root)
 	default:

@@ -9,31 +9,42 @@ import (
 )
 
 // runSetup bootstraps the full dev environment (idempotent).
-func runSetup(root string) int {
+func runSetup(root string, cfg config) int {
 	fmt.Println("tsguard setup")
 	fmt.Println("─────────")
 
 	// Step 1: Require Node.js >= 22
-	fmt.Println("  [1/3] Node.js 22...")
+	fmt.Println("  [1/5] Node.js 22...")
 	if !checkNode() {
 		return 2
 	}
 
-	// Step 2: npm install
-	fmt.Println("  [2/3] npm install...")
+	// Step 2: Reconcile devDependency manifest (before npm install so a single sync covers all)
+	fmt.Println("  [2/5] devDependency manifest...")
+	if err := ensureNpmDevDeps(root, cfg); err != nil {
+		fmt.Printf("  [FAIL] devDependency check failed: %v\n", err)
+		return 1
+	}
+
+	// Step 3: npm install
+	fmt.Println("  [3/5] npm install...")
 	if err := RunStreaming(root, "npm", "install"); err != nil {
 		fmt.Printf("  [FAIL] npm install failed: %v\n", err)
 		return 1
 	}
 	fmt.Println("  [OK]   node_modules ready")
 
-	// Step 3: Create .secrets.baseline if missing
+	// Step 4: Python helper tools (semgrep, detect-secrets) via uv tool / pipx
+	fmt.Println("  [4/5] Python helper tools...")
+	ensurePythonHelperTools(cfg)
+
+	// Step 5: Create .secrets.baseline if missing
 	baseline := filepath.Join(root, ".secrets.baseline")
-	fmt.Print("  [3/3] .secrets.baseline... ")
+	fmt.Print("  [5/5] .secrets.baseline... ")
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
 		fmt.Println("creating...")
-		if _, _, err := RunSilent("", "detect-secrets", "--version"); err != nil {
-			fmt.Println("  [SKIP] detect-secrets not installed (pip install detect-secrets)")
+		if !toolAvailable("detect-secrets") {
+			fmt.Println("  [SKIP] detect-secrets not installed — run setup again after installing it")
 		} else {
 			out, scanErr := RunCapture(root, "detect-secrets", "scan")
 			if scanErr != nil {
@@ -50,7 +61,7 @@ func runSetup(root string) int {
 		fmt.Println("exists")
 	}
 
-	// Step 4: AI tool hooks
+	// AI tool hooks
 	fmt.Println()
 	runHooks(root)
 
