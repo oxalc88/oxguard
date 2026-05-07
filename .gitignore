@@ -1,6 +1,12 @@
-# Compiled binaries
+# Compiled binaries (current + legacy names + cross-builds + Windows)
 /pyguard/pyguard
+/pyguard/pkn
+/pyguard/tsguard
+/pyguard/*.exe
 /tsguard/tsguard
+/tsguard/kps
+/tsguard/pyguard
+/tsguard/*.exe
 
 # Python
 __pycache__/
