@@ -4,23 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 
+	"github.com/oxDevelop/oxguard/tsguard/internal/hooks"
 	"golang.org/x/term"
 )
 
-// tsguardBinary returns the absolute path to the tsguard binary for the given project root.
-func tsguardBinary(root string) string {
-	name := "tsguard"
-	if runtime.GOOS == "windows" {
-		name = "tsguard.exe"
-	}
-	return filepath.Join(root, "tools", "tsguard", name)
-}
-
-// toolOption represents a selectable AI tool in the setup menu.
 type toolOption struct {
 	key   string
 	label string
@@ -35,7 +24,6 @@ var toolOptions = []toolOption{
 	{"6", "Kiro"},
 }
 
-// runHooks prompts for AI tool selection and generates hook configs.
 func runHooks(root string) int {
 	selected := promptToolSelection()
 
@@ -47,7 +35,7 @@ func runHooks(root string) int {
 	generated := 0
 
 	if selected["1"] {
-		if err := generateClaudeHook(root); err != nil {
+		if err := hooks.GenerateClaudeHook(root); err != nil {
 			fmt.Printf("  [FAIL] Claude Code hook: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .claude/settings.local.json (Claude Code PostToolUse)")
@@ -56,7 +44,7 @@ func runHooks(root string) int {
 	}
 
 	if selected["2"] {
-		if err := generateCopilotHook(root); err != nil {
+		if err := hooks.GenerateCopilotHook(root); err != nil {
 			fmt.Printf("  [FAIL] Copilot hook: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .github/hooks/tsguard-check.json (Copilot PostToolUse)")
@@ -66,7 +54,7 @@ func runHooks(root string) int {
 	}
 
 	if selected["3"] {
-		if err := generateCursorHook(root); err != nil {
+		if err := hooks.GenerateCursorHook(root); err != nil {
 			fmt.Printf("  [FAIL] Cursor hook: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .cursor/hooks.json (afterFileEdit)")
@@ -75,7 +63,7 @@ func runHooks(root string) int {
 	}
 
 	if selected["4"] {
-		if err := generateCodexHook(root); err != nil {
+		if err := hooks.GenerateCodexHook(root); err != nil {
 			fmt.Printf("  [FAIL] Codex hook: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .codex/hooks.json (PostToolUse)")
@@ -85,7 +73,7 @@ func runHooks(root string) int {
 	}
 
 	if selected["5"] {
-		if err := generateOpenCodePlugin(root); err != nil {
+		if err := hooks.GenerateOpenCodePlugin(root); err != nil {
 			fmt.Printf("  [FAIL] OpenCode plugin: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .opencode/plugins/tsguard/index.ts")
@@ -95,7 +83,7 @@ func runHooks(root string) int {
 	}
 
 	if selected["6"] {
-		if err := generateKiroHook(root); err != nil {
+		if err := hooks.GenerateKiroHook(root); err != nil {
 			fmt.Printf("  [FAIL] Kiro hook: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .kiro/hooks/tsguard.kiro.hook (IDE hook — auto-active)")
@@ -105,7 +93,7 @@ func runHooks(root string) int {
 	}
 
 	// Always update pre-commit
-	if err := generatePreCommit(root); err != nil {
+	if err := hooks.GeneratePreCommit(root); err != nil {
 		fmt.Printf("  [FAIL] pre-commit hook: %v\n", err)
 	} else {
 		fmt.Println("  [OK]   .pre-commit-config.yaml (universal — all tools)")
@@ -240,272 +228,4 @@ func promptText() map[string]bool {
 		result[strings.TrimSpace(part)] = true
 	}
 	return result
-}
-
-func generateClaudeHook(root string) error {
-	// .claude/ is at the repo root (parent of the TypeScript project directory)
-	settingsDir := filepath.Join(root, "..", ".claude")
-	path := filepath.Join(settingsDir, "settings.local.json")
-
-	tsguardBin := tsguardBinary(root)
-
-	var hookCmd string
-	if runtime.GOOS == "windows" {
-		escaped := strings.ReplaceAll(tsguardBin, `\`, `\\`)
-		hookCmd = fmt.Sprintf(`if ($env:CLAUDE_TOOL_OUTPUT_PATH -match '\.(ts|tsx)$') { & '%s' check }`, escaped)
-	} else {
-		hookCmd = fmt.Sprintf(`case "$CLAUDE_TOOL_OUTPUT_PATH" in *.ts|*.tsx) '%s' check ;; esac`, tsguardBin)
-	}
-
-	tsguardBinJSON := strings.ReplaceAll(tsguardBin, `\`, `\\`)
-	hookCmdJSON := strings.ReplaceAll(hookCmd, `"`, `\"`)
-
-	content := fmt.Sprintf(`{
-  "permissions": {
-    "allow": [
-      "Bash(%s check:*)",
-      "Bash(%s fix:*)",
-      "Bash(%s doctor:*)"
-    ]
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "%s"
-          }
-        ]
-      }
-    ]
-  }
-}
-`, tsguardBinJSON, tsguardBinJSON, tsguardBinJSON, hookCmdJSON)
-	return writeHookFile(path, content)
-}
-
-func generateCopilotHook(root string) error {
-	hooksDir := filepath.Join(root, "..", ".github", "hooks")
-	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
-		return err
-	}
-	hookContent := `{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "type": "command",
-        "command": "tsguard check --if-typescript",
-        "timeout": 120
-      }
-    ]
-  }
-}
-`
-	if err := writeHookFile(filepath.Join(hooksDir, "tsguard-check.json"), hookContent); err != nil {
-		return err
-	}
-
-	vscodeDir := filepath.Join(root, "..", ".vscode")
-	if err := os.MkdirAll(vscodeDir, 0o755); err != nil {
-		return err
-	}
-	tasksContent := `{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "tsguard check",
-      "type": "shell",
-      "command": "tsguard check",
-      "group": { "kind": "test", "isDefault": true },
-      "presentation": { "reveal": "always", "panel": "shared" },
-      "problemMatcher": []
-    },
-    {
-      "label": "tsguard fix",
-      "type": "shell",
-      "command": "tsguard fix",
-      "presentation": { "reveal": "always", "panel": "shared" },
-      "problemMatcher": []
-    }
-  ]
-}
-`
-	return writeHookFile(filepath.Join(vscodeDir, "tasks.json"), tasksContent)
-}
-
-func generateCursorHook(root string) error {
-	cursorDir := filepath.Join(root, "..", ".cursor")
-	if err := os.MkdirAll(cursorDir, 0o755); err != nil {
-		return err
-	}
-	content := `{
-  "version": 1,
-  "hooks": {
-    "afterFileEdit": [
-      {
-        "type": "command",
-        "command": "tsguard check --if-typescript",
-        "timeout": 120
-      }
-    ]
-  }
-}
-`
-	return writeHookFile(filepath.Join(cursorDir, "hooks.json"), content)
-}
-
-func generateCodexHook(root string) error {
-	codexDir := filepath.Join(root, "..", ".codex")
-	if err := os.MkdirAll(codexDir, 0o755); err != nil {
-		return err
-	}
-	hookContent := `{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "tsguard check --if-typescript",
-            "timeout": 120,
-            "statusMessage": "Running quality gates"
-          }
-        ]
-      }
-    ]
-  }
-}
-`
-	if err := writeHookFile(filepath.Join(codexDir, "hooks.json"), hookContent); err != nil {
-		return err
-	}
-
-	agentsContent := `# TypeScript Quality Gates
-
-After editing TypeScript files, run ` + "`tsguard check`" + ` to validate quality gates.
-If checks fail, fix the issues before committing.
-
-Quality gate commands:
-- ` + "`tsguard check`" + `      — full gate (lint, types, coverage, security)
-- ` + "`tsguard fix`" + `        — auto-format
-- ` + "`tsguard lint`" + `       — lint only (ultracite check)
-- ` + "`tsguard types`" + `      — type check only
-- ` + "`tsguard coverage`" + `   — tests + coverage
-- ` + "`tsguard complexity`" + ` — complexity analysis
-`
-	return writeHookFile(filepath.Join(root, "..", "AGENTS.md"), agentsContent)
-}
-
-func generateOpenCodePlugin(root string) error {
-	pluginDir := filepath.Join(root, "..", ".opencode", "plugins", "tsguard")
-	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
-		return err
-	}
-
-	tsContent := `import type { Plugin } from "@opencode-ai/plugin"
-
-export const KpsPlugin: Plugin = async ({ $ }) => {
-  return {
-    "file.edited": async (input: { filePath: string }) => {
-      if (input.filePath.endsWith(".ts") || input.filePath.endsWith(".tsx")) {
-        await $` + "`tsguard check`" + `
-      }
-    },
-  }
-}
-`
-	if err := writeHookFile(filepath.Join(pluginDir, "index.ts"), tsContent); err != nil {
-		return err
-	}
-
-	opencodeContent := `{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": [".opencode/plugins/tsguard"]
-}
-`
-	return writeHookFile(filepath.Join(root, "..", "opencode.json"), opencodeContent)
-}
-
-func generateKiroHook(root string) error {
-	tsguardBin := tsguardBinary(root)
-	binJSON := strings.ReplaceAll(tsguardBin, `\`, `\\`)
-
-	hooksDir := filepath.Join(root, "..", ".kiro", "hooks")
-	agentsDir := filepath.Join(root, "..", ".kiro", "agents")
-	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
-		return err
-	}
-
-	hookContent := fmt.Sprintf(`{
-  "name": "tsguard",
-  "description": "Run tsguard quality gate after editing TypeScript files",
-  "version": "1",
-  "when": {
-    "type": "fileEdited",
-    "patterns": ["**/*.ts", "**/*.tsx"]
-  },
-  "then": {
-    "type": "command",
-    "command": "%s check --if-typescript"
-  }
-}
-`, binJSON)
-	if err := writeHookFile(filepath.Join(hooksDir, "tsguard.kiro.hook"), hookContent); err != nil {
-		return err
-	}
-
-	agentContent := fmt.Sprintf(`{
-  "name": "tsguard",
-  "description": "TypeScript quality gate runner. Quality checks run automatically after every file write.",
-  "prompt": "You are working in a TypeScript project guarded by tsguard. After every write, the postToolUse hook runs '%s check --if-typescript' automatically. If the gate fails, fix the issue before continuing. Manual commands: tsguard check, tsguard fix, tsguard lint, tsguard types, tsguard coverage.",
-  "tools": ["read", "write", "shell"],
-  "hooks": {
-    "postToolUse": [
-      {
-        "matcher": "fs_write",
-        "command": "%s check --if-typescript"
-      }
-    ]
-  }
-}
-`, binJSON, binJSON)
-	return writeHookFile(filepath.Join(agentsDir, "tsguard.json"), agentContent)
-}
-
-func generatePreCommit(root string) error {
-	repoRoot := filepath.Join(root, "..")
-	path := filepath.Join(repoRoot, ".pre-commit-config.yaml")
-
-	content := `repos:
-  - repo: local
-    hooks:
-      - id: tsguard-check
-        name: tsguard check
-        entry: tsguard check
-        language: system
-        types: [ts]
-        pass_filenames: false
-`
-	return writeHookFile(path, content)
-}
-
-// writeHookFile writes content to path, creating parent dirs as needed.
-// Does not overwrite if file already exists with identical content.
-func writeHookFile(path, content string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	// Check if already identical
-	if existing, err := os.ReadFile(path); err == nil {
-		if string(existing) == content {
-			return nil // already up to date
-		}
-	}
-	return os.WriteFile(path, []byte(content), 0o644)
 }
