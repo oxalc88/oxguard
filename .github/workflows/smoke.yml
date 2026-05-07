@@ -20,7 +20,7 @@ jobs:
       - name: Install tsguard
         run: |
           curl -fsSL \
-            "https://github.com/oxDevelop/oxguard/releases/download/${OXGUARD_VERSION}/install.sh" \
+            "https://github.com/oxalc88/oxguard/releases/download/${OXGUARD_VERSION}/install.sh" \
             | sh -s -- tsguard
 
       - name: Verify --version
@@ -66,7 +66,7 @@ jobs:
       - name: Install pyguard
         run: |
           curl -fsSL \
-            "https://github.com/oxDevelop/oxguard/releases/download/${OXGUARD_VERSION}/install.sh" \
+            "https://github.com/oxalc88/oxguard/releases/download/${OXGUARD_VERSION}/install.sh" \
             | sh -s -- pyguard
 
       - name: Verify --version

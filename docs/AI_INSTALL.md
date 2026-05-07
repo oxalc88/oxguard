@@ -13,10 +13,10 @@ You are setting up tsguard (TypeScript quality gate) for this project.
 Follow these steps exactly, stopping and reporting if any step fails:
 
 1. Install tsguard by running:
-     curl -fsSL https://github.com/oxDevelop/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
+     curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
 
    If curl is unavailable on Windows, use instead:
-     & ([scriptblock]::Create((iwr -useb https://github.com/oxDevelop/oxguard/releases/latest/download/install.ps1))) tsguard
+     & ([scriptblock]::Create((iwr -useb https://github.com/oxalc88/oxguard/releases/latest/download/install.ps1))) tsguard
 
 2. Verify the install:
      tsguard --version
@@ -47,10 +47,10 @@ You are setting up pyguard (Python quality gate) for this project.
 Follow these steps exactly, stopping and reporting if any step fails:
 
 1. Install pyguard by running:
-     curl -fsSL https://github.com/oxDevelop/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
+     curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
 
    If curl is unavailable on Windows, use instead:
-     & ([scriptblock]::Create((iwr -useb https://github.com/oxDevelop/oxguard/releases/latest/download/install.ps1))) pyguard
+     & ([scriptblock]::Create((iwr -useb https://github.com/oxalc88/oxguard/releases/latest/download/install.ps1))) pyguard
 
 2. Verify the install:
      pyguard --version
