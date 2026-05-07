@@ -117,7 +117,7 @@ pyguard setup    # Python
 `setup` adds all required dev dependencies to `package.json` / `pyproject.toml`,
 runs `npm install` / `uv sync`, deploys pyguard's analysis helper scripts to
 `tools/analysis/`, creates `.secrets.baseline`, and offers to wire your AI
-tool's PostToolUse hook (Claude Code, Cursor, Copilot, Codex, OpenCode) so
+tool's PostToolUse hook (Claude Code, Cursor, Copilot, Codex, OpenCode, Kiro) so
 the gate runs automatically after every file edit.
 
 Pass `--yes` to skip interactive prompts (for CI or non-interactive shells):
@@ -143,7 +143,7 @@ pyguard check
 
 ## Install via AI agent
 
-If you use Claude Code, Cursor, Codex, or OpenCode, you can paste a one-shot
+If you use Claude Code, Cursor, Codex, OpenCode, or Kiro, you can paste a one-shot
 prompt and let your agent handle the full install + setup flow.
 
 → See [docs/AI_INSTALL.md](docs/AI_INSTALL.md) for copy-paste prompts.

@@ -32,6 +32,7 @@ var toolOptions = []toolOption{
 	{"3", "Cursor"},
 	{"4", "OpenAI Codex CLI"},
 	{"5", "OpenCode"},
+	{"6", "Kiro"},
 }
 
 // runHooks prompts for AI tool selection and generates hook configs.
@@ -89,6 +90,16 @@ func runHooks(root string) int {
 		} else {
 			fmt.Println("  [OK]   .opencode/plugins/tsguard/index.ts")
 			fmt.Println("  [OK]   opencode.json")
+			generated++
+		}
+	}
+
+	if selected["6"] {
+		if err := generateKiroHook(root); err != nil {
+			fmt.Printf("  [FAIL] Kiro hook: %v\n", err)
+		} else {
+			fmt.Println("  [OK]   .kiro/hooks/tsguard.kiro.hook (IDE hook — auto-active)")
+			fmt.Println("  [OK]   .kiro/agents/tsguard.json (CLI agent — activate with `/agent swap tsguard`)")
 			generated++
 		}
 	}
@@ -416,6 +427,55 @@ export const KpsPlugin: Plugin = async ({ $ }) => {
 }
 `
 	return writeHookFile(filepath.Join(root, "..", "opencode.json"), opencodeContent)
+}
+
+func generateKiroHook(root string) error {
+	tsguardBin := tsguardBinary(root)
+	binJSON := strings.ReplaceAll(tsguardBin, `\`, `\\`)
+
+	hooksDir := filepath.Join(root, "..", ".kiro", "hooks")
+	agentsDir := filepath.Join(root, "..", ".kiro", "agents")
+	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
+		return err
+	}
+
+	hookContent := fmt.Sprintf(`{
+  "name": "tsguard",
+  "description": "Run tsguard quality gate after editing TypeScript files",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["**/*.ts", "**/*.tsx"]
+  },
+  "then": {
+    "type": "command",
+    "command": "%s check --if-typescript"
+  }
+}
+`, binJSON)
+	if err := writeHookFile(filepath.Join(hooksDir, "tsguard.kiro.hook"), hookContent); err != nil {
+		return err
+	}
+
+	agentContent := fmt.Sprintf(`{
+  "name": "tsguard",
+  "description": "TypeScript quality gate runner. Quality checks run automatically after every file write.",
+  "prompt": "You are working in a TypeScript project guarded by tsguard. After every write, the postToolUse hook runs '%s check --if-typescript' automatically. If the gate fails, fix the issue before continuing. Manual commands: tsguard check, tsguard fix, tsguard lint, tsguard types, tsguard coverage.",
+  "tools": ["read", "write", "shell"],
+  "hooks": {
+    "postToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "%s check --if-typescript"
+      }
+    ]
+  }
+}
+`, binJSON, binJSON)
+	return writeHookFile(filepath.Join(agentsDir, "tsguard.json"), agentContent)
 }
 
 func generatePreCommit(root string) error {

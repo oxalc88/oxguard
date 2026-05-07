@@ -32,6 +32,7 @@ var toolOptions = []toolOption{
 	{"3", "Cursor"},
 	{"4", "OpenAI Codex CLI"},
 	{"5", "OpenCode"},
+	{"6", "Kiro"},
 }
 
 // runHooks prompts for AI tool selection and generates hook configs.
@@ -90,6 +91,16 @@ func runHooks(root string) int {
 		} else {
 			fmt.Println("  [OK]   .opencode/plugins/pyguard/index.ts")
 			fmt.Println("  [OK]   opencode.json")
+			generated++
+		}
+	}
+
+	if selected["6"] {
+		if err := generateKiroHook(root); err != nil {
+			fmt.Printf("  [FAIL] Kiro hook: %v\n", err)
+		} else {
+			fmt.Println("  [OK]   .kiro/hooks/pyguard.kiro.hook (IDE hook — auto-active)")
+			fmt.Println("  [OK]   .kiro/agents/pyguard.json (CLI agent — activate with `/agent swap pyguard`)")
 			generated++
 		}
 	}
@@ -399,6 +410,55 @@ func generateOpenCodePlugin(root string) error {
 }
 `
 	return writeHookFile(filepath.Join(root, "..", "opencode.json"), opencodeContent)
+}
+
+func generateKiroHook(root string) error {
+	pyguardBin := pyguardBinary(root)
+	binJSON := strings.ReplaceAll(pyguardBin, `\`, `\\`)
+
+	hooksDir := filepath.Join(root, "..", ".kiro", "hooks")
+	agentsDir := filepath.Join(root, "..", ".kiro", "agents")
+	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
+		return err
+	}
+
+	hookContent := fmt.Sprintf(`{
+  "name": "pyguard",
+  "description": "Run pyguard quality gate after editing Python files",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["**/*.py"]
+  },
+  "then": {
+    "type": "command",
+    "command": "%s check --if-python"
+  }
+}
+`, binJSON)
+	if err := writeHookFile(filepath.Join(hooksDir, "pyguard.kiro.hook"), hookContent); err != nil {
+		return err
+	}
+
+	agentContent := fmt.Sprintf(`{
+  "name": "pyguard",
+  "description": "Python quality gate runner. Quality checks run automatically after every file write.",
+  "prompt": "You are working in a Python project guarded by pyguard. After every write, the postToolUse hook runs '%s check --if-python' automatically. If the gate fails, fix the issue before continuing. Manual commands: pyguard check, pyguard fix, pyguard ruff, pyguard mypy, pyguard coverage.",
+  "tools": ["read", "write", "shell"],
+  "hooks": {
+    "postToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "%s check --if-python"
+      }
+    ]
+  }
+}
+`, binJSON, binJSON)
+	return writeHookFile(filepath.Join(agentsDir, "pyguard.json"), agentContent)
 }
 
 func generatePreCommit(root string) error {

@@ -1,6 +1,6 @@
 # Installing oxguard via AI agent
 
-Paste one of the prompts below into Claude Code, Cursor, Codex, OpenCode, or
+Paste one of the prompts below into Claude Code, Cursor, Codex, OpenCode, Kiro, or
 any agentic CLI from the root of your project. Pick the variant that matches
 your project type.
 
