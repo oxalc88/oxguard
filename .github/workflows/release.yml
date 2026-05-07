@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v0.1.0)"
+        required: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.tool }} ${{ matrix.os }}/${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tool: [pyguard, tsguard]
+        include_os:
+          - {os: linux,   arch: amd64, ext: tar.gz}
+          - {os: linux,   arch: arm64, ext: tar.gz}
+          - {os: darwin,  arch: amd64, ext: tar.gz}
+          - {os: darwin,  arch: arm64, ext: tar.gz}
+          - {os: windows, arch: amd64, ext: zip}
+    env:
+      GOOS:   ${{ matrix.include_os.os }}
+      GOARCH: ${{ matrix.include_os.arch }}
+      TAG:    ${{ github.ref_name || inputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.tool }}/go.mod
+          cache-dependency-path: ${{ matrix.tool }}/go.sum
+
+      - name: Build ${{ matrix.tool }}
+        run: |
+          BIN=${{ matrix.tool }}
+          [ "$GOOS" = "windows" ] && BIN="${BIN}.exe"
+          cd ${{ matrix.tool }}
+          go build \
+            -trimpath \
+            -ldflags "-s -w -X main.version=${{ env.TAG }}" \
+            -o "../dist/${BIN}" \
+            .
+
+      - name: Package
+        run: |
+          TOOL=${{ matrix.tool }}
+          OS=${{ matrix.include_os.os }}
+          ARCH=${{ matrix.include_os.arch }}
+          EXT=${{ matrix.include_os.ext }}
+          TAG=${{ env.TAG }}
+          NAME="${TOOL}-${TAG}-${OS}-${ARCH}"
+          OUTDIR="dist/${NAME}"
+          mkdir -p "$OUTDIR"
+
+          BIN="${TOOL}"
+          [ "$OS" = "windows" ] && BIN="${BIN}.exe"
+          cp "dist/${BIN}" "$OUTDIR/"
+          cp LICENSE "$OUTDIR/" 2>/dev/null || true
+
+          # pyguard ships the analysis helper scripts
+          if [ "$TOOL" = "pyguard" ]; then
+            cp -r pyguard/analysis "$OUTDIR/"
+          fi
+
+          cd dist
+          if [ "$EXT" = "zip" ]; then
+            zip -r "${NAME}.zip" "${NAME}/"
+            sha256sum "${NAME}.zip" > "${NAME}.zip.sha256"
+          else
+            tar -czf "${NAME}.tar.gz" "${NAME}/"
+            sha256sum "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256"
+          fi
+          cd ..
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.tool }}-${{ matrix.include_os.os }}-${{ matrix.include_os.arch }}
+          path: dist/${{ matrix.tool }}-*.*
+          retention-days: 1
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate combined checksums.txt
+        run: |
+          cd dist
+          cat *.sha256 > checksums.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || inputs.tag }}
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sha256
+            dist/checksums.txt
+            install.sh
+            install.ps1
+          generate_release_notes: true

@@ -1,0 +1,112 @@
+name: Smoke test
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to test (e.g. v0.1.0)"
+        required: true
+
+jobs:
+  smoke-tsguard:
+    name: tsguard smoke (Linux)
+    runs-on: ubuntu-latest
+    env:
+      OXGUARD_VERSION: ${{ github.event.release.tag_name || inputs.tag }}
+
+    steps:
+      - name: Install tsguard
+        run: |
+          curl -fsSL \
+            "https://github.com/oxDevelop/oxguard/releases/download/${OXGUARD_VERSION}/install.sh" \
+            | sh -s -- tsguard
+
+      - name: Verify --version
+        run: tsguard --version
+
+      - name: Create minimal TS project
+        run: |
+          mkdir ts-smoke && cd ts-smoke
+          npm init -y
+          mkdir src
+          echo 'export const x: number = 1' > src/x.ts
+          echo '{"compilerOptions":{"strict":true}}' > tsconfig.json
+
+      - name: Run setup --yes
+        run: cd ts-smoke && tsguard setup --yes
+        env:
+          CI: "true"
+
+      - name: Verify devDependencies added
+        run: |
+          cd ts-smoke
+          node -e "
+            const pkg = require('./package.json');
+            const required = ['ultracite','@biomejs/biome','typescript','vitest','@vitest/coverage-v8','fta-cli','knip','jscpd'];
+            const missing = required.filter(d => !pkg.devDependencies?.[d] && !pkg.dependencies?.[d]);
+            if (missing.length) { console.error('Missing devDeps:', missing); process.exit(1); }
+            console.log('All required devDependencies present');
+          "
+
+      - name: Run doctor
+        run: cd ts-smoke && tsguard doctor
+
+  smoke-pyguard:
+    name: pyguard smoke (Linux)
+    runs-on: ubuntu-latest
+    env:
+      OXGUARD_VERSION: ${{ github.event.release.tag_name || inputs.tag }}
+
+    steps:
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install pyguard
+        run: |
+          curl -fsSL \
+            "https://github.com/oxDevelop/oxguard/releases/download/${OXGUARD_VERSION}/install.sh" \
+            | sh -s -- pyguard
+
+      - name: Verify --version
+        run: pyguard --version
+
+      - name: Create minimal Python project
+        run: |
+          mkdir py-smoke && cd py-smoke
+          uv init --name smoke
+          echo "Hello" >> src/smoke/__init__.py
+
+      - name: Run setup --yes
+        run: cd py-smoke && pyguard setup --yes
+        env:
+          CI: "true"
+
+      - name: Verify analysis scripts deployed
+        run: |
+          cd py-smoke
+          for f in _paths.py analyze_criticality.py check_halstead.py check_secrets.py check_type_complexity.py; do
+            [ -f "tools/analysis/$f" ] || { echo "Missing: tools/analysis/$f"; exit 1; }
+          done
+          echo "All analysis scripts present"
+
+      - name: Verify dev-group packages in pyproject
+        run: |
+          cd py-smoke
+          python3 - <<'EOF'
+          import tomllib, sys
+          with open("pyproject.toml","rb") as f:
+              data = tomllib.load(f)
+          deps = data.get("dependency-groups",{}).get("dev",[])
+          dep_names = {d.split(">=")[0].split("==")[0].strip().lower() for d in deps}
+          required = {"ruff","mypy","pytest","pytest-cov","radon","bandit","pip-audit","detect-secrets","vulture","deptry","pyan3","networkx","semgrep"}
+          missing = required - dep_names
+          if missing:
+              print("Missing dev-group packages:", missing, file=sys.stderr)
+              sys.exit(1)
+          print("All required dev-group packages present")
+          EOF
+
+      - name: Run doctor
+        run: cd py-smoke && pyguard doctor
