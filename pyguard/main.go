@@ -161,7 +161,7 @@ func dispatch(cmd string, args []string, cfg config, root string) int {
 
 	// Setup
 	case "setup":
-		return runSetup(root)
+		return runSetup(root, cfg)
 	case "hooks":
 		return runHooks(root)
 

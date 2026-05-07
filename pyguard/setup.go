@@ -17,19 +17,19 @@ import (
 )
 
 // runSetup bootstraps the full dev environment (idempotent).
-func runSetup(root string) int {
+func runSetup(root string, cfg config) int {
 	fmt.Println("pyguard setup")
 	fmt.Println("─────────")
 	repoPkn := pyguardBinary(root)
 
 	// Step 1: Require Python >= 3.13
-	fmt.Println("  [1/7] Python 3.13...")
+	fmt.Println("  [1/8] Python 3.13...")
 	if !checkPython() {
 		return 2
 	}
 
 	// Step 2: Install uv if missing
-	fmt.Print("  [2/7] uv... ")
+	fmt.Print("  [2/8] uv... ")
 	out, _, err := RunSilent("", "uv", "--version")
 	if err != nil {
 		fmt.Println("not found — downloading...")
@@ -44,17 +44,31 @@ func runSetup(root string) int {
 		fmt.Printf("found (%s)\n", strings.TrimSpace(out))
 	}
 
-	// Step 3: uv sync (create .venv + install deps)
-	fmt.Println("  [3/7] uv sync...")
+	// Step 3: Reconcile dev-group manifest (before uv sync so a single sync covers all)
+	fmt.Println("  [3/8] dev-group manifest...")
+	if err := ensureUvDevDeps(root, cfg); err != nil {
+		fmt.Printf("  [FAIL] dev-group check failed: %v\n", err)
+		return 1
+	}
+
+	// Step 4: uv sync (create .venv + install deps)
+	fmt.Println("  [4/8] uv sync...")
 	if err := RunStreaming(root, "uv", "sync"); err != nil {
 		fmt.Printf("  [FAIL] uv sync failed: %v\n", err)
 		return 1
 	}
 	fmt.Println("  [OK]   .venv ready")
 
-	// Step 4: Create .secrets.baseline if missing
+	// Step 5: Deploy analysis helper scripts into tools/analysis/
+	fmt.Println("  [5/8] analysis scripts...")
+	if err := ensureAnalysisScripts(root, cfg); err != nil {
+		fmt.Printf("  [FAIL] analysis scripts: %v\n", err)
+		return 1
+	}
+
+	// Step 6: Create .secrets.baseline if missing
 	baseline := filepath.Join(root, ".secrets.baseline")
-	fmt.Print("  [4/7] .secrets.baseline... ")
+	fmt.Print("  [6/8] .secrets.baseline... ")
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
 		fmt.Println("creating...")
 		out, scanErr := RunCapture(root, "uv", "run", "detect-secrets", "scan")
@@ -71,8 +85,8 @@ func runSetup(root string) int {
 		fmt.Println("exists")
 	}
 
-	// Step 5: Ensure the repo-local pyguard binary exists before hooks reference it.
-	fmt.Print("  [5/7] repo-local pyguard... ")
+	// Step 7: Ensure the repo-local pyguard binary exists before hooks reference it.
+	fmt.Print("  [7/8] repo-local pyguard... ")
 	repoStatus, err := ensureRepoPknBinary(root)
 	if err != nil {
 		fmt.Printf("failed\n  [FAIL] %v\n", err)
@@ -80,13 +94,12 @@ func runSetup(root string) int {
 	}
 	fmt.Println(repoStatus)
 
-	// Step 6: Optionally add pyguard to PATH on Unix, without replacing an existing install.
-	fmt.Print("  [6/7] pyguard on PATH... ")
+	// Step 8: Optionally add pyguard to PATH on Unix, without replacing an existing install.
+	fmt.Print("  [8/8] pyguard on PATH... ")
 	pathReady, pathStatus := installPkn(root)
 	fmt.Println(pathStatus)
 
-	// Step 7: AI tool hooks
-	fmt.Println("  [7/7] AI tool hooks...")
+	// AI tool hooks
 	fmt.Println()
 	runHooks(root)
 
