@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.tool }} ${{ matrix.os }}/${{ matrix.arch }}
+    name: Build ${{ matrix.tool }} ${{ matrix.include_os.os }}/${{ matrix.include_os.arch }}
     runs-on: ubuntu-latest
     strategy:
       matrix:

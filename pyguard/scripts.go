@@ -1,7 +1,7 @@
 package main
 
 import (
-	"crypto/sha256"
+	"bytes"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -54,31 +54,23 @@ func ensureAnalysisScripts(root string, cfg config) error {
 			updated++
 
 		case readErr != nil:
-			return fmt.Errorf("reading %s: %w", target, err)
+			return fmt.Errorf("reading %s: %w", target, readErr)
 
-		case sha256Equal(embeddedData, diskData):
+		case bytes.Equal(embeddedData, diskData):
 			unchanged++
 
 		default:
-			// File exists but differs.
-			if cfg.assumeYes || isCI() {
+			// File exists but differs from embedded version.
+			fmt.Printf("  tools/analysis/%s differs from embedded version.\n", entry.Name())
+			if confirmYesNo("    Overwrite?", true, cfg.assumeYes) {
 				if err := os.WriteFile(target, embeddedData, 0o644); err != nil {
 					return fmt.Errorf("overwriting %s: %w", entry.Name(), err)
 				}
 				fmt.Printf("  [UPD]  tools/analysis/%s\n", entry.Name())
 				updated++
 			} else {
-				fmt.Printf("  tools/analysis/%s differs from embedded version.\n", entry.Name())
-				if confirmYesNo("    Overwrite?", true, false) {
-					if err := os.WriteFile(target, embeddedData, 0o644); err != nil {
-						return fmt.Errorf("overwriting %s: %w", entry.Name(), err)
-					}
-					fmt.Printf("  [UPD]  tools/analysis/%s\n", entry.Name())
-					updated++
-				} else {
-					fmt.Printf("  [SKIP] tools/analysis/%s\n", entry.Name())
-					skipped++
-				}
+				fmt.Printf("  [SKIP] tools/analysis/%s\n", entry.Name())
+				skipped++
 			}
 		}
 	}
@@ -92,8 +84,3 @@ func ensureAnalysisScripts(root string, cfg config) error {
 	return nil
 }
 
-func sha256Equal(a, b []byte) bool {
-	ha := sha256.Sum256(a)
-	hb := sha256.Sum256(b)
-	return ha == hb
-}

@@ -66,8 +66,8 @@ TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
 need_cmd curl
-curl -fsSL --progress-bar -o "$TMPDIR/$TARBALL"          "$BASE_URL/$TARBALL"
-curl -fsSL                 -o "$TMPDIR/$TARBALL.sha256"   "$BASE_URL/$TARBALL.sha256"
+curl -fsSL --progress-bar -o "$TMPDIR/$TARBALL" "$BASE_URL/$TARBALL"
+curl -fsSL -o "$TMPDIR/$TARBALL.sha256" "$BASE_URL/$TARBALL.sha256"
 
 # ── verify ───────────────────────────────────────────────────────────────────
 

@@ -45,13 +45,7 @@ func missingUvDevDeps(root string, manifest []string) ([]string, error) {
 
 	// PEP 735: [dependency-groups].dev (what `uv add --group dev` writes)
 	if dg, ok := raw["dependency-groups"].(map[string]interface{}); ok {
-		if devList, ok := dg["dev"].([]interface{}); ok {
-			for _, v := range devList {
-				if s, ok := v.(string); ok {
-					declared[normPkgName(s)] = true
-				}
-			}
-		}
+		collectDepGroup(dg, "dev", declared)
 	}
 
 	// Legacy uv: [tool.uv.dev-dependencies]
@@ -74,6 +68,26 @@ func missingUvDevDeps(root string, manifest []string) ([]string, error) {
 		}
 	}
 	return missing, nil
+}
+
+// collectDepGroup populates declared with package names from a PEP 735 dependency group.
+// Entries are either bare strings ("ruff>=0.4") or inline-table group references
+// ({include-group = "extra-dev"}), which are recursively followed.
+func collectDepGroup(groups map[string]interface{}, name string, declared map[string]bool) {
+	list, ok := groups[name].([]interface{})
+	if !ok {
+		return
+	}
+	for _, v := range list {
+		switch entry := v.(type) {
+		case string:
+			declared[normPkgName(entry)] = true
+		case map[string]interface{}:
+			if ref, ok := entry["include-group"].(string); ok {
+				collectDepGroup(groups, ref, declared)
+			}
+		}
+	}
 }
 
 // normPkgName extracts the bare package name from a PEP 508 specifier,
@@ -144,8 +158,8 @@ func confirmYesNo(prompt string, defaultYes bool, assumeYes bool) bool {
 	input := strings.ToLower(strings.TrimSpace(scanner.Text()))
 
 	switch input {
-	case "", "y", "yes":
-		return defaultYes || input == "y" || input == "yes"
+	case "y", "yes":
+		return true
 	case "n", "no":
 		return false
 	default:

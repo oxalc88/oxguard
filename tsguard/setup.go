@@ -13,20 +13,18 @@ func runSetup(root string, cfg config) int {
 	fmt.Println("tsguard setup")
 	fmt.Println("─────────")
 
-	// Step 1: Require Node.js >= 22
 	fmt.Println("  [1/5] Node.js 22...")
 	if !checkNode() {
 		return 2
 	}
 
-	// Step 2: Reconcile devDependency manifest (before npm install so a single sync covers all)
+	// Reconcile before npm install so a single sync covers newly added deps.
 	fmt.Println("  [2/5] devDependency manifest...")
 	if err := ensureNpmDevDeps(root, cfg); err != nil {
 		fmt.Printf("  [FAIL] devDependency check failed: %v\n", err)
 		return 1
 	}
 
-	// Step 3: npm install
 	fmt.Println("  [3/5] npm install...")
 	if err := RunStreaming(root, "npm", "install"); err != nil {
 		fmt.Printf("  [FAIL] npm install failed: %v\n", err)
@@ -34,11 +32,9 @@ func runSetup(root string, cfg config) int {
 	}
 	fmt.Println("  [OK]   node_modules ready")
 
-	// Step 4: Python helper tools (semgrep, detect-secrets) via uv tool / pipx
 	fmt.Println("  [4/5] Python helper tools...")
 	ensurePythonHelperTools(cfg)
 
-	// Step 5: Create .secrets.baseline if missing
 	baseline := filepath.Join(root, ".secrets.baseline")
 	fmt.Print("  [5/5] .secrets.baseline... ")
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
@@ -61,7 +57,6 @@ func runSetup(root string, cfg config) int {
 		fmt.Println("exists")
 	}
 
-	// AI tool hooks
 	fmt.Println()
 	runHooks(root)
 

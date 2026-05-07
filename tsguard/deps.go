@@ -93,11 +93,9 @@ func ensurePythonHelperTools(cfg config) {
 			continue
 		}
 
-		if !cfg.assumeYes && !isCI() {
-			if !confirmYesNo(fmt.Sprintf("  Install %s (uv tool install)?", tool), true, false) {
-				fmt.Printf("  [SKIP] %s — install manually: uv tool install %s\n", tool, tool)
-				continue
-			}
+		if !confirmYesNo(fmt.Sprintf("  Install %s (uv tool install)?", tool), true, cfg.assumeYes) {
+			fmt.Printf("  [SKIP] %s — install manually: uv tool install %s\n", tool, tool)
+			continue
 		}
 
 		fmt.Printf("  [..] %s — installing...\n", tool)
@@ -141,8 +139,8 @@ func confirmYesNo(prompt string, defaultYes bool, assumeYes bool) bool {
 	input := strings.ToLower(strings.TrimSpace(scanner.Text()))
 
 	switch input {
-	case "", "y", "yes":
-		return defaultYes || input == "y" || input == "yes"
+	case "y", "yes":
+		return true
 	case "n", "no":
 		return false
 	default:

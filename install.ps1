@@ -10,8 +10,11 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $Repo    = "oxDevelop/oxguard"
-$InstallDir = if ($env:OXGUARD_INSTALL_DIR) { $env:OXGUARD_INSTALL_DIR } `
-              else { Join-Path $env:LOCALAPPDATA "Programs\oxguard" }
+$InstallDir = if ($env:OXGUARD_INSTALL_DIR) {
+    $env:OXGUARD_INSTALL_DIR
+} else {
+    Join-Path $env:LOCALAPPDATA "Programs\oxguard"
+}
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
