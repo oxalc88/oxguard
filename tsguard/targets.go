@@ -114,8 +114,9 @@ func runSecurity(r *Runner, initFlag bool) int {
 
 func runSemgrep(r *Runner) int {
 	if !toolAvailable("semgrep") {
-		fmt.Println("  [SKIP] semgrep — not installed (pip install semgrep)")
-		return 0
+		if !ensureSinglePythonTool("semgrep") {
+			return 0
+		}
 	}
 	res := r.Run("semgrep", "semgrep", "--config=p/javascript", "--config=p/typescript",
 		"--error", "--quiet", ".")
@@ -155,8 +156,9 @@ func runSecrets(r *Runner, initFlag bool) int {
 	}
 
 	if !toolAvailable("detect-secrets") {
-		fmt.Println("  [SKIP] detect-secrets — not installed (pip install detect-secrets)")
-		return 0
+		if !ensureSinglePythonTool("detect-secrets") {
+			return 0
+		}
 	}
 
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
