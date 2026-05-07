@@ -2,23 +2,14 @@ package hooks
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 )
 
 func GenerateKiroHook(root string) error {
-	tsguardBin := tsguardBinary(root)
-	binJSON := strings.ReplaceAll(tsguardBin, `\`, `\\`)
+	binJSON := jsonEscapePath(tsguardBinary(root))
 
 	hooksDir := filepath.Join(root, "..", ".kiro", "hooks")
 	agentsDir := filepath.Join(root, "..", ".kiro", "agents")
-	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
-		return err
-	}
 
 	hookContent := fmt.Sprintf(`{
   "name": "tsguard",

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func GenerateCodexHook(root string) error {
@@ -30,7 +29,7 @@ func GenerateCodexHook(root string) error {
     ]
   }
 }
-`, strings.ReplaceAll(pyguardBin, `\`, `\\`))
+`, jsonEscapePath(pyguardBin))
 	if err := writeHookFile(filepath.Join(codexDir, "hooks.json"), hookContent); err != nil {
 		return err
 	}

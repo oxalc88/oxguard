@@ -2,23 +2,14 @@ package hooks
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 )
 
 func GenerateKiroHook(root string) error {
-	pyguardBin := pyguardBinary(root)
-	binJSON := strings.ReplaceAll(pyguardBin, `\`, `\\`)
+	binJSON := jsonEscapePath(pyguardBinary(root))
 
 	hooksDir := filepath.Join(root, "..", ".kiro", "hooks")
 	agentsDir := filepath.Join(root, "..", ".kiro", "agents")
-	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(agentsDir, 0o755); err != nil {
-		return err
-	}
 
 	hookContent := fmt.Sprintf(`{
   "name": "pyguard",

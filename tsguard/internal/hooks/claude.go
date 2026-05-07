@@ -15,13 +15,12 @@ func GenerateClaudeHook(root string) error {
 
 	var hookCmd string
 	if runtime.GOOS == "windows" {
-		escaped := strings.ReplaceAll(tsguardBin, `\`, `\\`)
-		hookCmd = fmt.Sprintf(`if ($env:CLAUDE_TOOL_OUTPUT_PATH -match '\.(ts|tsx)$') { & '%s' check }`, escaped)
+		hookCmd = fmt.Sprintf(`if ($env:CLAUDE_TOOL_OUTPUT_PATH -match '\.(ts|tsx)$') { & '%s' check }`, jsonEscapePath(tsguardBin))
 	} else {
 		hookCmd = fmt.Sprintf(`case "$CLAUDE_TOOL_OUTPUT_PATH" in *.ts|*.tsx) '%s' check ;; esac`, tsguardBin)
 	}
 
-	tsguardBinJSON := strings.ReplaceAll(tsguardBin, `\`, `\\`)
+	tsguardBinJSON := jsonEscapePath(tsguardBin)
 	hookCmdJSON := strings.ReplaceAll(hookCmd, `"`, `\"`)
 
 	content := fmt.Sprintf(`{

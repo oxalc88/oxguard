@@ -13,13 +13,9 @@ func TestGenerateKiroHook(t *testing.T) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatalf("setup: create proj dir: %v", err)
 	}
-
-	t.Run("returns no error", func(t *testing.T) {
-		err := GenerateKiroHook(proj)
-		if err != nil {
-			t.Fatalf("GenerateKiroHook returned error: %v", err)
-		}
-	})
+	if err := GenerateKiroHook(proj); err != nil {
+		t.Fatalf("GenerateKiroHook: %v", err)
+	}
 
 	t.Run("hook file exists at correct path", func(t *testing.T) {
 		hookPath := filepath.Join(tmp, ".kiro", "hooks", "pyguard.kiro.hook")

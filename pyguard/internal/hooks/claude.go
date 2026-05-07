@@ -14,13 +14,12 @@ func GenerateClaudeHook(root string) error {
 
 	var hookCmd string
 	if runtime.GOOS == "windows" {
-		escaped := strings.ReplaceAll(pyguardBin, `\`, `\\`)
-		hookCmd = fmt.Sprintf(`if ($env:CLAUDE_TOOL_OUTPUT_PATH -match '\\.py$') { & '%s' check }`, escaped)
+		hookCmd = fmt.Sprintf(`if ($env:CLAUDE_TOOL_OUTPUT_PATH -match '\\.py$') { & '%s' check }`, jsonEscapePath(pyguardBin))
 	} else {
 		hookCmd = fmt.Sprintf(`case "$CLAUDE_TOOL_OUTPUT_PATH" in *.py) '%s' check ;; esac`, pyguardBin)
 	}
 
-	pyguardBinJSON := strings.ReplaceAll(pyguardBin, `\`, `\\`)
+	pyguardBinJSON := jsonEscapePath(pyguardBin)
 	hookCmdJSON := strings.ReplaceAll(hookCmd, `"`, `\"`)
 
 	content := fmt.Sprintf(`{

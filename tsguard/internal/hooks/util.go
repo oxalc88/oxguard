@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func tsguardBinary(root string) string {
@@ -12,6 +13,10 @@ func tsguardBinary(root string) string {
 		name = "tsguard.exe"
 	}
 	return filepath.Join(root, "tools", "tsguard", name)
+}
+
+func jsonEscapePath(p string) string {
+	return strings.ReplaceAll(p, `\`, `\\`)
 }
 
 func writeHookFile(path, content string) error {

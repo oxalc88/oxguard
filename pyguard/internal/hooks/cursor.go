@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func GenerateCursorHook(root string) error {
-	pyguardBin := pyguardBinary(root)
 	cursorDir := filepath.Join(root, "..", ".cursor")
 	if err := os.MkdirAll(cursorDir, 0o755); err != nil {
 		return err
@@ -25,6 +23,6 @@ func GenerateCursorHook(root string) error {
     ]
   }
 }
-`, strings.ReplaceAll(pyguardBin, `\`, `\\`))
+`, jsonEscapePath(pyguardBinary(root)))
 	return writeHookFile(filepath.Join(cursorDir, "hooks.json"), content)
 }

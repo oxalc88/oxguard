@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func GenerateCopilotHook(root string) error {
-	pyguardBin := pyguardBinary(root)
+	pyguardBinJSON := jsonEscapePath(pyguardBinary(root))
 	hooksDir := filepath.Join(root, "..", ".github", "hooks")
 	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
 		return err
@@ -24,7 +23,7 @@ func GenerateCopilotHook(root string) error {
     ]
   }
 }
-`, strings.ReplaceAll(pyguardBin, `\`, `\\`))
+`, pyguardBinJSON)
 	if err := writeHookFile(filepath.Join(hooksDir, "pyguard-check.json"), hookContent); err != nil {
 		return err
 	}
@@ -33,7 +32,6 @@ func GenerateCopilotHook(root string) error {
 	if err := os.MkdirAll(vscodeDir, 0o755); err != nil {
 		return err
 	}
-	pyguardBinJSON := strings.ReplaceAll(pyguardBin, `\`, `\\`)
 	tasksContent := fmt.Sprintf(`{
   "version": "2.0.0",
   "tasks": [

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 func pyguardBinary(root string) string {
@@ -12,6 +13,10 @@ func pyguardBinary(root string) string {
 		name = "pyguard.exe"
 	}
 	return filepath.Join(root, "tools", "pyguard", name)
+}
+
+func jsonEscapePath(p string) string {
+	return strings.ReplaceAll(p, `\`, `\\`)
 }
 
 func writeHookFile(path, content string) error {
