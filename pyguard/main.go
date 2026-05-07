@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var version = "dev"
+
 const usage = `pyguard — Python quality gate runner
 
 Quality gates (replaces make):
@@ -60,10 +62,13 @@ func main() {
 	cmd := os.Args[1]
 	args := os.Args[2:]
 
-	// Help commands need no root and no lock.
+	// Help and version commands need no root and no lock.
 	switch cmd {
 	case "help", "-h", "--help":
 		fmt.Print(usage)
+		os.Exit(0)
+	case "version", "--version", "-v":
+		fmt.Println(version)
 		os.Exit(0)
 	}
 
@@ -193,6 +198,7 @@ type config struct {
 	logFile   string // --log-file path
 	tailLines int    // --tail N
 	allowPipe bool   // --allow-pipe
+	assumeYes bool   // --yes / -y: skip interactive prompts
 }
 
 func parseFlags(args []string) config {
@@ -228,6 +234,8 @@ func parseFlags(args []string) config {
 			cfg.initFlag = true
 		case "--allow-pipe":
 			cfg.allowPipe = true
+		case "--yes", "-y":
+			cfg.assumeYes = true
 		}
 	}
 	return cfg

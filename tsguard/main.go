@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var version = "dev"
+
 const usage = `tsguard — TypeScript quality gate runner
 
 Quality gates (replaces npm scripts):
@@ -59,6 +61,9 @@ func main() {
 	switch cmd {
 	case "help", "-h", "--help":
 		fmt.Print(usage)
+		os.Exit(0)
+	case "version", "--version", "-v":
+		fmt.Println(version)
 		os.Exit(0)
 	}
 
@@ -171,6 +176,7 @@ type config struct {
 	tailLines    int
 	allowPipe    bool
 	ftaScoreCap  int
+	assumeYes    bool
 }
 
 func parseFlags(args []string) config {
@@ -207,6 +213,8 @@ func parseFlags(args []string) config {
 			cfg.initFlag = true
 		case "--allow-pipe":
 			cfg.allowPipe = true
+		case "--yes", "-y":
+			cfg.assumeYes = true
 		case "--max-fta-score":
 			if i+1 < len(args) {
 				i++
