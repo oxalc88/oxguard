@@ -36,8 +36,6 @@ Informational (advisory, never fails gate):
 | Criticality analysis | pyan3 + networkx → CRITICALITY.md | Load-bearing functions (high fan-in, bottlenecks) — tells AI where to apply stricter standards |
 
 ```bash
-cd pyguard && go build -o pyguard .
-
 pyguard check        # full gate (ruff → mypy → radon → types → coverage → security)
 pyguard fix          # auto-format (ruff format + lint --fix)
 pyguard audit        # informational: criticality + dead code + deps
@@ -45,10 +43,9 @@ pyguard security     # security gates only
 pyguard types        # type-annotation complexity only
 ```
 
-The `pyguard/analysis/` directory holds the Python helper scripts invoked by pyguard at
-runtime. These scripts must be present in the consuming project's
-`tools/analysis/` directory — pyguard calls them project-relative, e.g.
-`uv run python tools/analysis/check_halstead.py`.
+pyguard ships Python helper scripts (in `pyguard/analysis/`) that are invoked at
+runtime. `pyguard setup` deploys them automatically to the consuming project's
+`tools/analysis/` directory.
 
 ### `tsguard` — TypeScript quality gate
 
@@ -61,9 +58,9 @@ runtime. These scripts must be present in the consuming project's
 | Maintainability (FTA) | fta-cli | Files too complex to maintain — catches what cyclomatic alone misses |
 | Types | tsc --noEmit | Type errors |
 | Coverage | vitest + coverage | Untested code paths |
-| Security — static | semgrep | XSS, `eval()`, path traversal, insecure patterns (skips if not installed) |
+| Security — static | semgrep | XSS, `eval()`, path traversal, insecure patterns |
 | Security — CVEs | npm audit | Known vulnerabilities in dependencies |
-| Security — secrets | detect-secrets | Credentials accidentally committed (skips if not installed) |
+| Security — secrets | detect-secrets | Credentials accidentally committed |
 
 Informational:
 
@@ -73,8 +70,6 @@ Informational:
 | Duplicate code | jscpd | Copy-pasted blocks that should be abstracted |
 
 ```bash
-cd tsguard && go build -o tsguard .
-
 tsguard check        # full gate (lint → complexity → fta → types → coverage → security)
 tsguard fix          # auto-format (ultracite fix)
 tsguard audit        # informational: dead code + duplicates
