@@ -88,6 +88,7 @@ try {
     # ── extract ───────────────────────────────────────────────────────────────
 
     Expand-Archive -Path $ZipPath -DestinationPath $TmpDir -Force
+    $ExtractedDir = Join-Path $TmpDir "$Tool-$Version-$OS-$Arch"
 
     # ── install ───────────────────────────────────────────────────────────────
 
@@ -96,12 +97,12 @@ try {
     }
 
     $BinName = "$Tool.exe"
-    Copy-Item (Join-Path $TmpDir $BinName) (Join-Path $InstallDir $BinName) -Force
+    Copy-Item (Join-Path $ExtractedDir $BinName) (Join-Path $InstallDir $BinName) -Force
 
     Ok "$Tool installed to $InstallDir\$BinName"
 
     # pyguard: copy analysis helper scripts
-    $analysisDir = Join-Path $TmpDir "analysis"
+    $analysisDir = Join-Path $ExtractedDir "analysis"
     if ($Tool -eq "pyguard" -and (Test-Path $analysisDir)) {
         $shareDir = Join-Path $env:LOCALAPPDATA "oxguard\pyguard"
         if (-not (Test-Path $shareDir)) { New-Item -ItemType Directory -Path $shareDir | Out-Null }
