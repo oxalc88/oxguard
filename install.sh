@@ -85,19 +85,20 @@ cd - >/dev/null
 # ── extract ──────────────────────────────────────────────────────────────────
 
 tar -xzf "$TMPDIR/$TARBALL" -C "$TMPDIR"
+EXTRACTED="$TMPDIR/${TARBALL%.tar.gz}"
 
 # ── install ──────────────────────────────────────────────────────────────────
 
 mkdir -p "$INSTALL_DIR"
 
-install -m 755 "$TMPDIR/$TOOL" "$INSTALL_DIR/$TOOL"
+install -m 755 "$EXTRACTED/$TOOL" "$INSTALL_DIR/$TOOL"
 
 # pyguard ships analysis helper scripts — place them alongside the binary
 # so `pyguard setup` can also embed and deploy them; this is a fallback copy.
-if [ "$TOOL" = "pyguard" ] && [ -d "$TMPDIR/analysis" ]; then
+if [ "$TOOL" = "pyguard" ] && [ -d "$EXTRACTED/analysis" ]; then
   SHARE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/oxguard/pyguard"
   mkdir -p "$SHARE_DIR"
-  cp -r "$TMPDIR/analysis" "$SHARE_DIR/"
+  cp -r "$EXTRACTED/analysis" "$SHARE_DIR/"
 fi
 
 ok "$TOOL installed to $INSTALL_DIR/$TOOL"
