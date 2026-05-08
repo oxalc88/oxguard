@@ -88,7 +88,7 @@ try {
     # ── extract ───────────────────────────────────────────────────────────────
 
     Expand-Archive -Path $ZipPath -DestinationPath $TmpDir -Force
-    $ExtractedDir = Join-Path $TmpDir "$Tool-$Version-$OS-$Arch"
+    $ExtractedDir = Join-Path $TmpDir ($ZipName -replace '\.zip$')
 
     # ── install ───────────────────────────────────────────────────────────────
 
@@ -122,7 +122,7 @@ try {
     # ── PATH guidance ─────────────────────────────────────────────────────────
 
     $currentPath = [System.Environment]::GetEnvironmentVariable("PATH", "User")
-    if ($currentPath -notlike "*$InstallDir*") {
+    if ($currentPath -split ';' -notcontains $InstallDir) {
         Write-Host ""
         Write-Host "  [!] $InstallDir is not on your PATH." -ForegroundColor Yellow
         Write-Host "      Run this to add it permanently (requires terminal restart):"

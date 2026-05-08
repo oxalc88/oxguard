@@ -105,8 +105,7 @@ ok "$TOOL installed to $INSTALL_DIR/$TOOL"
 
 # ── verify binary runs ───────────────────────────────────────────────────────
 
-if "$INSTALL_DIR/$TOOL" --version >/dev/null 2>&1; then
-  INSTALLED_VER="$("$INSTALL_DIR/$TOOL" --version 2>&1)"
+if INSTALLED_VER="$("$INSTALL_DIR/$TOOL" --version 2>&1)"; then
   ok "$TOOL $INSTALLED_VER is working"
 else
   die "$TOOL installed but --version failed — check your system libraries"
