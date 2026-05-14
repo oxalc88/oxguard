@@ -8,7 +8,7 @@ import (
 )
 
 // runDoctor checks the full toolchain and reports status without making changes.
-func runDoctor(root string) int {
+func runDoctor(root, pm string) int {
 	fmt.Println("tsguard doctor")
 	fmt.Println("──────────")
 
@@ -19,12 +19,12 @@ func runDoctor(root string) int {
 		failures++
 	}
 
-	// npm
-	if out, _, err := RunSilent("", "npm", "--version"); err != nil {
-		fmt.Println("  [FAIL] npm — not found")
+	// package manager
+	if out, _, err := RunSilent("", pm, "--version"); err != nil {
+		fmt.Printf("  [FAIL] %s — not found\n", pm)
 		failures++
 	} else {
-		fmt.Printf("  [OK]   npm (%s)\n", strings.TrimSpace(out))
+		fmt.Printf("  [OK]   %s (%s)\n", pm, strings.TrimSpace(out))
 	}
 
 	// node_modules
@@ -36,7 +36,7 @@ func runDoctor(root string) int {
 		fmt.Println("  [OK]   node_modules")
 	}
 
-	// Individual tools via npx
+	// Individual tools via package manager exec
 	for _, tool := range []struct{ name, cmd string }{
 		{"tsc", "tsc"},
 		{"vitest", "vitest"},
@@ -44,7 +44,7 @@ func runDoctor(root string) int {
 		{"ultracite", "ultracite"},
 		{"fta-cli", "fta-cli"},
 	} {
-		out, _, err := RunSilent(root, "npx", tool.cmd, "--version")
+		out, _, err := RunSilent(root, pkgExec(pm, tool.cmd, "--version")...)
 		if err != nil {
 			fmt.Printf("  [FAIL] %s — not found. Run: tsguard setup\n", tool.name)
 			failures++
@@ -59,7 +59,7 @@ func runDoctor(root string) int {
 		{"knip", "knip"},
 		{"jscpd", "jscpd"},
 	} {
-		out, _, err := RunSilent(root, "npx", tool.cmd, "--version")
+		out, _, err := RunSilent(root, pkgExec(pm, tool.cmd, "--version")...)
 		if err != nil {
 			fmt.Printf("  [SKIP] %s — not installed (optional, needed for tsguard audit)\n", tool.name)
 		} else {

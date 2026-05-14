@@ -101,6 +101,161 @@ func TestSecretsScanDiff_Fail(t *testing.T) {
 	}
 }
 
+// TestDetectPackageManager checks lockfile and packageManager-field resolution.
+func TestDetectPackageManager(t *testing.T) {
+	cases := []struct {
+		name     string
+		files    map[string]string // filename → content
+		wantPM   string
+	}{
+		{
+			name:   "pnpm lockfile",
+			files:  map[string]string{"pnpm-lock.yaml": ""},
+			wantPM: "pnpm",
+		},
+		{
+			name:   "yarn lockfile",
+			files:  map[string]string{"yarn.lock": ""},
+			wantPM: "yarn",
+		},
+		{
+			name:   "npm lockfile",
+			files:  map[string]string{"package-lock.json": "{}"},
+			wantPM: "npm",
+		},
+		{
+			name:   "packageManager field pnpm wins over no lockfile",
+			files:  map[string]string{"package.json": `{"packageManager":"pnpm@9.0.0"}`},
+			wantPM: "pnpm",
+		},
+		{
+			name:   "packageManager field yarn",
+			files:  map[string]string{"package.json": `{"packageManager":"yarn@4.0.0"}`},
+			wantPM: "yarn",
+		},
+		{
+			name: "packageManager field wins over lockfile",
+			files: map[string]string{
+				"package.json":     `{"packageManager":"pnpm@9.0.0"}`,
+				"package-lock.json": "{}",
+			},
+			wantPM: "pnpm",
+		},
+		{
+			name:   "no lockfile defaults to npm",
+			files:  map[string]string{"package.json": `{}`},
+			wantPM: "npm",
+		},
+		{
+			name:   "empty root defaults to npm",
+			files:  map[string]string{},
+			wantPM: "npm",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for name, content := range tc.files {
+				if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got := detectPackageManager(dir)
+			if got != tc.wantPM {
+				t.Fatalf("detectPackageManager = %q, want %q", got, tc.wantPM)
+			}
+		})
+	}
+}
+
+// TestPkgExecSelectsCorrectRunner checks pkgExec returns the right command prefix.
+func TestPkgExecSelectsCorrectRunner(t *testing.T) {
+	cases := []struct {
+		pm   string
+		tool string
+		want string // first two words of joined result
+	}{
+		{"npm", "tsc", "npx tsc"},
+		{"", "tsc", "npx tsc"},     // empty defaults to npm
+		{"pnpm", "tsc", "pnpm exec tsc"},
+		{"yarn", "tsc", "yarn exec tsc"},
+	}
+	for _, tc := range cases {
+		got := strings.Join(pkgExec(tc.pm, tc.tool), " ")
+		if got != tc.want {
+			t.Errorf("pkgExec(%q, %q) = %q, want %q", tc.pm, tc.tool, got, tc.want)
+		}
+	}
+}
+
+// TestRunNpmAuditUsesPnpm verifies pnpm audit is invoked in a pnpm project.
+func TestRunNpmAuditUsesPnpm(t *testing.T) {
+	r, logPath := newTestRunner(t)
+	r.pkgManager = "pnpm"
+
+	if code := runNpmAudit(r); code != 0 {
+		t.Fatalf("runNpmAudit returned %d", code)
+	}
+
+	for _, entry := range readCommandLog(t, logPath) {
+		if strings.HasPrefix(entry, "pnpm audit") {
+			return
+		}
+	}
+	t.Fatalf("expected pnpm audit in log, got: %v", readCommandLog(t, logPath))
+}
+
+// TestRunNpmAuditDefaultsToNpm verifies npm audit is used when no PM is set.
+func TestRunNpmAuditDefaultsToNpm(t *testing.T) {
+	r, logPath := newTestRunner(t)
+
+	if code := runNpmAudit(r); code != 0 {
+		t.Fatalf("runNpmAudit returned %d", code)
+	}
+
+	for _, entry := range readCommandLog(t, logPath) {
+		if strings.HasPrefix(entry, "npm audit") {
+			return
+		}
+	}
+	t.Fatalf("expected npm audit in log, got: %v", readCommandLog(t, logPath))
+}
+
+// TestPkgExecUsedForLintInPnpmProject verifies lint uses pnpm exec in a pnpm project.
+func TestPkgExecUsedForLintInPnpmProject(t *testing.T) {
+	r, logPath := newTestRunner(t)
+	r.pkgManager = "pnpm"
+
+	if code := runLint(r); code != 0 {
+		t.Fatalf("runLint returned %d", code)
+	}
+
+	entries := readCommandLog(t, logPath)
+	for _, entry := range entries {
+		if entry == "pnpm exec ultracite check" {
+			return
+		}
+	}
+	t.Fatalf("expected 'pnpm exec ultracite check' in log, got: %v", entries)
+}
+
+// TestNoNpxInPnpmCheckRun verifies no bare npx calls appear in a pnpm check run.
+func TestNoNpxInPnpmCheckRun(t *testing.T) {
+	r, logPath := newTestRunner(t)
+	r.pkgManager = "pnpm"
+
+	if code := runCheck(r, []string{"src"}, 60); code != 0 {
+		t.Fatalf("runCheck returned %d", code)
+	}
+
+	for _, entry := range readCommandLog(t, logPath) {
+		if strings.HasPrefix(entry, "npx ") {
+			t.Fatalf("unexpected bare npx call in pnpm project: %q", entry)
+		}
+	}
+}
+
 func newTestRunner(t *testing.T) (*Runner, string) {
 	t.Helper()
 
@@ -115,7 +270,7 @@ func newTestRunner(t *testing.T) (*Runner, string) {
 	}
 
 	logPath := filepath.Join(root, "commands.log")
-	for _, name := range []string{"npx", "npm", "semgrep"} {
+	for _, name := range []string{"npx", "npm", "pnpm", "yarn", "semgrep"} {
 		writeFakeCommand(t, filepath.Join(binDir, name))
 	}
 	// detect-secrets needs to emit JSON for scan and respect DETECT_SECRETS_SCAN_OUTPUT.

@@ -76,6 +76,8 @@ func main() {
 		os.Exit(exitUnknown)
 	}
 
+	cfg.pkgManager = detectPackageManager(root)
+
 	if cfg.ifTypeScript {
 		if !editedFileIsTypeScript() {
 			os.Exit(0)
@@ -84,7 +86,7 @@ func main() {
 
 	// doctor is read-only — exempt from the instance lock.
 	if cmd == "doctor" {
-		os.Exit(runDoctor(root))
+		os.Exit(runDoctor(root, cfg.pkgManager))
 	}
 
 	// Instance lock — prevents concurrent tsguard runs from stacking up.
@@ -115,7 +117,7 @@ func dispatch(cmd string, cfg config, root string) int {
 		}
 	}
 
-	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines}
+	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager}
 
 	switch cmd {
 	case "check":
@@ -177,6 +179,7 @@ type config struct {
 	allowPipe    bool
 	ftaScoreCap  int
 	assumeYes    bool
+	pkgManager   string // "npm" | "pnpm" | "yarn" — detected from project root
 }
 
 func parseFlags(args []string) config {

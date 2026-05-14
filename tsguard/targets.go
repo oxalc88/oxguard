@@ -39,7 +39,7 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 // runFix runs auto-formatter: ultracite fix (biome format + lint --fix).
 func runFix(r *Runner) int {
 	fmt.Println("tsguard fix")
-	res := r.Run("ultracite fix", "npx", "ultracite", "fix")
+	res := r.Run("ultracite fix", pkgExec(r.pkgManager, "ultracite", "fix")...)
 	if !res.ok {
 		return 1
 	}
@@ -48,7 +48,7 @@ func runFix(r *Runner) int {
 
 // runLint runs lint + format check via ultracite check.
 func runLint(r *Runner) int {
-	res := r.Run("ultracite check", "npx", "ultracite", "check")
+	res := r.Run("ultracite check", pkgExec(r.pkgManager, "ultracite", "check")...)
 	if !res.ok {
 		return 1
 	}
@@ -57,7 +57,7 @@ func runLint(r *Runner) int {
 
 // runTypes runs strict type checking.
 func runTypes(r *Runner) int {
-	res := r.Run("tsc --noEmit", "npx", "tsc", "--noEmit")
+	res := r.Run("tsc --noEmit", pkgExec(r.pkgManager, "tsc", "--noEmit")...)
 	if !res.ok {
 		return 1
 	}
@@ -75,7 +75,7 @@ func runComplexity(r *Runner, _ []string) int {
 func runFTA(r *Runner, dirs []string, scoreCap int) int {
 	scoreCapStr := strconv.Itoa(scoreCap)
 	for _, dir := range dirs {
-		res := r.Run("fta "+dir, "npx", "fta-cli", "--score-cap", scoreCapStr, dir)
+		res := r.Run("fta "+dir, pkgExec(r.pkgManager, "fta-cli", "--score-cap", scoreCapStr, dir)...)
 		if !res.ok {
 			return 1
 		}
@@ -85,7 +85,7 @@ func runFTA(r *Runner, dirs []string, scoreCap int) int {
 
 // runCoverage runs vitest with coverage (threshold enforced via vitest.config.ts).
 func runCoverage(r *Runner) int {
-	res := r.Run("vitest --coverage", "npx", "vitest", "run", "--coverage")
+	res := r.Run("vitest --coverage", pkgExec(r.pkgManager, "vitest", "run", "--coverage")...)
 	if !res.ok {
 		return 1
 	}
@@ -120,7 +120,16 @@ func runSemgrep(r *Runner) int {
 }
 
 func runNpmAudit(r *Runner) int {
-	res := r.Run("npm audit", "npm", "audit", "--audit-level=moderate")
+	var args []string
+	switch r.pkgManager {
+	case "pnpm":
+		args = []string{"pnpm", "audit", "--audit-level", "moderate"}
+	case "yarn":
+		args = []string{"yarn", "npm", "audit", "--severity", "moderate"}
+	default:
+		args = []string{"npm", "audit", "--audit-level=moderate"}
+	}
+	res := r.Run("dependency audit", args...)
 	if !res.ok {
 		return 1
 	}
@@ -223,13 +232,13 @@ func runAudit(r *Runner, dirs []string) int {
 
 // runDeadCode runs knip for dead code and unused dependency detection (informational).
 func runDeadCode(r *Runner) int {
-	r.Run("knip", "npx", "knip")
+	r.Run("knip", pkgExec(r.pkgManager, "knip")...)
 	return 0 // always informational
 }
 
 // runDuplicates runs jscpd for copy-paste code detection (informational).
 func runDuplicates(r *Runner, dirs []string) int {
-	args := append([]string{"npx", "jscpd"}, dirs...)
+	args := append(pkgExec(r.pkgManager, "jscpd"), dirs...)
 	r.Run("jscpd", args...)
 	return 0 // always informational
 }

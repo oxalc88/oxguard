@@ -55,7 +55,7 @@ func missingNpmDevDeps(root string, manifest []string) ([]string, error) {
 }
 
 // ensureNpmDevDeps checks for missing devDependencies, prompts if any are absent,
-// and runs npm install --save-dev for the gap. Skips silently if nothing is missing.
+// and installs them using the project's package manager.
 func ensureNpmDevDeps(root string, cfg config) error {
 	missing, err := missingNpmDevDeps(root, requiredNpmDevDeps)
 	if err != nil {
@@ -76,9 +76,17 @@ func ensureNpmDevDeps(root string, cfg config) error {
 		return nil
 	}
 
-	args := append([]string{"install", "--save-dev"}, missing...)
-	if err := RunStreaming(root, append([]string{"npm"}, args...)...); err != nil {
-		return fmt.Errorf("npm install --save-dev: %w", err)
+	var installArgs []string
+	switch cfg.pkgManager {
+	case "pnpm":
+		installArgs = append([]string{"pnpm", "add", "-D"}, missing...)
+	case "yarn":
+		installArgs = append([]string{"yarn", "add", "-D"}, missing...)
+	default:
+		installArgs = append([]string{"npm", "install", "--save-dev"}, missing...)
+	}
+	if err := RunStreaming(root, installArgs...); err != nil {
+		return fmt.Errorf("%s add devDependencies: %w", cfg.pkgManager, err)
 	}
 	fmt.Println("  [OK]   devDependencies added")
 	return nil
@@ -165,4 +173,44 @@ func confirmYesNo(prompt string, defaultYes bool, assumeYes bool) bool {
 // isCI returns true when running in a known CI environment.
 func isCI() bool {
 	return os.Getenv("CI") == "true" || os.Getenv("CI") == "1"
+}
+
+// detectPackageManager returns "pnpm", "yarn", or "npm" by inspecting the project root.
+// Resolution order: package.json "packageManager" field → lockfile → default npm.
+func detectPackageManager(root string) string {
+	if data, err := os.ReadFile(filepath.Join(root, "package.json")); err == nil {
+		var pkg struct {
+			PackageManager string `json:"packageManager"`
+		}
+		if json.Unmarshal(data, &pkg) == nil && pkg.PackageManager != "" {
+			name := strings.SplitN(pkg.PackageManager, "@", 2)[0]
+			switch name {
+			case "pnpm", "yarn":
+				return name
+			}
+		}
+	}
+	for _, pair := range [][2]string{
+		{"pnpm-lock.yaml", "pnpm"},
+		{"yarn.lock", "yarn"},
+		{"package-lock.json", "npm"},
+	} {
+		if _, err := os.Stat(filepath.Join(root, pair[0])); err == nil {
+			return pair[1]
+		}
+	}
+	return "npm"
+}
+
+// pkgExec returns a command slice for running a locally-installed tool with the
+// project's package manager (npx for npm, pnpm exec for pnpm, yarn exec for yarn).
+func pkgExec(pm string, args ...string) []string {
+	switch pm {
+	case "pnpm":
+		return append([]string{"pnpm", "exec"}, args...)
+	case "yarn":
+		return append([]string{"yarn", "exec"}, args...)
+	default:
+		return append([]string{"npx"}, args...)
+	}
 }

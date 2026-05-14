@@ -25,9 +25,18 @@ func runSetup(root string, cfg config) int {
 		return 1
 	}
 
-	fmt.Println("  [3/5] npm install...")
-	if err := RunStreaming(root, "npm", "install"); err != nil {
-		fmt.Printf("  [FAIL] npm install failed: %v\n", err)
+	fmt.Printf("  [3/5] %s install...\n", cfg.pkgManager)
+	var installCmd []string
+	switch cfg.pkgManager {
+	case "pnpm":
+		installCmd = []string{"pnpm", "install"}
+	case "yarn":
+		installCmd = []string{"yarn", "install"}
+	default:
+		installCmd = []string{"npm", "install"}
+	}
+	if err := RunStreaming(root, installCmd...); err != nil {
+		fmt.Printf("  [FAIL] %s install failed: %v\n", cfg.pkgManager, err)
 		return 1
 	}
 	fmt.Println("  [OK]   node_modules ready")
