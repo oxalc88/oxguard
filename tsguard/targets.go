@@ -161,9 +161,20 @@ func runSecrets(r *Runner, initFlag bool) int {
 		return 0
 	}
 
-	if _, err := os.Stat(baseline); os.IsNotExist(err) {
-		fmt.Println("  [FAIL] secrets — .secrets.baseline not found")
-		fmt.Println("         Run: tsguard secrets --init")
+	// Read and parse the baseline before running the slow scan so we fail fast on missing/corrupt files.
+	baselineData, err := os.ReadFile(baseline)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("  [FAIL] secrets — .secrets.baseline not found")
+			fmt.Println("         Run: tsguard secrets --init")
+		} else {
+			fmt.Printf("  [FAIL] secrets — could not read .secrets.baseline: %v\n", err)
+		}
+		return 1
+	}
+	var known secretsReport
+	if err := json.Unmarshal(baselineData, &known); err != nil {
+		fmt.Printf("  [FAIL] secrets — could not parse .secrets.baseline: %v\n", err)
 		return 1
 	}
 
@@ -175,16 +186,6 @@ func runSecrets(r *Runner, initFlag bool) int {
 	var current secretsReport
 	if err := json.Unmarshal([]byte(stdout), &current); err != nil {
 		fmt.Printf("  [FAIL] detect-secrets scan: could not parse output: %v\n", err)
-		return 1
-	}
-	baselineData, err := os.ReadFile(baseline)
-	if err != nil {
-		fmt.Printf("  [FAIL] secrets — could not read .secrets.baseline: %v\n", err)
-		return 1
-	}
-	var known secretsReport
-	if err := json.Unmarshal(baselineData, &known); err != nil {
-		fmt.Printf("  [FAIL] secrets — could not parse .secrets.baseline: %v\n", err)
 		return 1
 	}
 	var newFound []string

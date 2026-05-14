@@ -273,7 +273,6 @@ func newTestRunner(t *testing.T) (*Runner, string) {
 	for _, name := range []string{"npx", "npm", "pnpm", "yarn", "semgrep"} {
 		writeFakeCommand(t, filepath.Join(binDir, name))
 	}
-	// detect-secrets needs to emit JSON for scan and respect DETECT_SECRETS_SCAN_OUTPUT.
 	writeDetectSecretsCommand(t, filepath.Join(binDir, "detect-secrets"))
 
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))

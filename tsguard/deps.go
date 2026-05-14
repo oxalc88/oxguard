@@ -78,10 +78,8 @@ func ensureNpmDevDeps(root string, cfg config) error {
 
 	var installArgs []string
 	switch cfg.pkgManager {
-	case "pnpm":
-		installArgs = append([]string{"pnpm", "add", "-D"}, missing...)
-	case "yarn":
-		installArgs = append([]string{"yarn", "add", "-D"}, missing...)
+	case "pnpm", "yarn":
+		installArgs = append([]string{cfg.pkgManager, "add", "-D"}, missing...)
 	default:
 		installArgs = append([]string{"npm", "install", "--save-dev"}, missing...)
 	}

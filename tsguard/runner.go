@@ -20,7 +20,7 @@ type Runner struct {
 	timeout    int    // seconds per tool
 	logFile    string // path to append full output (empty = no log file)
 	tailLines  int    // print only the last N lines to stdout (0 = all)
-	pkgManager string // "npm" | "pnpm" | "yarn"
+	pkgManager string
 }
 
 // Result holds the outcome of a single tool run.

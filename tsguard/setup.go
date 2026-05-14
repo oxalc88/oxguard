@@ -26,16 +26,7 @@ func runSetup(root string, cfg config) int {
 	}
 
 	fmt.Printf("  [3/5] %s install...\n", cfg.pkgManager)
-	var installCmd []string
-	switch cfg.pkgManager {
-	case "pnpm":
-		installCmd = []string{"pnpm", "install"}
-	case "yarn":
-		installCmd = []string{"yarn", "install"}
-	default:
-		installCmd = []string{"npm", "install"}
-	}
-	if err := RunStreaming(root, installCmd...); err != nil {
+	if err := RunStreaming(root, cfg.pkgManager, "install"); err != nil {
 		fmt.Printf("  [FAIL] %s install failed: %v\n", cfg.pkgManager, err)
 		return 1
 	}

@@ -179,7 +179,7 @@ type config struct {
 	allowPipe    bool
 	ftaScoreCap  int
 	assumeYes    bool
-	pkgManager   string // "npm" | "pnpm" | "yarn" — detected from project root
+	pkgManager   string
 }
 
 func parseFlags(args []string) config {
