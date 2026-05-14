@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -157,11 +158,58 @@ func runSecrets(r *Runner, initFlag bool) int {
 		return 1
 	}
 
-	res := r.Run("detect-secrets audit", "detect-secrets", "audit", baseline)
-	if !res.ok {
+	stdout, _, scanErr := RunSilent(r.root, "detect-secrets", "scan")
+	if scanErr != nil {
+		fmt.Println("  [FAIL] detect-secrets scan failed")
 		return 1
 	}
+	var current secretsReport
+	if err := json.Unmarshal([]byte(stdout), &current); err != nil {
+		fmt.Printf("  [FAIL] detect-secrets scan: could not parse output: %v\n", err)
+		return 1
+	}
+	baselineData, err := os.ReadFile(baseline)
+	if err != nil {
+		fmt.Printf("  [FAIL] secrets — could not read .secrets.baseline: %v\n", err)
+		return 1
+	}
+	var known secretsReport
+	if err := json.Unmarshal(baselineData, &known); err != nil {
+		fmt.Printf("  [FAIL] secrets — could not parse .secrets.baseline: %v\n", err)
+		return 1
+	}
+	var newFound []string
+	for file, entries := range current.Results {
+		knownHashes := make(map[string]bool)
+		for _, e := range known.Results[file] {
+			knownHashes[e.HashedSecret] = true
+		}
+		for _, e := range entries {
+			if !knownHashes[e.HashedSecret] {
+				newFound = append(newFound, fmt.Sprintf("  %s:%d [%s]", file, e.LineNumber, e.Type))
+			}
+		}
+	}
+	if len(newFound) > 0 {
+		fmt.Printf("  [FAIL] detect-secrets — %d new potential secret(s) found:\n", len(newFound))
+		for _, s := range newFound {
+			fmt.Println(s)
+		}
+		fmt.Println("         To update baseline: tsguard secrets --init")
+		return 1
+	}
+	fmt.Println("  [OK]   detect-secrets")
 	return 0
+}
+
+type secretsReport struct {
+	Results map[string][]secretEntry `json:"results"`
+}
+
+type secretEntry struct {
+	HashedSecret string `json:"hashed_secret"`
+	Type         string `json:"type"`
+	LineNumber   int    `json:"line_number"`
 }
 
 // runAudit runs informational analysis: dead-code + duplicates.
