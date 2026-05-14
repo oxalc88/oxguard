@@ -85,6 +85,29 @@ func TestSecretsScanDiff_Pass(t *testing.T) {
 	}
 }
 
+// TestSecretsScanUsesBaseline verifies the scan command passes the baseline
+// path back to detect-secrets so baseline filters and exclusions are applied.
+func TestSecretsScanUsesBaseline(t *testing.T) {
+	r, logPath := newTestRunner(t)
+	baselinePath := filepath.Join(r.root, ".secrets.baseline")
+
+	if err := os.WriteFile(baselinePath, []byte(`{"results":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if code := runSecrets(r, false); code != 0 {
+		t.Fatalf("runSecrets returned %d, want 0", code)
+	}
+
+	want := "detect-secrets scan --baseline " + baselinePath
+	for _, entry := range readCommandLog(t, logPath) {
+		if entry == want {
+			return
+		}
+	}
+	t.Fatalf("expected %q in log, got: %v", want, readCommandLog(t, logPath))
+}
+
 // TestSecretsScanDiff_Fail verifies the gate fails when scan finds a secret not in baseline.
 func TestSecretsScanDiff_Fail(t *testing.T) {
 	r, _ := newTestRunner(t)

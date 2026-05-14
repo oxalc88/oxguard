@@ -178,7 +178,7 @@ func runSecrets(r *Runner, initFlag bool) int {
 		return 1
 	}
 
-	stdout, _, scanErr := RunSilent(r.root, "detect-secrets", "scan")
+	stdout, _, scanErr := RunSilent(r.root, "detect-secrets", "scan", "--baseline", baseline)
 	if scanErr != nil {
 		fmt.Println("  [FAIL] detect-secrets scan failed")
 		return 1
