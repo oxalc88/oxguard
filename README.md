@@ -54,7 +54,7 @@ runtime. `pyguard setup` deploys them automatically to the consuming project's
 | Gate | Tool | What it catches |
 |---|---|---|
 | Lint + format + cognitive complexity | ultracite (`ultracite/biome/core`) | Style drift, common JS/TS mistake patterns, excessive cognitive complexity |
-| Maintainability (FTA) | fta-cli | Files too complex to maintain — catches what cyclomatic alone misses |
+| Maintainability (FTA) | `fta` (from `fta-cli`) | Files too complex to maintain — catches what cyclomatic alone misses |
 | Types | tsc --noEmit | Type errors |
 | Coverage | vitest + coverage | Untested code paths |
 | Security — static | semgrep | XSS, `eval()`, path traversal, insecure patterns |
@@ -130,7 +130,7 @@ pyguard setup --yes
 **2. Verify**
 
 ```bash
-tsguard doctor   # checks Node.js, npm, tsc, vitest, biome, fta-cli, …
+tsguard doctor   # checks Node.js, npm, tsc, vitest, biome, ultracite, fta, …
 pyguard doctor   # checks Python, uv, .venv, ruff, mypy, radon, …
 ```
 

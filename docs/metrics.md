@@ -83,7 +83,7 @@ makes mistakes likely.
 
 ## FTA Score (tsguard)
 
-**Tool:** fta-cli  
+**Tool:** `fta` (from the `fta-cli` package)  
 **Threshold:** ≤ 60 per file
 
 FTA (Fast TypeScript Analyzer) is the TypeScript equivalent of pyguard's three complexity

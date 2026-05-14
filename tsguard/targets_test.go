@@ -104,9 +104,9 @@ func TestSecretsScanDiff_Fail(t *testing.T) {
 // TestDetectPackageManager checks lockfile and packageManager-field resolution.
 func TestDetectPackageManager(t *testing.T) {
 	cases := []struct {
-		name     string
-		files    map[string]string // filename → content
-		wantPM   string
+		name   string
+		files  map[string]string // filename → content
+		wantPM string
 	}{
 		{
 			name:   "pnpm lockfile",
@@ -136,7 +136,7 @@ func TestDetectPackageManager(t *testing.T) {
 		{
 			name: "packageManager field wins over lockfile",
 			files: map[string]string{
-				"package.json":     `{"packageManager":"pnpm@9.0.0"}`,
+				"package.json":      `{"packageManager":"pnpm@9.0.0"}`,
 				"package-lock.json": "{}",
 			},
 			wantPM: "pnpm",
@@ -177,7 +177,7 @@ func TestPkgExecSelectsCorrectRunner(t *testing.T) {
 		want string // first two words of joined result
 	}{
 		{"npm", "tsc", "npx tsc"},
-		{"", "tsc", "npx tsc"},     // empty defaults to npm
+		{"", "tsc", "npx tsc"}, // empty defaults to npm
 		{"pnpm", "tsc", "pnpm exec tsc"},
 		{"yarn", "tsc", "yarn exec tsc"},
 	}
@@ -238,6 +238,41 @@ func TestPkgExecUsedForLintInPnpmProject(t *testing.T) {
 		}
 	}
 	t.Fatalf("expected 'pnpm exec ultracite check' in log, got: %v", entries)
+}
+
+// TestRunFTAUsesFtaBinaryInPnpmProject verifies pnpm projects call the
+// executable exported by the fta-cli package, which is `fta`.
+func TestRunFTAUsesFtaBinaryInPnpmProject(t *testing.T) {
+	r, logPath := newTestRunner(t)
+	r.pkgManager = "pnpm"
+
+	if code := runFTA(r, []string{"src"}, 60); code != 0 {
+		t.Fatalf("runFTA returned %d", code)
+	}
+
+	for _, entry := range readCommandLog(t, logPath) {
+		if entry == "pnpm exec fta --score-cap 60 src" {
+			return
+		}
+	}
+	t.Fatalf("expected 'pnpm exec fta --score-cap 60 src' in log, got: %v", readCommandLog(t, logPath))
+}
+
+// TestRunFTAUsesFtaBinaryByDefault verifies npm/npx also uses the `fta`
+// executable instead of the package name `fta-cli`.
+func TestRunFTAUsesFtaBinaryByDefault(t *testing.T) {
+	r, logPath := newTestRunner(t)
+
+	if code := runFTA(r, []string{"src"}, 60); code != 0 {
+		t.Fatalf("runFTA returned %d", code)
+	}
+
+	for _, entry := range readCommandLog(t, logPath) {
+		if entry == "npx fta --score-cap 60 src" {
+			return
+		}
+	}
+	t.Fatalf("expected 'npx fta --score-cap 60 src' in log, got: %v", readCommandLog(t, logPath))
 }
 
 // TestNoNpxInPnpmCheckRun verifies no bare npx calls appear in a pnpm check run.

@@ -42,7 +42,7 @@ func runDoctor(root, pm string) int {
 		{"vitest", "vitest"},
 		{"biome", "@biomejs/biome"},
 		{"ultracite", "ultracite"},
-		{"fta-cli", "fta-cli"},
+		{"fta", "fta"},
 	} {
 		out, _, err := RunSilent(root, pkgExec(pm, tool.cmd, "--version")...)
 		if err != nil {

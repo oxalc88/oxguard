@@ -19,7 +19,7 @@ Quality gates (replaces npm scripts):
   tsguard lint           lint + format check (ultracite check)
   tsguard types          type checking (tsc --noEmit)
   tsguard complexity     compatibility alias; complexity is enforced by ultracite check
-  tsguard fta            Halstead + cyclomatic + LOC score per file (fta-cli, default cap 60)
+  tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)
   tsguard coverage       run tests with coverage (vitest --coverage)
   tsguard security       security: detect-secrets (hard) + npm audit (warning)
   tsguard npm-audit      dependency vulnerability scan (warning only)

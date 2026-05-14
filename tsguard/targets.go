@@ -75,7 +75,7 @@ func runComplexity(r *Runner, _ []string) int {
 func runFTA(r *Runner, dirs []string, scoreCap int) int {
 	scoreCapStr := strconv.Itoa(scoreCap)
 	for _, dir := range dirs {
-		res := r.Run("fta "+dir, pkgExec(r.pkgManager, "fta-cli", "--score-cap", scoreCapStr, dir)...)
+		res := r.Run("fta "+dir, pkgExec(r.pkgManager, "fta", "--score-cap", scoreCapStr, dir)...)
 		if !res.ok {
 			return 1
 		}
