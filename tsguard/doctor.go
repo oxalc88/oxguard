@@ -40,7 +40,6 @@ func runDoctor(root, pm string) int {
 	for _, tool := range []struct{ name, cmd string }{
 		{"tsc", "tsc"},
 		{"vitest", "vitest"},
-		{"biome", "@biomejs/biome"},
 		{"ultracite", "ultracite"},
 		{"fta", "fta"},
 	} {
