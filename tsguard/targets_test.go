@@ -85,39 +85,52 @@ func TestSecretsScanDiff_Pass(t *testing.T) {
 	}
 }
 
-// TestSecretsScanUsesBaseline verifies the scan command passes the baseline
-// path back to detect-secrets so baseline filters and exclusions are applied.
-func TestSecretsScanUsesBaseline(t *testing.T) {
-	r, logPath := newTestRunner(t)
+// seedBaselineWithNewSecret writes an empty baseline and sets DETECT_SECRETS_SCAN_OUTPUT
+// to report a single new secret, so runSecrets will see a diff and fail.
+func seedBaselineWithNewSecret(t *testing.T, r *Runner) string {
+	t.Helper()
 	baselinePath := filepath.Join(r.root, ".secrets.baseline")
-
 	if err := os.WriteFile(baselinePath, []byte(`{"results":{}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	t.Setenv("DETECT_SECRETS_SCAN_OUTPUT",
+		`{"results":{"src/api.ts":[{"hashed_secret":"abc123","type":"Hex High Entropy String","line_number":42}]}}`)
+	return baselinePath
+}
 
-	if code := runSecrets(r, false); code != 0 {
-		t.Fatalf("runSecrets returned %d, want 0", code)
+// TestSecretsScanUsesBaseline verifies the scan command passes a baseline copy
+// back to detect-secrets so baseline filters and exclusions are applied without
+// mutating the user's checked-in baseline.
+func TestSecretsScanUsesBaseline(t *testing.T) {
+	r, logPath := newTestRunner(t)
+	baselinePath := seedBaselineWithNewSecret(t, r)
+
+	if code := runSecrets(r, false); code == 0 {
+		t.Fatal("runSecrets returned 0, want non-zero (new secret detected)")
 	}
 
-	want := "detect-secrets scan --baseline " + baselinePath
+	if data, err := os.ReadFile(baselinePath); err != nil {
+		t.Fatalf("read original baseline: %v", err)
+	} else if string(data) != `{"results":{}}` {
+		t.Fatalf("original baseline was mutated: %s", string(data))
+	}
+
+	usedTempPath := false
 	for _, entry := range readCommandLog(t, logPath) {
-		if entry == want {
-			return
+		if strings.HasPrefix(entry, "detect-secrets scan --baseline ") && !strings.Contains(entry, baselinePath) {
+			usedTempPath = true
+			break
 		}
 	}
-	t.Fatalf("expected %q in log, got: %v", want, readCommandLog(t, logPath))
+	if !usedTempPath {
+		t.Fatalf("expected detect-secrets to scan with a temp baseline copy, got: %v", readCommandLog(t, logPath))
+	}
 }
 
 // TestSecretsScanDiff_Fail verifies the gate fails when scan finds a secret not in baseline.
 func TestSecretsScanDiff_Fail(t *testing.T) {
 	r, _ := newTestRunner(t)
-
-	// Baseline has no entries; scan output reports a new secret.
-	if err := os.WriteFile(filepath.Join(r.root, ".secrets.baseline"), []byte(`{"results":{}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("DETECT_SECRETS_SCAN_OUTPUT",
-		`{"results":{"src/api.ts":[{"hashed_secret":"abc123","type":"Hex High Entropy String","line_number":42}]}}`)
+	seedBaselineWithNewSecret(t, r)
 
 	if code := runSecrets(r, false); code == 0 {
 		t.Fatal("runSecrets returned 0, want non-zero (new secret detected)")
@@ -354,15 +367,21 @@ func writeFakeCommand(t *testing.T, path string) {
 func writeDetectSecretsCommand(t *testing.T, path string) {
 	t.Helper()
 
-	// Logs args like other fakes; for `scan`, emits JSON from DETECT_SECRETS_SCAN_OUTPUT
-	// (or an empty-results object by default) so the scan+diff gate can parse it.
+	// Logs args like other fakes. For `scan --baseline <file>`, mutates the
+	// provided baseline file in place like detect-secrets 1.5.0 does and emits
+	// no stdout. For plain `scan`, emits baseline JSON to stdout.
 	script := "#!/bin/sh\n" +
 		"printf '%s %s\\n' \"$(basename \"$0\")\" \"$*\" >> \"$TSGUARD_LOG\"\n" +
 		"if [ \"$1\" = \"scan\" ]; then\n" +
 		"  if [ -n \"$DETECT_SECRETS_SCAN_OUTPUT\" ]; then\n" +
-		"    printf '%s' \"$DETECT_SECRETS_SCAN_OUTPUT\"\n" +
+		"    output=\"$DETECT_SECRETS_SCAN_OUTPUT\"\n" +
 		"  else\n" +
-		"    printf '{\"results\":{}}'\n" +
+		"    output='{\"results\":{}}'\n" +
+		"  fi\n" +
+		"  if [ \"$2\" = \"--baseline\" ] && [ -n \"$3\" ]; then\n" +
+		"    printf '%s' \"$output\" > \"$3\"\n" +
+		"  else\n" +
+		"    printf '%s' \"$output\"\n" +
 		"  fi\n" +
 		"fi\n" +
 		"exit 0\n"

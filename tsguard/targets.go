@@ -178,18 +178,34 @@ func runSecrets(r *Runner, initFlag bool) int {
 		return 1
 	}
 
-	stdout, _, scanErr := RunSilent(r.root, "detect-secrets", "scan", "--baseline", baseline)
+	tempBaselinePath, err := seedTempBaseline(baselineData)
+	if err != nil {
+		fmt.Printf("  [FAIL] detect-secrets scan: could not prepare temp baseline: %v\n", err)
+		return 1
+	}
+	defer os.Remove(tempBaselinePath)
+
+	_, _, scanErr := RunSilent(r.root, "detect-secrets", "scan", "--baseline", tempBaselinePath)
 	if scanErr != nil {
 		fmt.Println("  [FAIL] detect-secrets scan failed")
 		return 1
 	}
+
+	currentData, err := os.ReadFile(tempBaselinePath)
+	if err != nil {
+		fmt.Printf("  [FAIL] detect-secrets scan: could not read updated baseline: %v\n", err)
+		return 1
+	}
 	var current secretsReport
-	if err := json.Unmarshal([]byte(stdout), &current); err != nil {
-		fmt.Printf("  [FAIL] detect-secrets scan: could not parse output: %v\n", err)
+	if err := json.Unmarshal(currentData, &current); err != nil {
+		fmt.Printf("  [FAIL] detect-secrets scan: could not parse updated baseline: %v\n", err)
 		return 1
 	}
 	var newFound []string
 	for file, entries := range current.Results {
+		if len(entries) == 0 {
+			continue
+		}
 		knownHashes := make(map[string]bool)
 		for _, e := range known.Results[file] {
 			knownHashes[e.HashedSecret] = true
@@ -220,6 +236,26 @@ type secretEntry struct {
 	HashedSecret string `json:"hashed_secret"`
 	Type         string `json:"type"`
 	LineNumber   int    `json:"line_number"`
+}
+
+// seedTempBaseline writes data to a fresh temp file and returns its path.
+// The caller is responsible for removing the file (e.g. via defer os.Remove).
+func seedTempBaseline(data []byte) (string, error) {
+	f, err := os.CreateTemp("", "tsguard-secrets-*.baseline")
+	if err != nil {
+		return "", err
+	}
+	path := f.Name()
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(path)
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(path)
+		return "", err
+	}
+	return path, nil
 }
 
 // runAudit runs informational analysis: dead-code + duplicates.
