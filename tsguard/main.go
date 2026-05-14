@@ -14,11 +14,11 @@ var version = "dev"
 const usage = `tsguard — TypeScript quality gate runner
 
 Quality gates (replaces npm scripts):
-  tsguard check          full gate: lint + complexity + fta + types + coverage + security
+  tsguard check          full gate: lint + fta + types + coverage + security
   tsguard fix            auto-format: ultracite fix
   tsguard lint           lint + format check (ultracite check)
   tsguard types          type checking (tsc --noEmit)
-  tsguard complexity     complexity analysis (biome noExcessiveCognitiveComplexity)
+  tsguard complexity     compatibility alias; complexity is enforced by ultracite check
   tsguard fta            Halstead + cyclomatic + LOC score per file (fta-cli, default cap 60)
   tsguard coverage       run tests with coverage (vitest --coverage)
   tsguard security       security: detect-secrets (hard) + npm audit (warning)

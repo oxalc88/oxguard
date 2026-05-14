@@ -53,8 +53,7 @@ runtime. `pyguard setup` deploys them automatically to the consuming project's
 
 | Gate | Tool | What it catches |
 |---|---|---|
-| Lint + format | ultracite (biome) | Style drift, common JS/TS mistake patterns |
-| Cyclomatic complexity | biome cognitive complexity | Functions too complex to safely modify |
+| Lint + format + cognitive complexity | ultracite (`ultracite/biome/core`) | Style drift, common JS/TS mistake patterns, excessive cognitive complexity |
 | Maintainability (FTA) | fta-cli | Files too complex to maintain — catches what cyclomatic alone misses |
 | Types | tsc --noEmit | Type errors |
 | Coverage | vitest + coverage | Untested code paths |
@@ -70,11 +69,12 @@ Informational:
 | Duplicate code | jscpd | Copy-pasted blocks that should be abstracted |
 
 ```bash
-tsguard check        # full gate (lint → complexity → fta → types → coverage → security)
+tsguard check        # full gate (lint → fta → types → coverage → security)
 tsguard fix          # auto-format (ultracite fix)
 tsguard audit        # informational: dead code + duplicates
 tsguard security     # security gates only
 tsguard fta          # FTA score gate only
+tsguard complexity   # compatibility alias: complexity is enforced by ultracite check
 ```
 
 The security gate (`semgrep`, `detect-secrets`) requires Python tooling. `tsguard setup`

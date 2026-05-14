@@ -43,7 +43,7 @@ Quality gate commands:
 - ` + "`tsguard lint`" + `       — lint only (ultracite check)
 - ` + "`tsguard types`" + `      — type check only
 - ` + "`tsguard coverage`" + `   — tests + coverage
-- ` + "`tsguard complexity`" + ` — complexity analysis
+- ` + "`tsguard complexity`" + ` — compatibility alias for ultracite's complexity checks
 `
 	return writeHookFile(filepath.Join(root, "..", "AGENTS.md"), agentsContent)
 }

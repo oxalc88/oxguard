@@ -1,3 +1,10 @@
+---
+summary: Reference guide for the complexity and maintainability metrics enforced by pyguard and tsguard.
+read_when:
+  - Explaining why a complexity or maintainability gate failed.
+  - Adjusting thresholds or gate semantics for pyguard or tsguard.
+---
+
 # Complexity Metrics
 
 oxguard uses several complementary metrics to catch code that has grown too complex to
