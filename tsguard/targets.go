@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-// runCheck runs the full quality gate: lint → complexity → fta → types → coverage → security.
+// runCheck runs the full quality gate: lint (includes Ultracite/Biome complexity) → fta → types → coverage → security.
 // Sequential, fail-fast: stops at first failure.
 func runCheck(r *Runner, dirs []string, ftaCap int) int {
 	fmt.Println("tsguard check")
@@ -18,7 +18,6 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 		fn   func() int
 	}{
 		{"lint", func() int { return runLint(r) }},
-		{"complexity", func() int { return runComplexity(r, dirs) }},
 		{"fta", func() int { return runFTA(r, dirs, ftaCap) }},
 		{"types", func() int { return runTypes(r) }},
 		{"coverage", func() int { return runCoverage(r) }},
@@ -64,15 +63,10 @@ func runTypes(r *Runner) int {
 	return 0
 }
 
-// runComplexity runs biome complexity check in isolation.
-func runComplexity(r *Runner, dirs []string) int {
-	args := append([]string{"npx", "@biomejs/biome", "lint",
-		"--rule", "complexity/noExcessiveCognitiveComplexity"}, dirs...)
-	res := r.Run("complexity", args...)
-	if !res.ok {
-		return 1
-	}
-	return 0
+// Compatibility alias: complexity rules are enforced by the lint gate.
+func runComplexity(r *Runner, _ []string) int {
+	fmt.Println("  complexity: delegated to ultracite check")
+	return runLint(r)
 }
 
 // runFTA runs the Fast TypeScript Analyzer for Halstead + cyclomatic + LOC score.
