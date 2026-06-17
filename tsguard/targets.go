@@ -14,6 +14,11 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 	fmt.Println("tsguard check")
 	fmt.Println("─────────")
 
+	// Remove stale coverage artifacts from previous runs before lint scans the tree.
+	// vitest --coverage writes coverage/ at the end of the run; without this cleanup
+	// the next lint gate flags generated files it did not produce.
+	os.RemoveAll(filepath.Join(r.root, "coverage"))
+
 	steps := []struct {
 		name string
 		fn   func() int
