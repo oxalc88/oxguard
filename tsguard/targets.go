@@ -89,9 +89,16 @@ func runFTA(r *Runner, dirs []string, scoreCap int) int {
 	return 0
 }
 
-// runCoverage runs vitest with coverage (threshold enforced via vitest.config.ts).
+// runCoverage runs vitest with coverage, enforcing an 80% floor on all metrics.
+// Projects with stricter thresholds in vitest.config.ts will still fail at their own threshold.
 func runCoverage(r *Runner) int {
-	res := r.Run("vitest --coverage", pkgExec(r.pkgManager, "vitest", "run", "--coverage")...)
+	args := pkgExec(r.pkgManager, "vitest", "run", "--coverage",
+		"--coverage.thresholds.lines=80",
+		"--coverage.thresholds.functions=80",
+		"--coverage.thresholds.branches=80",
+		"--coverage.thresholds.statements=80",
+	)
+	res := r.Run("vitest --coverage", args...)
 	if !res.ok {
 		return 1
 	}
