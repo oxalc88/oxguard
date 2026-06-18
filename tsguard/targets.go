@@ -89,17 +89,37 @@ func runFTA(r *Runner, dirs []string, scoreCap int) int {
 	return 0
 }
 
-// runCoverage runs vitest with coverage, enforcing an 80% floor on all metrics.
-// Projects with stricter thresholds in vitest.config.ts will still fail at their own threshold.
+// runCoverage detects the project's test runner from package.json deps and config files,
+// then runs coverage with an 80% floor. vitest and jest are fully supported.
+// Other detected runners (mocha, ava, etc.) fail with a clear message.
 func runCoverage(r *Runner) int {
-	args := pkgExec(r.pkgManager, "vitest", "run", "--coverage",
-		"--coverage.thresholds.lines=80",
-		"--coverage.thresholds.functions=80",
-		"--coverage.thresholds.branches=80",
-		"--coverage.thresholds.statements=80",
-	)
-	res := r.Run("vitest --coverage", args...)
-	if !res.ok {
+	runner := detectTestRunner(r.root)
+	switch runner {
+	case "vitest":
+		args := pkgExec(r.pkgManager, "vitest", "run", "--coverage",
+			"--coverage.thresholds.lines=80",
+			"--coverage.thresholds.functions=80",
+			"--coverage.thresholds.branches=80",
+			"--coverage.thresholds.statements=80",
+		)
+		res := r.Run("vitest --coverage", args...)
+		if !res.ok {
+			return 1
+		}
+	case "jest":
+		const threshold = `--coverageThreshold={"global":{"lines":80,"functions":80,"branches":80,"statements":80}}`
+		args := pkgExec(r.pkgManager, "jest", "--coverage", threshold)
+		res := r.Run("jest --coverage", args...)
+		if !res.ok {
+			return 1
+		}
+	case "":
+		fmt.Println("  [FAIL] coverage — no test runner found in package.json or config files")
+		fmt.Println("         Add vitest or jest to devDependencies")
+		return 1
+	default:
+		fmt.Printf("  [FAIL] coverage — %s detected but coverage enforcement requires vitest or jest\n", runner)
+		fmt.Println("         Migrate to vitest or jest, or run coverage manually")
 		return 1
 	}
 	return 0

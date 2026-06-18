@@ -334,6 +334,9 @@ func newTestRunner(t *testing.T) (*Runner, string) {
 	if err := os.WriteFile(filepath.Join(root, ".secrets.baseline"), []byte(`{"results":{}}`), 0o644); err != nil {
 		t.Fatalf("write baseline: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"devDependencies":{"vitest":"*"}}`), 0o644); err != nil {
+		t.Fatalf("write package.json: %v", err)
+	}
 
 	binDir := filepath.Join(root, "bin")
 	if err := os.MkdirAll(binDir, 0o755); err != nil {

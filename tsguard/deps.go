@@ -173,6 +173,62 @@ func isCI() bool {
 	return os.Getenv("CI") == "true" || os.Getenv("CI") == "1"
 }
 
+// testRunnerPriority defines known JS/TS test runners checked against package.json deps.
+var testRunnerPriority = []struct {
+	name string
+	deps []string
+}{
+	{"vitest", []string{"vitest"}},
+	{"jest", []string{"jest", "ts-jest", "@jest/core", "babel-jest"}},
+	{"mocha", []string{"mocha"}},
+	{"ava", []string{"ava"}},
+	{"jasmine", []string{"jasmine"}},
+}
+
+// detectTestRunner inspects package.json dependencies then config files to identify
+// the project's test runner. Returns the runner name or "" if none is recognised.
+func detectTestRunner(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, "package.json"))
+	if err == nil {
+		var pkg struct {
+			Dependencies    map[string]json.RawMessage `json:"dependencies"`
+			DevDependencies map[string]json.RawMessage `json:"devDependencies"`
+		}
+		if json.Unmarshal(data, &pkg) == nil {
+			allDeps := make(map[string]bool, len(pkg.Dependencies)+len(pkg.DevDependencies))
+			for k := range pkg.Dependencies {
+				allDeps[k] = true
+			}
+			for k := range pkg.DevDependencies {
+				allDeps[k] = true
+			}
+			for _, runner := range testRunnerPriority {
+				for _, dep := range runner.deps {
+					if allDeps[dep] {
+						return runner.name
+					}
+				}
+			}
+		}
+	}
+
+	// Fallback: config file presence when runner isn't listed as a dep.
+	for _, pair := range [][2]string{
+		{"vitest.config.ts", "vitest"},
+		{"vitest.config.js", "vitest"},
+		{"vitest.config.mjs", "vitest"},
+		{"jest.config.ts", "jest"},
+		{"jest.config.js", "jest"},
+		{"jest.config.json", "jest"},
+	} {
+		if _, err := os.Stat(filepath.Join(root, pair[0])); err == nil {
+			return pair[1]
+		}
+	}
+
+	return ""
+}
+
 // detectPackageManager returns "pnpm", "yarn", or "npm" by inspecting the project root.
 // Resolution order: package.json "packageManager" field → lockfile → default npm.
 func detectPackageManager(root string) string {
