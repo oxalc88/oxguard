@@ -77,6 +77,16 @@ tsguard fta          # FTA score gate only
 tsguard complexity   # compatibility alias: complexity is enforced by ultracite check
 ```
 
+Key flags:
+
+```bash
+tsguard check --dirs src,lib          # override scanned directories (default: src,cdk)
+tsguard check --exclude docs,scripts  # exclude additional directories from all scans
+                                      # node_modules, dist, .next, build, coverage are always excluded
+tsguard check --max-fta-score 50      # tighten FTA complexity cap (default: 60)
+tsguard check --tail 30               # show only the last 30 lines of each tool's output
+```
+
 The security gate (`semgrep`, `detect-secrets`) requires Python tooling. `tsguard setup`
 installs both automatically via `uv tool install` (falling back to `pipx`). If the
 tools are missing when `tsguard check` runs, tsguard will attempt to install them
