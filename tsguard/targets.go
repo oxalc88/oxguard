@@ -96,6 +96,10 @@ func runCoverage(r *Runner) int {
 	runner := detectTestRunner(r.root)
 	switch runner {
 	case "vitest":
+		if err := checkVitestVersionMatch(r.root); err != nil {
+			fmt.Printf("  [FAIL] coverage — %s\n", err)
+			return 1
+		}
 		args := pkgExec(r.pkgManager, "vitest", "run", "--coverage",
 			"--coverage.thresholds.lines=80",
 			"--coverage.thresholds.functions=80",

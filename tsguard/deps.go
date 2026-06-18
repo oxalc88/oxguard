@@ -229,6 +229,44 @@ func detectTestRunner(root string) string {
 	return ""
 }
 
+// installedVersion reads the "version" field from node_modules/<pkg>/package.json.
+// Returns "" if the package is not installed or the file cannot be parsed.
+func installedVersion(root, pkg string) string {
+	data, err := os.ReadFile(filepath.Join(root, "node_modules", pkg, "package.json"))
+	if err != nil {
+		return ""
+	}
+	var p struct {
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(data, &p) != nil {
+		return ""
+	}
+	return p.Version
+}
+
+// majorVersion returns the major component of a semver string (e.g. "3.2.6" → "3").
+func majorVersion(v string) string {
+	if idx := strings.Index(v, "."); idx != -1 {
+		return v[:idx]
+	}
+	return v
+}
+
+// checkVitestVersionMatch verifies that vitest and @vitest/coverage-v8 share the same
+// major version. Returns an error with both versions when they differ.
+func checkVitestVersionMatch(root string) error {
+	vv := installedVersion(root, "vitest")
+	cv := installedVersion(root, "@vitest/coverage-v8")
+	if vv == "" || cv == "" {
+		return nil // one or both not installed — let vitest surface its own error
+	}
+	if majorVersion(vv) != majorVersion(cv) {
+		return fmt.Errorf("vitest@%s and @vitest/coverage-v8@%s major versions differ — align them in package.json", vv, cv)
+	}
+	return nil
+}
+
 // detectCoverageWrapper returns "c8", "nyc", or "" by checking package.json deps.
 // c8 is preferred over nyc (more modern, native V8 coverage).
 func detectCoverageWrapper(root string) string {
