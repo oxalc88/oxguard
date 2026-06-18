@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // runCheck runs the full quality gate: lint (includes Ultracite/Biome complexity) → fta → types → coverage → security.
@@ -116,8 +117,12 @@ func runSemgrep(r *Runner) int {
 	if !ensureSinglePythonTool("semgrep") {
 		return 0
 	}
-	res := r.Run("semgrep", "semgrep", "--config=p/javascript", "--config=p/typescript",
-		"--error", "--quiet", ".")
+	args := []string{"semgrep", "--config=p/javascript", "--config=p/typescript", "--error", "--quiet"}
+	for _, dir := range r.excludeDirs {
+		args = append(args, "--exclude", dir)
+	}
+	args = append(args, ".")
+	res := r.Run("semgrep", args...)
 	if !res.ok {
 		return 1
 	}
@@ -148,7 +153,7 @@ func runSecrets(r *Runner, initFlag bool) int {
 	if initFlag {
 		// tsguard secrets --init: create baseline explicitly
 		fmt.Print("  Creating .secrets.baseline...")
-		out, err := RunCapture(r.root, "detect-secrets", "scan")
+		out, err := RunCapture(r.root, append([]string{"detect-secrets", "scan"}, detectSecretsExcludeArgs(r.excludeDirs)...)...)
 		if err != nil {
 			fmt.Printf(" failed\n  [FAIL] detect-secrets scan failed\n")
 			fmt.Println("         Install detect-secrets: pip install detect-secrets")
@@ -190,7 +195,8 @@ func runSecrets(r *Runner, initFlag bool) int {
 	}
 	defer os.Remove(tempBaselinePath)
 
-	_, _, scanErr := RunSilent(r.root, "detect-secrets", "scan", "--baseline", tempBaselinePath)
+	scanArgs := append([]string{"detect-secrets", "scan", "--baseline", tempBaselinePath}, detectSecretsExcludeArgs(r.excludeDirs)...)
+	_, _, scanErr := RunSilent(r.root, scanArgs...)
 	if scanErr != nil {
 		fmt.Println("  [FAIL] detect-secrets scan failed")
 		return 1
@@ -241,6 +247,14 @@ type secretEntry struct {
 	HashedSecret string `json:"hashed_secret"`
 	Type         string `json:"type"`
 	LineNumber   int    `json:"line_number"`
+}
+
+// detectSecretsExcludeArgs returns --exclude-files <regex> args for detect-secrets, or nil if dirs is empty.
+func detectSecretsExcludeArgs(dirs []string) []string {
+	if len(dirs) == 0 {
+		return nil
+	}
+	return []string{"--exclude-files", strings.Join(dirs, "|")}
 }
 
 // seedTempBaseline writes data to a fresh temp file and returns its path.

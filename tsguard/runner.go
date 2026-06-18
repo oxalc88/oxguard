@@ -16,11 +16,12 @@ import (
 
 // Runner executes subprocesses from the project root.
 type Runner struct {
-	root       string
-	timeout    int    // seconds per tool
-	logFile    string // path to append full output (empty = no log file)
-	tailLines  int    // print only the last N lines to stdout (0 = all)
-	pkgManager string
+	root        string
+	timeout     int      // seconds per tool
+	logFile     string   // path to append full output (empty = no log file)
+	tailLines   int      // print only the last N lines to stdout (0 = all)
+	pkgManager  string
+	excludeDirs []string // directories excluded from all security/scan tools
 }
 
 // Result holds the outcome of a single tool run.

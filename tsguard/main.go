@@ -35,6 +35,7 @@ Environment setup:
 
 Flags:
   --dirs <d1,d2>    override target directories (default: src,cdk)
+  --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)
   --timeout <s>     per-tool timeout in seconds (default: 300)
   --tail <n>        print only the last N lines of each tool's output to stdout
   --log-file <path> append full output to file (in addition to stdout)
@@ -117,7 +118,7 @@ func dispatch(cmd string, cfg config, root string) int {
 		}
 	}
 
-	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager}
+	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, excludeDirs: cfg.excludeDirs}
 
 	switch cmd {
 	case "check":
@@ -171,6 +172,7 @@ var heavyGates = map[string]bool{
 // config holds parsed flags.
 type config struct {
 	dirs         []string
+	excludeDirs  []string
 	timeout      int
 	ifTypeScript bool
 	initFlag     bool
@@ -185,6 +187,7 @@ type config struct {
 func parseFlags(args []string) config {
 	cfg := config{
 		dirs:        []string{"src", "cdk"},
+		excludeDirs: []string{"node_modules", "dist", ".next", "build", "coverage"},
 		timeout:     300,
 		ftaScoreCap: 60,
 	}
@@ -194,6 +197,11 @@ func parseFlags(args []string) config {
 			if i+1 < len(args) {
 				i++
 				cfg.dirs = strings.Split(args[i], ",")
+			}
+		case "--exclude":
+			if i+1 < len(args) {
+				i++
+				cfg.excludeDirs = append(cfg.excludeDirs, strings.Split(args[i], ",")...)
 			}
 		case "--timeout":
 			if i+1 < len(args) {
