@@ -22,7 +22,7 @@ slips through.
 | Maintainability index | radon mi | Files that have grown too tangled to maintain |
 | Halstead complexity | radon hal + check_halstead.py | Functions with too many distinct concepts — error-prone to reason about |
 | Type annotation complexity | check_type_complexity.py | Type hints that hide structure behind deep nesting |
-| Coverage | pytest + coverage | Untested code paths |
+| Coverage | pytest (or unittest via pytest) — 80% floor | Untested code paths |
 | Security — static | bandit | `eval()`, shell injection, weak crypto, insecure defaults |
 | Security — CVEs | pip-audit | Known CVEs in dependencies |
 | Security — secrets | detect-secrets | Credentials accidentally committed |
@@ -56,7 +56,7 @@ runtime. `pyguard setup` deploys them automatically to the consuming project's
 | Lint + format + cognitive complexity | ultracite (`ultracite/biome/core`) | Style drift, common JS/TS mistake patterns, excessive cognitive complexity |
 | Maintainability (FTA) | `fta` (from `fta-cli`) | Files too complex to maintain — catches what cyclomatic alone misses |
 | Types | tsc --noEmit | Type errors |
-| Coverage | vitest + coverage | Untested code paths |
+| Coverage | vitest / jest / mocha+c8 / ava+c8 — 80% floor | Untested code paths |
 | Security — static | semgrep | XSS, `eval()`, path traversal, insecure patterns |
 | Security — CVEs | npm audit | Known vulnerabilities in dependencies |
 | Security — secrets | detect-secrets | Credentials accidentally committed |
@@ -86,6 +86,24 @@ tsguard check --exclude docs,scripts  # exclude additional directories from all 
 tsguard check --max-fta-score 50      # tighten FTA complexity cap (default: 60)
 tsguard check --tail 30               # show only the last 30 lines of each tool's output
 ```
+
+**Coverage gate** — runner detection and threshold enforcement:
+
+tsguard reads `package.json` to detect the test runner (devDependencies and config files).
+The 80% floor is enforced regardless of project config — projects with stricter thresholds
+in their own config still fail at the higher value.
+
+| Runner detected | How coverage runs |
+|---|---|
+| `vitest` | `vitest run --coverage` with threshold flags |
+| `jest` | `jest --coverage --coverageThreshold={"global":...}` |
+| `mocha` / `ava` / `jasmine` | wrapped with `c8` or `nyc` (must be in devDependencies) |
+| none found | gate fails with install hint |
+| runner found, no wrapper | gate fails — add `c8` to devDependencies |
+
+pyguard detects pytest from `pyproject.toml` dev-group dependencies and config files.
+If only `unittest` test files are found (no pytest markers), pytest is used as the runner
+since it discovers and runs unittest tests natively.
 
 The security gate (`semgrep`, `detect-secrets`) requires Python tooling. `tsguard setup`
 installs both automatically via `uv tool install` (falling back to `pipx`). If the
