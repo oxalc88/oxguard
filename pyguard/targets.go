@@ -108,9 +108,10 @@ func runTypes(r *Runner, dirs []string) int {
 	return 0
 }
 
-// runCoverage runs pytest with coverage (threshold enforced via pyproject.toml).
+// runCoverage runs pytest with coverage, enforcing an 80% floor.
+// Projects with a stricter --cov-fail-under in pyproject.toml will still fail at their own threshold.
 func runCoverage(r *Runner) int {
-	res := r.Run("pytest --cov", "uv", "run", "pytest")
+	res := r.Run("pytest --cov", "uv", "run", "pytest", "--cov", "--cov-fail-under=80")
 	if !res.ok {
 		return 1
 	}
