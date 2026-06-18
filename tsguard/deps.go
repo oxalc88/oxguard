@@ -229,6 +229,36 @@ func detectTestRunner(root string) string {
 	return ""
 }
 
+// detectCoverageWrapper returns "c8", "nyc", or "" by checking package.json deps.
+// c8 is preferred over nyc (more modern, native V8 coverage).
+func detectCoverageWrapper(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, "package.json"))
+	if err != nil {
+		return ""
+	}
+	var pkg struct {
+		Dependencies    map[string]json.RawMessage `json:"dependencies"`
+		DevDependencies map[string]json.RawMessage `json:"devDependencies"`
+	}
+	if json.Unmarshal(data, &pkg) != nil {
+		return ""
+	}
+	allDeps := make(map[string]bool, len(pkg.Dependencies)+len(pkg.DevDependencies))
+	for k := range pkg.Dependencies {
+		allDeps[k] = true
+	}
+	for k := range pkg.DevDependencies {
+		allDeps[k] = true
+	}
+	if allDeps["c8"] {
+		return "c8"
+	}
+	if allDeps["nyc"] {
+		return "nyc"
+	}
+	return ""
+}
+
 // detectPackageManager returns "pnpm", "yarn", or "npm" by inspecting the project root.
 // Resolution order: package.json "packageManager" field → lockfile → default npm.
 func detectPackageManager(root string) string {

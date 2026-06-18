@@ -89,9 +89,9 @@ func runFTA(r *Runner, dirs []string, scoreCap int) int {
 	return 0
 }
 
-// runCoverage detects the project's test runner from package.json deps and config files,
-// then runs coverage with an 80% floor. vitest and jest are fully supported.
-// Other detected runners (mocha, ava, etc.) fail with a clear message.
+// runCoverage detects the project's test runner and enforces an 80% coverage floor.
+// vitest and jest have native threshold flags. For other runners (mocha, ava, jasmine)
+// c8 or nyc must be present to wrap the runner — fails hard if neither is found.
 func runCoverage(r *Runner) int {
 	runner := detectTestRunner(r.root)
 	switch runner {
@@ -118,8 +118,38 @@ func runCoverage(r *Runner) int {
 		fmt.Println("         Add vitest or jest to devDependencies")
 		return 1
 	default:
-		fmt.Printf("  [FAIL] coverage — %s detected but coverage enforcement requires vitest or jest\n", runner)
-		fmt.Println("         Migrate to vitest or jest, or run coverage manually")
+		return runCoverageWithWrapper(r, runner)
+	}
+	return 0
+}
+
+// runCoverageWithWrapper wraps runners that lack native coverage threshold support
+// (mocha, ava, jasmine, etc.) with c8 or nyc. Fails if neither wrapper is present.
+func runCoverageWithWrapper(r *Runner, runner string) int {
+	wrapper := detectCoverageWrapper(r.root)
+	switch wrapper {
+	case "c8":
+		args := pkgExec(r.pkgManager, "c8",
+			"--lines", "80", "--functions", "80", "--branches", "80", "--statements", "80",
+			runner,
+		)
+		res := r.Run(fmt.Sprintf("c8 %s --coverage", runner), args...)
+		if !res.ok {
+			return 1
+		}
+	case "nyc":
+		args := pkgExec(r.pkgManager, "nyc",
+			"--check-coverage",
+			"--lines", "80", "--functions", "80", "--branches", "80", "--statements", "80",
+			runner,
+		)
+		res := r.Run(fmt.Sprintf("nyc %s --coverage", runner), args...)
+		if !res.ok {
+			return 1
+		}
+	default:
+		fmt.Printf("  [FAIL] coverage — %s detected but no coverage wrapper found\n", runner)
+		fmt.Println("         Add c8 or nyc to devDependencies: npm install --save-dev c8")
 		return 1
 	}
 	return 0
