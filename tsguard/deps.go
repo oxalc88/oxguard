@@ -298,7 +298,9 @@ func detectCoverageWrapper(root string) string {
 }
 
 // detectPackageManager returns "pnpm", "yarn", or "npm" by inspecting the project root.
-// Resolution order: package.json "packageManager" field → lockfile → default npm.
+// Resolution order: package.json "packageManager" field → lockfile (walks up to workspace root) → default npm.
+// Lockfile walk is necessary for pnpm/yarn workspaces where the lockfile lives at the workspace
+// root rather than in each subpackage directory.
 func detectPackageManager(root string) string {
 	if data, err := os.ReadFile(filepath.Join(root, "package.json")); err == nil {
 		var pkg struct {
@@ -312,14 +314,23 @@ func detectPackageManager(root string) string {
 			}
 		}
 	}
-	for _, pair := range [][2]string{
+	lockfiles := [][2]string{
 		{"pnpm-lock.yaml", "pnpm"},
 		{"yarn.lock", "yarn"},
 		{"package-lock.json", "npm"},
-	} {
-		if _, err := os.Stat(filepath.Join(root, pair[0])); err == nil {
-			return pair[1]
+	}
+	dir := root
+	for {
+		for _, pair := range lockfiles {
+			if _, err := os.Stat(filepath.Join(dir, pair[0])); err == nil {
+				return pair[1]
+			}
 		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
 	}
 	return "npm"
 }

@@ -205,6 +205,38 @@ func TestDetectPackageManager(t *testing.T) {
 	}
 }
 
+// TestDetectPackageManagerWorkspace verifies lockfile detection walks up to the workspace root.
+// In pnpm/yarn workspaces the lockfile lives at the workspace root, not in each subpackage.
+func TestDetectPackageManagerWorkspace(t *testing.T) {
+	cases := []struct {
+		name     string
+		lockfile string
+		wantPM   string
+	}{
+		{"pnpm workspace lockfile at grandparent", "pnpm-lock.yaml", "pnpm"},
+		{"yarn workspace lockfile at grandparent", "yarn.lock", "yarn"},
+		{"npm workspace lockfile at grandparent", "package-lock.json", "npm"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			workspaceRoot := t.TempDir()
+			subpkg := filepath.Join(workspaceRoot, "packages", "foundation")
+			if err := os.MkdirAll(subpkg, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			// Lockfile at workspace root only — not in the subpackage.
+			if err := os.WriteFile(filepath.Join(workspaceRoot, tc.lockfile), []byte(""), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			got := detectPackageManager(subpkg)
+			if got != tc.wantPM {
+				t.Fatalf("detectPackageManager = %q, want %q", got, tc.wantPM)
+			}
+		})
+	}
+}
+
 // TestPkgExecSelectsCorrectRunner checks pkgExec returns the right command prefix.
 func TestPkgExecSelectsCorrectRunner(t *testing.T) {
 	cases := []struct {
