@@ -171,3 +171,55 @@ func confirmYesNo(prompt string, defaultYes bool, assumeYes bool) bool {
 func isCI() bool {
 	return os.Getenv("CI") == "true" || os.Getenv("CI") == "1"
 }
+
+// detectPythonTestRunner inspects pyproject.toml deps and config files to identify
+// the project's test runner. Returns "pytest", "unittest", or "".
+// unittest returns "unittest" only when no pytest markers are found but test files exist —
+// pyguard will still run pytest (which discovers unittest tests natively).
+func detectPythonTestRunner(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, "pyproject.toml"))
+	if err == nil {
+		var raw map[string]interface{}
+		if toml.Unmarshal(data, &raw) == nil {
+			declared := map[string]bool{}
+			if dg, ok := raw["dependency-groups"].(map[string]interface{}); ok {
+				collectDepGroup(dg, "dev", declared)
+			}
+			if tool, ok := raw["tool"].(map[string]interface{}); ok {
+				if uvSec, ok := tool["uv"].(map[string]interface{}); ok {
+					if devList, ok := uvSec["dev-dependencies"].([]interface{}); ok {
+						for _, v := range devList {
+							if s, ok := v.(string); ok {
+								declared[normPkgName(s)] = true
+							}
+						}
+					}
+				}
+			}
+			if declared["pytest"] {
+				return "pytest"
+			}
+		}
+	}
+
+	// Config file fallback.
+	for _, f := range []string{"pytest.ini", "conftest.py"} {
+		if _, err := os.Stat(filepath.Join(root, f)); err == nil {
+			return "pytest"
+		}
+	}
+	if data, err := os.ReadFile(filepath.Join(root, "setup.cfg")); err == nil {
+		if strings.Contains(string(data), "[tool:pytest]") {
+			return "pytest"
+		}
+	}
+
+	// No pytest markers found — check for test files (unittest convention).
+	for _, dir := range []string{"tests", "test"} {
+		if entries, err := os.ReadDir(filepath.Join(root, dir)); err == nil && len(entries) > 0 {
+			return "unittest"
+		}
+	}
+
+	return ""
+}

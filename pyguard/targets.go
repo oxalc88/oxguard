@@ -108,11 +108,26 @@ func runTypes(r *Runner, dirs []string) int {
 	return 0
 }
 
-// runCoverage runs pytest with coverage, enforcing an 80% floor.
-// Projects with a stricter --cov-fail-under in pyproject.toml will still fail at their own threshold.
+// runCoverage detects the project's test runner from pyproject.toml and config files,
+// then runs coverage with an 80% floor. pytest is used directly; for unittest projects
+// pytest is used as the runner since it discovers unittest tests natively.
 func runCoverage(r *Runner) int {
-	res := r.Run("pytest --cov", "uv", "run", "pytest", "--cov", "--cov-fail-under=80")
-	if !res.ok {
+	runner := detectPythonTestRunner(r.root)
+	switch runner {
+	case "pytest":
+		res := r.Run("pytest --cov", "uv", "run", "pytest", "--cov", "--cov-fail-under=80")
+		if !res.ok {
+			return 1
+		}
+	case "unittest":
+		// pytest discovers and runs unittest tests without requiring rewrites.
+		res := r.Run("pytest --cov (unittest)", "uv", "run", "pytest", "--cov", "--cov-fail-under=80")
+		if !res.ok {
+			return 1
+		}
+	case "":
+		fmt.Println("  [FAIL] coverage — no test runner or test files found")
+		fmt.Println("         Add pytest to dev dependencies: uv add --group dev pytest pytest-cov")
 		return 1
 	}
 	return 0
