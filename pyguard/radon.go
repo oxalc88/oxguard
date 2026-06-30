@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -23,12 +22,7 @@ func runRadon(r *Runner, dirs []string) int {
 
 	// Export test-exclusion env vars for the Python analysis scripts (check_halstead.py,
 	// check_type_complexity.py), which use _paths.collect_paths as their single walk point.
-	if r.excludeTests {
-		os.Setenv("PYGUARD_EXCLUDE_TESTS", "1")
-	} else {
-		os.Setenv("PYGUARD_EXCLUDE_TESTS", "0")
-	}
-	os.Setenv("PYGUARD_EXCLUDE_GLOBS", strings.Join(r.exclude, ","))
+	r.exportExcludeEnv()
 
 	// Informational display: CC averages, MI, Halstead raw numbers
 	args := append(radonExcludeArgs(r, "cc", "--total-average"), dirs...)

@@ -5,10 +5,12 @@ from __future__ import annotations
 import fnmatch
 import os
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 
-def _test_exclude_patterns() -> list[str]:
+@lru_cache(maxsize=None)
+def _test_exclude_patterns() -> tuple[str, ...]:
     """Return file-name glob patterns to exclude, driven by Go-set env vars.
 
     PYGUARD_EXCLUDE_TESTS=1   → add conventional test-file patterns.
@@ -21,10 +23,10 @@ def _test_exclude_patterns() -> list[str]:
     raw_globs = os.environ.get("PYGUARD_EXCLUDE_GLOBS", "")
     if raw_globs:
         patterns += [g.strip() for g in raw_globs.split(",") if g.strip()]
-    return patterns
+    return tuple(patterns)
 
 
-def _is_excluded(path: Path, patterns: list[str]) -> bool:
+def _is_excluded(path: Path, patterns: tuple[str, ...]) -> bool:
     """Return True if path matches any of the exclusion glob patterns."""
     name = path.name
     return any(fnmatch.fnmatch(name, pat) for pat in patterns)

@@ -24,6 +24,17 @@ type Runner struct {
 	exclude      []string // additional exclude globs from [tool.pyguard] exclude
 }
 
+// exportExcludeEnv sets PYGUARD_EXCLUDE_TESTS and PYGUARD_EXCLUDE_GLOBS for Python
+// analysis scripts that use _paths.collect_paths as their single file-walk point.
+func (r *Runner) exportExcludeEnv() {
+	val := "0"
+	if r.excludeTests {
+		val = "1"
+	}
+	os.Setenv("PYGUARD_EXCLUDE_TESTS", val)
+	os.Setenv("PYGUARD_EXCLUDE_GLOBS", strings.Join(r.exclude, ","))
+}
+
 // Result holds the outcome of a single tool run.
 type Result struct {
 	name   string

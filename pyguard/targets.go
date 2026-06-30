@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // runCheck runs the full quality gate: ruff → mypy → radon → coverage → security.
@@ -100,15 +99,8 @@ func runMypy(r *Runner, dirs []string) int {
 }
 
 // runTypes checks type-annotation complexity (depth > 2 or length > 40 chars).
-// Exports PYGUARD_EXCLUDE_TESTS/PYGUARD_EXCLUDE_GLOBS so _paths.collect_paths
-// applies the same test-file filtering as the radon gate.
 func runTypes(r *Runner, dirs []string) int {
-	if r.excludeTests {
-		os.Setenv("PYGUARD_EXCLUDE_TESTS", "1")
-	} else {
-		os.Setenv("PYGUARD_EXCLUDE_TESTS", "0")
-	}
-	os.Setenv("PYGUARD_EXCLUDE_GLOBS", strings.Join(r.exclude, ","))
+	r.exportExcludeEnv()
 	args := append([]string{"uv", "run", "python", "tools/analysis/check_type_complexity.py"}, dirs...)
 	res := r.Run("types", args...)
 	if !res.ok {
