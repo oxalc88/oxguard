@@ -208,27 +208,27 @@ func runSecretsInit(r *Runner) int {
 	return 0
 }
 
-// runNpmAudit runs the PM-native dependency vulnerability scan (hard gate for moderate+).
-// Also runs audit-ci for threshold enforcement and allowlist support.
+// runNpmAudit runs dependency vulnerability scanning. audit-ci is the hard gate:
+// it supports allowlists (.auditcirc.json) and custom thresholds. PM-native audit
+// runs first as informational output (richer output format) but does not gate.
 func runNpmAudit(r *Runner) int {
-	// PM-native audit.
-	var auditArgs []string
+	// PM-native audit — informational; richer output, does not gate.
+	var infoArgs []string
 	switch r.pkgManager {
 	case "pnpm":
-		auditArgs = []string{"pnpm", "audit", "--audit-level", "moderate"}
+		infoArgs = []string{"pnpm", "audit", "--audit-level", "moderate"}
 	case "yarn":
-		auditArgs = []string{"yarn", "npm", "audit", "--severity", "moderate"}
+		infoArgs = []string{"yarn", "npm", "audit", "--severity", "moderate"}
 	default:
-		auditArgs = []string{"npm", "audit", "--audit-level=moderate"}
+		infoArgs = []string{"npm", "audit", "--audit-level=moderate"}
 	}
-	res := r.Run("dependency audit", auditArgs...)
+	r.Run("dependency audit (info)", infoArgs...)
+
+	// audit-ci — hard gate: threshold enforcement + allowlist via .auditcirc.json.
+	res := r.Run("audit-ci", pkgExec(r.pkgManager, "audit-ci", "--moderate")...)
 	if !res.ok {
 		return 1
 	}
-
-	// audit-ci: threshold enforcement with allowlist support (.auditcirc.json if present).
-	auditCIArgs := pkgExec(r.pkgManager, "audit-ci", "--moderate")
-	r.Run("audit-ci", auditCIArgs...) // advisory — don't fail the gate (audit already gated above)
 	return 0
 }
 
