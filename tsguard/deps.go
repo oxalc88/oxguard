@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"golang.org/x/term"
@@ -21,10 +24,160 @@ var requiredNpmDevDeps = []string{
 	"fta-cli",
 	"knip",
 	"jscpd",
+	// Security: secrets + CVE gates (no Python required).
+	"secretlint",
+	"@secretlint/secretlint-rule-preset-recommend",
+	"audit-ci",
 }
 
-// pythonHelperTools are installed system-wide via uv tool / pipx, not npm.
-var pythonHelperTools = []string{"semgrep", "detect-secrets"}
+// opengrep delivery: pinned version downloaded project-local (no pip, no global install).
+// Binary lands in node_modules/.cache/oxguard/opengrep (not committed, .gitignore'd).
+const (
+	opengrepVersion = "v1.23.0"
+	opengrepCacheDir = "node_modules/.cache/oxguard"
+	opengrepBinary   = "opengrep"
+)
+
+// opengrepBinaryPath returns the project-local Opengrep binary path.
+func opengrepBinaryPath(root string) string {
+	name := opengrepBinary
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return filepath.Join(root, opengrepCacheDir, name)
+}
+
+// opengrepAssetName returns the Opengrep release asset filename for this platform.
+// Asset naming: opengrep_<os>_<arch>[.exe]
+// Linux: manylinux (glibc, standard distros) for amd64; musllinux for containers.
+// Returns ("", false) for unsupported platforms.
+func opengrepAssetName() (string, bool) {
+	switch runtime.GOOS {
+	case "linux":
+		switch runtime.GOARCH {
+		case "amd64":
+			return "opengrep_manylinux_x86", true
+		case "arm64":
+			return "opengrep_manylinux_aarch64", true
+		}
+	case "darwin":
+		switch runtime.GOARCH {
+		case "amd64":
+			return "opengrep_osx_x86", true
+		case "arm64":
+			return "opengrep_osx_arm64", true
+		}
+	case "windows":
+		if runtime.GOARCH == "amd64" {
+			return "opengrep_windows_x86.exe", true
+		}
+	}
+	return "", false
+}
+
+// ensureOpengrep ensures the project-local Opengrep binary is present and correct.
+// Downloads from GitHub Releases if missing. Returns false with a printed skip message
+// on failure (network unavailable, unsupported platform) — never returns an error that
+// blocks setup; the gate itself will [SKIP] if the binary is absent.
+func ensureOpengrep(root string, cfg config) bool {
+	binaryPath := opengrepBinaryPath(root)
+	if _, err := os.Stat(binaryPath); err == nil {
+		// Already present — verify it runs.
+		if _, _, err := RunSilent("", binaryPath, "--version"); err == nil {
+			fmt.Printf("  [OK]   opengrep %s (project-local)\n", opengrepVersion)
+			return true
+		}
+		// Broken binary — remove and re-download.
+		_ = os.Remove(binaryPath)
+	}
+
+	assetName, ok := opengrepAssetName()
+	if !ok {
+		fmt.Printf("  [SKIP] opengrep — unsupported platform %s/%s\n", runtime.GOOS, runtime.GOARCH)
+		return false
+	}
+
+	baseURL := fmt.Sprintf("https://github.com/opengrep/opengrep/releases/download/%s", opengrepVersion)
+
+	if !confirmYesNo("  Download Opengrep (project-local SAST engine, ~50 MB)?", true, cfg.assumeYes) {
+		fmt.Println("  [SKIP] opengrep — skipped. SAST gate will [SKIP] until downloaded.")
+		return false
+	}
+
+	fmt.Printf("  [..]   downloading opengrep %s...\n", opengrepVersion)
+
+	cacheDir := filepath.Join(root, opengrepCacheDir)
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		fmt.Printf("  [SKIP] opengrep — could not create cache dir: %v\n", err)
+		return false
+	}
+
+	// Download binary.
+	tmpBin := binaryPath + ".tmp"
+	if err := downloadFile(tmpBin, baseURL+"/"+assetName); err != nil {
+		fmt.Printf("  [SKIP] opengrep — download failed: %v\n", err)
+		_ = os.Remove(tmpBin)
+		return false
+	}
+
+	if err := os.Chmod(tmpBin, 0o755); err != nil {
+		fmt.Printf("  [SKIP] opengrep — chmod failed: %v\n", err)
+		_ = os.Remove(tmpBin)
+		return false
+	}
+	if err := os.Rename(tmpBin, binaryPath); err != nil {
+		fmt.Printf("  [SKIP] opengrep — could not install binary: %v\n", err)
+		_ = os.Remove(tmpBin)
+		return false
+	}
+
+	// Write to .gitignore so the binary is not committed.
+	addToGitignore(root, opengrepCacheDir+"/")
+
+	fmt.Printf("  [OK]   opengrep %s installed (project-local)\n", opengrepVersion)
+	return true
+}
+
+// downloadFile downloads url to destPath via HTTP GET.
+func downloadFile(destPath, url string) error {
+	resp, err := http.Get(url) //nolint:gosec,noctx
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+	}
+	f, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+
+// addToGitignore appends line to .gitignore if it is not already present.
+func addToGitignore(root, line string) {
+	gitignorePath := filepath.Join(root, ".gitignore")
+	data, _ := os.ReadFile(gitignorePath)
+	for _, existing := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(existing) == strings.TrimSpace(line) {
+			return
+		}
+	}
+	f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	prefix := ""
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		prefix = "\n"
+	}
+	_, _ = fmt.Fprintf(f, "%s%s\n", prefix, line)
+}
 
 // missingNpmDevDeps reads package.json and returns deps from manifest that are
 // absent from both devDependencies and dependencies. Returns nil if package.json
@@ -90,51 +243,6 @@ func ensureNpmDevDeps(root string, cfg config) error {
 	return nil
 }
 
-// ensurePythonHelperTools installs semgrep and detect-secrets system-wide via
-// uv tool install → pipx install → install hint. Never blocks setup.
-func ensurePythonHelperTools(cfg config) {
-	for _, tool := range pythonHelperTools {
-		if toolAvailable(tool) {
-			fmt.Printf("  [OK]   %s\n", tool)
-			continue
-		}
-		if !confirmYesNo(fmt.Sprintf("  Install %s (uv tool install)?", tool), true, cfg.assumeYes) {
-			fmt.Printf("  [SKIP] %s — install manually: uv tool install %s\n", tool, tool)
-			continue
-		}
-		ensureSinglePythonTool(tool)
-	}
-}
-
-// ensureSinglePythonTool ensures the tool is available, installing it if missing.
-// Returns true if available after the attempt. Runtime gates call this directly
-// so a drifted environment self-heals instead of silently passing the security gate.
-func ensureSinglePythonTool(tool string) bool {
-	if toolAvailable(tool) {
-		return true
-	}
-	uvOk := toolAvailable("uv")
-	pipxOk := toolAvailable("pipx")
-	if !uvOk && !pipxOk {
-		fmt.Printf("  [SKIP] %s — install manually: uv tool install %s\n", tool, tool)
-		return false
-	}
-	fmt.Printf("  [..]   %s — installing...\n", tool)
-	if uvOk {
-		if err := RunStreaming("", "uv", "tool", "install", tool); err == nil {
-			fmt.Printf("  [OK]   %s (via uv)\n", tool)
-			return true
-		}
-	}
-	if pipxOk {
-		if err := RunStreaming("", "pipx", "install", tool); err == nil {
-			fmt.Printf("  [OK]   %s (via pipx)\n", tool)
-			return true
-		}
-	}
-	fmt.Printf("  [SKIP] %s — install manually:\n         uv tool install %s   # or: pipx install %s\n", tool, tool, tool)
-	return false
-}
 
 // confirmYesNo prints a y/n prompt and returns the user's choice.
 // Returns defaultYes immediately when assumeYes is set, CI=true, or stdin is not a TTY.
