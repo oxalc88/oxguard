@@ -30,6 +30,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   exclude = ["*/fixtures/*"]     # add project-specific patterns
   ```
 
+## [0.5.1] — 2026-06-30
+
+### Changed
+
+- **Default scan scope is now `.` (project root)** — both `tsguard` and `pyguard` previously
+  defaulted to opinionated directory lists (`src,cdk` and `functions,cdk` respectively).
+  The new default scans from the project root so the gate works out of the box on any
+  layout without requiring `--dirs`. Override per-project with `--dirs src,lib` or set
+  `dirs` in `oxguard.toml` / `[tool.pyguard]`.
+
 ## [0.5.0] — 2026-06-30
 
 ### Added
