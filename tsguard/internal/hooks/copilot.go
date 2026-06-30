@@ -6,30 +6,16 @@ import (
 	"strings"
 )
 
-const copilotInstructions = `
-## TypeScript quality gates (tsguard)
-
-After editing TypeScript files, run ` + "`tsguard check`" + ` to validate all quality gates.
-Fix any failures before committing. Key commands:
-
-- ` + "`tsguard check`" + `    — full gate: lint → fta → types → coverage → security (secretlint + audit-ci + opengrep)
-- ` + "`tsguard fix`" + `      — auto-format (ultracite fix)
-- ` + "`tsguard security`" + ` — secrets + CVE + SAST only
-- ` + "`tsguard setup`" + `    — install deps + download opengrep binary
-
-Project config: ` + "`oxguard.toml`" + ` at repo root overrides default dirs and excludes.
-`
-
 // GenerateCopilotInstructions appends tsguard usage instructions to
-// .github/copilot-instructions.md, creating the file if absent.
-func GenerateCopilotInstructions(root string) error {
+// .github/copilot-instructions.md using content from the caller's embedded
+// skill/copilot.md. Creates the file if absent; idempotent via marker check.
+func GenerateCopilotInstructions(root string, content []byte) error {
 	ghDir := filepath.Join(root, "..", ".github")
 	if err := os.MkdirAll(ghDir, 0o755); err != nil {
 		return err
 	}
 	dest := filepath.Join(ghDir, "copilot-instructions.md")
 	existing, _ := os.ReadFile(dest)
-	// Avoid duplicating the block if it's already present.
 	marker := "## TypeScript quality gates (tsguard)"
 	if strings.Contains(string(existing), marker) {
 		return nil
@@ -39,7 +25,7 @@ func GenerateCopilotInstructions(root string) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.WriteString(copilotInstructions)
+	_, err = f.Write(append([]byte("\n"), content...))
 	return err
 }
 

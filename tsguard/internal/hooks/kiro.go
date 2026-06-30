@@ -3,9 +3,10 @@ package hooks
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
-func GenerateKiroHook(root string) error {
+func GenerateKiroHook(root string, agentTemplate []byte) error {
 	binJSON := jsonEscapePath(tsguardBinary(root))
 
 	hooksDir := filepath.Join(root, "..", ".kiro", "hooks")
@@ -29,20 +30,6 @@ func GenerateKiroHook(root string) error {
 		return err
 	}
 
-	agentContent := fmt.Sprintf(`{
-  "name": "tsguard",
-  "description": "TypeScript quality gate runner. Quality checks run automatically after every file write.",
-  "prompt": "You are working in a TypeScript project guarded by tsguard. After every write, the postToolUse hook runs '%s check --if-typescript' automatically. If the gate fails, fix the issue before continuing. Manual commands: tsguard check, tsguard fix, tsguard lint, tsguard types, tsguard coverage.",
-  "tools": ["read", "write", "shell"],
-  "hooks": {
-    "postToolUse": [
-      {
-        "matcher": "fs_write",
-        "command": "%s check --if-typescript"
-      }
-    ]
-  }
-}
-`, binJSON, binJSON)
+	agentContent := strings.ReplaceAll(string(agentTemplate), "__BINARY__", binJSON)
 	return writeHookFile(filepath.Join(agentsDir, "tsguard.json"), agentContent)
 }

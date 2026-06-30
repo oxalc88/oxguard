@@ -5,25 +5,13 @@ import (
 	"path/filepath"
 )
 
-func GenerateOpenCodePlugin(root string) error {
+func GenerateOpenCodePlugin(root string, pluginContent []byte) error {
 	pluginDir := filepath.Join(root, "..", ".opencode", "plugins", "tsguard")
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		return err
 	}
 
-	tsContent := `import type { Plugin } from "@opencode-ai/plugin"
-
-export const KpsPlugin: Plugin = async ({ $ }) => {
-  return {
-    "file.edited": async (input: { filePath: string }) => {
-      if (input.filePath.endsWith(".ts") || input.filePath.endsWith(".tsx")) {
-        await $` + "`tsguard check`" + `
-      }
-    },
-  }
-}
-`
-	if err := writeHookFile(filepath.Join(pluginDir, "index.ts"), tsContent); err != nil {
+	if err := writeHookFile(filepath.Join(pluginDir, "index.ts"), string(pluginContent)); err != nil {
 		return err
 	}
 
