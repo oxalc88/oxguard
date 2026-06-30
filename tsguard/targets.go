@@ -183,9 +183,12 @@ func runSecurity(r *Runner, initFlag bool) int {
 }
 
 // runSecretlint scans for hardcoded credentials using secretlint (npm-native, no Python).
+// Scopes to r.dirs so it only scans project source; .gitignore handles exclusions.
+// NOTE: Go's exec.Command does not invoke a shell — globs like **/* would be passed
+// as literals. Pass source dirs as positional arguments instead.
 func runSecretlint(r *Runner) int {
-	// secretlint scans all tracked files; exclude dirs using --ignore-path or pattern args.
-	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore", "**/*")
+	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore")
+	args = append(args, r.dirs...)
 	res := r.Run("secretlint", args...)
 	if !res.ok {
 		return 1
@@ -193,13 +196,13 @@ func runSecretlint(r *Runner) int {
 	return 0
 }
 
-// runSecretsInit is the legacy entry point (tsguard secrets --init).
-// With secretlint, there is no persistent baseline to create — secretlint scans
-// all files on each run. This command now runs secretlint in dry-run mode and
-// reports findings without failing, so the developer can see the state.
+// runSecretsInit is the entry point for tsguard secrets --init.
+// secretlint requires no persistent baseline — it scans on every run.
+// This command runs a scan and reports findings for developer review.
 func runSecretsInit(r *Runner) int {
 	fmt.Println("  Scanning for secrets (secretlint)...")
-	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore", "**/*")
+	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore")
+	args = append(args, r.dirs...)
 	r.Run("secretlint scan", args...)
 	fmt.Println("  [OK]   secretlint scan complete (no baseline needed)")
 	return 0
