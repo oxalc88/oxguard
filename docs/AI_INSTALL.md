@@ -150,6 +150,9 @@ Report the new version and any changes to the doctor output.
   skip the interactive AI tool picker (stdin is not a TTY in agent mode). To deploy
   hook configs and skill files, the user must run `tsguard hooks` / `pyguard hooks`
   interactively. Informing the user of this is step 6 in the install prompts above.
+- **Default scan scope** — both tools scan from the project root (`.`) by default.
+  `node_modules`, `dist`, `.next`, `build`, `coverage`, and AI tool dirs are always
+  excluded. Pass `--dirs src,lib` to restrict to specific subdirectories.
 - **`oxguard.toml`** (tsguard only) — projects can create an `oxguard.toml` at the
   repo root to set default `dirs`, `exclude`, `fta-score-cap`, and `timeout` without
   passing CLI flags every time. CLI flags always win over the file.
