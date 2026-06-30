@@ -14,12 +14,6 @@ var claudeSkillContent []byte
 //go:embed skill/cursor.mdc
 var cursorRuleContent []byte
 
-//go:embed skill/copilot.md
-var copilotInstructionsContent []byte
-
-//go:embed skill/codex.md
-var codexSkillContent []byte
-
 //go:embed skill/kiro-agent.json
 var kiroAgentContent []byte
 
