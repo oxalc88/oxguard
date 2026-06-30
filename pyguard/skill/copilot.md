@@ -8,4 +8,4 @@ Fix any failures before committing. Key commands:
 - `pyguard security` — secrets + CVE + SAST only
 - `pyguard setup`    — install dev deps via uv
 
-Default dirs: `functions,cdk` — override with `--dirs` if the project structure differs.
+Default dirs: `.` (project root) — use `--dirs` to restrict to specific subdirectories.

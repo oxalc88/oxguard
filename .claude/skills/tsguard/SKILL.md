@@ -64,7 +64,7 @@ Pregunta una sola vez con `AskUserQuestion`:
 Si el usuario ya indicó el subcomando en su mensaje, úsalo sin preguntar.
 
 Flags adicionales:
-- `--dirs <d1,d2,...>` — default `src,cdk`; adapta si el proyecto tiene otra estructura. También configurable en `oxguard.toml`.
+- `--dirs <d1,d2,...>` — default `.` (raíz del proyecto); usa esto si quieres restringir a subdirectorios específicos. También configurable en `oxguard.toml`.
 - `--exclude <d1,d2,...>` — excluir directorios adicionales. Aditivo; los defaults (`node_modules`, `dist`, `.agents`, `.claude`, etc.) siempre aplican.
 - `--max-fta-score <n>` — default `60`
 - `--timeout <s>` — default 300

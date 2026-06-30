@@ -34,7 +34,7 @@ Environment setup:
   tsguard hooks          generate AI tool hook configs
 
 Flags:
-  --dirs <d1,d2>    override target directories (default: src,cdk)
+  --dirs <d1,d2>    override target directories (default: . — project root)
   --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)
   --timeout <s>     per-tool timeout in seconds (default: 300)
   --tail <n>        print only the last N lines of each tool's output to stdout

@@ -27,7 +27,7 @@ func TestRunComplexityUsesUltraciteCheck(t *testing.T) {
 func TestRunCheckDoesNotRunSeparateComplexityStep(t *testing.T) {
 	r, logPath := newTestRunner(t)
 
-	if code := runCheck(r, []string{"src", "cdk"}, 60); code != 0 {
+	if code := runCheck(r, []string{"."}, 60); code != 0 {
 		t.Fatalf("runCheck returned %d", code)
 	}
 

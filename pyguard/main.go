@@ -39,7 +39,7 @@ Testing (replaces jq):
   pyguard test <fn> <client>      invoke test harness + parse summary
 
 Flags:
-  --dirs <d1,d2>    override target directories (default: functions,cdk)
+  --dirs <d1,d2>    override target directories (default: . — project root)
   --timeout <s>     per-tool timeout in seconds (default: 300)
   --tail <n>        print only the last N lines of each tool's output to stdout
   --log-file <path> append full output to file (in addition to stdout)
@@ -203,7 +203,7 @@ type config struct {
 
 func parseFlags(args []string) config {
 	cfg := config{
-		dirs:    []string{"functions", "cdk"},
+		dirs:    []string{"."},
 		timeout: 300,
 	}
 	for i := 0; i < len(args); i++ {

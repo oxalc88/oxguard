@@ -10,7 +10,8 @@ import (
 )
 
 // defaultDirs are scanned when neither CLI nor oxguard.toml specifies dirs.
-var defaultDirs = []string{"src", "cdk"}
+// Scan from project root; excludeDirs filters the noise.
+var defaultDirs = []string{"."}
 
 // defaultExcludes are always applied to every gate.
 var defaultExcludes = []string{

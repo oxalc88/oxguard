@@ -80,7 +80,7 @@ tsguard complexity   # compatibility alias: complexity is enforced by ultracite 
 Key flags:
 
 ```bash
-tsguard check --dirs src,lib          # override scanned directories (default: src,cdk)
+tsguard check --dirs src,lib          # override scanned directories (default: . — project root)
 tsguard check --exclude docs,scripts  # exclude additional directories from all scans
                                       # node_modules, dist, .next, build, coverage are always excluded
 tsguard check --max-fta-score 50      # tighten FTA complexity cap (default: 60)

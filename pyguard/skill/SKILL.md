@@ -64,7 +64,7 @@ Pregunta una sola vez con `AskUserQuestion`:
 Si el usuario ya indicó el subcomando en su mensaje ("corre pyguard mypy"), úsalo sin preguntar.
 
 Flags adicionales que el usuario puede pasar:
-- `--dirs <d1,d2,...>` — default `functions,cdk`; si el proyecto tiene otra estructura, usa la que corresponda
+- `--dirs <d1,d2,...>` — default `.` (raíz del proyecto); usa esto si quieres restringir a subdirectorios específicos
 - `--timeout <s>` — default 300; no cambies sin que el usuario lo pida
 
 ## Paso 4: ejecutar con log-file
