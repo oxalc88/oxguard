@@ -18,7 +18,8 @@ func TestRunComplexityUsesUltraciteCheck(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 command, got %d: %v", len(entries), entries)
 	}
-	if got := entries[0]; got != "npx ultracite check" {
+	// runLint now appends dirs to the ultracite check command.
+	if got := entries[0]; !strings.HasPrefix(got, "npx ultracite check") {
 		t.Fatalf("expected ultracite complexity alias, got %q", got)
 	}
 }
@@ -33,7 +34,8 @@ func TestRunCheckDoesNotRunSeparateComplexityStep(t *testing.T) {
 	entries := readCommandLog(t, logPath)
 	lintRuns := 0
 	for _, entry := range entries {
-		if entry == "npx ultracite check" {
+		// runLint now appends dirs to the command (e.g. "npx ultracite check src cdk").
+		if strings.HasPrefix(entry, "npx ultracite check") {
 			lintRuns++
 		}
 		if strings.Contains(entry, "@biomejs/biome") {
@@ -46,8 +48,8 @@ func TestRunCheckDoesNotRunSeparateComplexityStep(t *testing.T) {
 	}
 }
 
-// TestRunCheckNoAuditCall asserts detect-secrets audit is never invoked in check.
-func TestRunCheckNoAuditCall(t *testing.T) {
+// TestRunCheckNoDetectSecretsCall asserts detect-secrets (old Python tool) is never invoked.
+func TestRunCheckNoDetectSecretsCall(t *testing.T) {
 	r, logPath := newTestRunner(t)
 
 	if code := runCheck(r, []string{"src"}, 60); code != 0 {
@@ -55,86 +57,44 @@ func TestRunCheckNoAuditCall(t *testing.T) {
 	}
 
 	for _, entry := range readCommandLog(t, logPath) {
-		if strings.Contains(entry, "detect-secrets audit") {
-			t.Fatalf("detect-secrets audit must not be called in check, got: %q", entry)
+		if strings.Contains(entry, "detect-secrets") {
+			t.Fatalf("detect-secrets must not be called in check, got: %q", entry)
 		}
 	}
 }
 
-// TestSecretsScanDiff_Pass verifies the gate passes when scan matches baseline.
-func TestSecretsScanDiff_Pass(t *testing.T) {
+// TestRunCheckNoPythonToolCalls asserts no Python tools (semgrep, detect-secrets, pipx, uv) are invoked.
+func TestRunCheckNoPythonToolCalls(t *testing.T) {
 	r, logPath := newTestRunner(t)
 
-	// Baseline and scan both empty — no new secrets.
-	if err := os.WriteFile(filepath.Join(r.root, ".secrets.baseline"), []byte(`{"results":{}}`), 0o644); err != nil {
-		t.Fatal(err)
+	if code := runCheck(r, []string{"src"}, 60); code != 0 {
+		t.Fatalf("runCheck returned %d", code)
 	}
 
-	if code := runSecrets(r, false); code != 0 {
-		t.Fatalf("runSecrets returned %d, want 0", code)
-	}
-
-	found := false
-	for _, e := range readCommandLog(t, logPath) {
-		if strings.HasPrefix(e, "detect-secrets scan") {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatal("expected detect-secrets scan to be logged")
-	}
-}
-
-// seedBaselineWithNewSecret writes an empty baseline and sets DETECT_SECRETS_SCAN_OUTPUT
-// to report a single new secret, so runSecrets will see a diff and fail.
-func seedBaselineWithNewSecret(t *testing.T, r *Runner) string {
-	t.Helper()
-	baselinePath := filepath.Join(r.root, ".secrets.baseline")
-	if err := os.WriteFile(baselinePath, []byte(`{"results":{}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("DETECT_SECRETS_SCAN_OUTPUT",
-		`{"results":{"src/api.ts":[{"hashed_secret":"abc123","type":"Hex High Entropy String","line_number":42}]}}`)
-	return baselinePath
-}
-
-// TestSecretsScanUsesBaseline verifies the scan command passes a baseline copy
-// back to detect-secrets so baseline filters and exclusions are applied without
-// mutating the user's checked-in baseline.
-func TestSecretsScanUsesBaseline(t *testing.T) {
-	r, logPath := newTestRunner(t)
-	baselinePath := seedBaselineWithNewSecret(t, r)
-
-	if code := runSecrets(r, false); code == 0 {
-		t.Fatal("runSecrets returned 0, want non-zero (new secret detected)")
-	}
-
-	if data, err := os.ReadFile(baselinePath); err != nil {
-		t.Fatalf("read original baseline: %v", err)
-	} else if string(data) != `{"results":{}}` {
-		t.Fatalf("original baseline was mutated: %s", string(data))
-	}
-
-	usedTempPath := false
+	pythonTools := []string{"semgrep", "detect-secrets", "pipx", "uv tool"}
 	for _, entry := range readCommandLog(t, logPath) {
-		if strings.HasPrefix(entry, "detect-secrets scan --baseline ") && !strings.Contains(entry, baselinePath) {
-			usedTempPath = true
-			break
+		for _, tool := range pythonTools {
+			if strings.Contains(entry, tool) {
+				t.Fatalf("Python tool %q must not be called in tsguard check, got: %q", tool, entry)
+			}
 		}
-	}
-	if !usedTempPath {
-		t.Fatalf("expected detect-secrets to scan with a temp baseline copy, got: %v", readCommandLog(t, logPath))
 	}
 }
 
-// TestSecretsScanDiff_Fail verifies the gate fails when scan finds a secret not in baseline.
-func TestSecretsScanDiff_Fail(t *testing.T) {
-	r, _ := newTestRunner(t)
-	seedBaselineWithNewSecret(t, r)
+// TestRunSecretlintInvokesSecretlint verifies runSecretlint delegates to secretlint via pkgExec.
+func TestRunSecretlintInvokesSecretlint(t *testing.T) {
+	r, logPath := newTestRunner(t)
 
-	if code := runSecrets(r, false); code == 0 {
-		t.Fatal("runSecrets returned 0, want non-zero (new secret detected)")
+	if code := runSecretlint(r); code != 0 {
+		t.Fatalf("runSecretlint returned %d", code)
 	}
+
+	for _, entry := range readCommandLog(t, logPath) {
+		if strings.Contains(entry, "secretlint") {
+			return
+		}
+	}
+	t.Fatalf("expected secretlint in command log, got: %v", readCommandLog(t, logPath))
 }
 
 // TestDetectPackageManager checks lockfile and packageManager-field resolution.
@@ -301,11 +261,12 @@ func TestPkgExecUsedForLintInPnpmProject(t *testing.T) {
 
 	entries := readCommandLog(t, logPath)
 	for _, entry := range entries {
-		if entry == "pnpm exec ultracite check" {
+		// runLint now appends dirs, e.g. "pnpm exec ultracite check src".
+		if strings.HasPrefix(entry, "pnpm exec ultracite check") {
 			return
 		}
 	}
-	t.Fatalf("expected 'pnpm exec ultracite check' in log, got: %v", entries)
+	t.Fatalf("expected 'pnpm exec ultracite check ...' in log, got: %v", entries)
 }
 
 // TestRunFTAUsesFtaBinaryInPnpmProject verifies pnpm projects call the
@@ -363,9 +324,6 @@ func newTestRunner(t *testing.T) (*Runner, string) {
 	t.Helper()
 
 	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, ".secrets.baseline"), []byte(`{"results":{}}`), 0o644); err != nil {
-		t.Fatalf("write baseline: %v", err)
-	}
 	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"devDependencies":{"vitest":"*"}}`), 0o644); err != nil {
 		t.Fatalf("write package.json: %v", err)
 	}
@@ -376,15 +334,14 @@ func newTestRunner(t *testing.T) (*Runner, string) {
 	}
 
 	logPath := filepath.Join(root, "commands.log")
-	for _, name := range []string{"npx", "npm", "pnpm", "yarn", "semgrep"} {
+	for _, name := range []string{"npx", "npm", "pnpm", "yarn"} {
 		writeFakeCommand(t, filepath.Join(binDir, name))
 	}
-	writeDetectSecretsCommand(t, filepath.Join(binDir, "detect-secrets"))
 
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("TSGUARD_LOG", logPath)
 
-	return &Runner{root: root, timeout: 5}, logPath
+	return &Runner{root: root, timeout: 5, dirs: []string{"src"}}, logPath
 }
 
 func writeFakeCommand(t *testing.T, path string) {
@@ -399,32 +356,6 @@ func writeFakeCommand(t *testing.T, path string) {
 	}
 }
 
-func writeDetectSecretsCommand(t *testing.T, path string) {
-	t.Helper()
-
-	// Logs args like other fakes. For `scan --baseline <file>`, mutates the
-	// provided baseline file in place like detect-secrets 1.5.0 does and emits
-	// no stdout. For plain `scan`, emits baseline JSON to stdout.
-	script := "#!/bin/sh\n" +
-		"printf '%s %s\\n' \"$(basename \"$0\")\" \"$*\" >> \"$TSGUARD_LOG\"\n" +
-		"if [ \"$1\" = \"scan\" ]; then\n" +
-		"  if [ -n \"$DETECT_SECRETS_SCAN_OUTPUT\" ]; then\n" +
-		"    output=\"$DETECT_SECRETS_SCAN_OUTPUT\"\n" +
-		"  else\n" +
-		"    output='{\"results\":{}}'\n" +
-		"  fi\n" +
-		"  if [ \"$2\" = \"--baseline\" ] && [ -n \"$3\" ]; then\n" +
-		"    printf '%s' \"$output\" > \"$3\"\n" +
-		"  else\n" +
-		"    printf '%s' \"$output\"\n" +
-		"  fi\n" +
-		"fi\n" +
-		"exit 0\n"
-
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake detect-secrets: %v", err)
-	}
-}
 
 func readCommandLog(t *testing.T, path string) []string {
 	t.Helper()
