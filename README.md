@@ -148,9 +148,21 @@ pyguard setup    # Python
 
 `setup` adds all required dev dependencies to `package.json` / `pyproject.toml`,
 runs `npm install` / `uv sync`, deploys pyguard's analysis helper scripts to
-`tools/analysis/`, creates `.secrets.baseline`, and offers to wire your AI
-tool's PostToolUse hook (Claude Code, Cursor, Copilot, Codex, OpenCode, Kiro) so
-the gate runs automatically after every file edit.
+`tools/analysis/`, creates `.secrets.baseline`, and offers to configure your AI
+tools. For each tool you select, it writes both a **hook** (so the gate runs
+automatically after every file edit) and an **AI skill/instructions file** (so
+your agent understands how to interpret gate output):
+
+| AI tool | Hook written | Skill / instructions written |
+|---|---|---|
+| Claude Code | `.claude/settings.local.json` | `.claude/skills/tsguard/SKILL.md` |
+| GitHub Copilot | `.github/hooks/tsguard-check.json` + `.vscode/tasks.json` | `.github/copilot-instructions.md` |
+| Cursor | `.cursor/hooks.json` | `.cursor/rules/tsguard.mdc` |
+| OpenAI Codex CLI | `.codex/hooks.json` | `AGENTS.md` |
+| OpenCode | `.opencode/plugins/tsguard/index.ts` + `opencode.json` | (plugin is the skill) |
+| Kiro | `.kiro/hooks/tsguard.kiro.hook` | `.kiro/agents/tsguard.json` |
+
+*(pyguard writes the same set with `pyguard` names in each path.)*
 
 Pass `--yes` to skip interactive prompts (for CI or non-interactive shells):
 
