@@ -33,6 +33,7 @@ Follow these steps exactly, stopping and reporting if any step fails:
 
    Setup adds any missing devDependencies to package.json, runs npm install,
    and downloads the Opengrep SAST binary into node_modules/.cache/oxguard/.
+   Setup is idempotent — safe to re-run on an existing project.
    Commit the package.json diff afterward.
 
 4. Run the doctor and show me the full output:
@@ -42,8 +43,19 @@ Follow these steps exactly, stopping and reporting if any step fails:
    Do NOT attempt to fix any code yet — just report:
      tsguard check
 
+   Behavior notes for interpreting the output:
+   - tsguard scans from the project root (.) by default. node_modules, dist,
+     .next, build, coverage, and AI tool dirs (.claude, .opencode, .kiro, .agents)
+     are always excluded. If you need to restrict to specific subdirectories,
+     pass --dirs src,lib. To add more exclusions, pass --exclude extra,dirs.
+   - If the SAST gate prints [SKIP], the Opengrep binary was not downloaded yet —
+     that is not a failure. Run `tsguard setup` again to fetch it, then re-run check.
+   - You can persist custom dirs/excludes/thresholds in an oxguard.toml file at the
+     project root instead of passing CLI flags every time. CLI flags always win.
+
 6. Tell the user that to configure their AI tool hooks and skill files they should
    run `tsguard hooks` interactively and select their tools from the menu.
+   (setup --yes skips this step because stdin is not a TTY in agent mode.)
 
 Report a concise summary: gates passed, gates failed, any install issues.
 ```
@@ -70,9 +82,11 @@ Follow these steps exactly, stopping and reporting if any step fails:
 
    Setup will:
    - Add missing dev-group packages to pyproject.toml and run uv sync
-   - Deploy analysis helper scripts to tools/analysis/
+   - Deploy analysis helper scripts to tools/analysis/ (commit these — pyguard
+     invokes them at runtime; they must live in the project repo)
    - Create .secrets.baseline
 
+   Setup is idempotent — safe to re-run on an existing project.
    Commit the pyproject.toml diff and the new tools/analysis/ files afterward.
 
 4. Run the doctor and show me the full output:
@@ -82,8 +96,14 @@ Follow these steps exactly, stopping and reporting if any step fails:
    Do NOT attempt to fix any code yet — just report:
      pyguard check
 
+   Behavior notes for interpreting the output:
+   - pyguard scans from the project root (.) by default. __pycache__, .venv,
+     node_modules, and common build dirs are always excluded. If you need to
+     restrict to specific subdirectories, pass --dirs src,lib.
+
 6. Tell the user that to configure their AI tool hooks and skill files they should
    run `pyguard hooks` interactively and select their tools from the menu.
+   (setup --yes skips this step because stdin is not a TTY in agent mode.)
 
 Report a concise summary: gates passed, gates failed, any install issues.
 ```
@@ -123,12 +143,14 @@ tsguard is already installed on this project. Update to the latest version:
 
 2. Re-run setup to sync devDependencies and update the Opengrep binary:
      tsguard setup --yes
+   (setup is idempotent — only adds what is missing, never removes existing config)
 
 3. Run doctor to confirm everything is healthy:
      tsguard doctor
 
-4. Tell the user to run `tsguard hooks` interactively if they want to update
-   the AI tool skill files deployed to this project.
+4. Tell the user to run `tsguard hooks` interactively if they want to redeploy
+   updated AI tool skill files. (setup --yes skips the hook/skill installer
+   because stdin is not a TTY in agent mode.)
 
 Report the new version and any changes to the doctor output.
 ```
