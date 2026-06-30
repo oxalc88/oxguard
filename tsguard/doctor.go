@@ -67,24 +67,21 @@ func runDoctor(root, pm string) int {
 		}
 	}
 
-	for _, tool := range []struct{ name, cmd, install string }{
-		{"detect-secrets", "detect-secrets", "pip install detect-secrets"},
-		{"semgrep", "semgrep", "pip install semgrep"},
-	} {
-		if out, _, err := RunSilent("", tool.cmd, "--version"); err != nil {
-			fmt.Printf("  [SKIP] %s — not installed (optional, %s)\n", tool.name, tool.install)
-		} else {
-			fmt.Printf("  [OK]   %s (%s)\n", tool.name, strings.TrimSpace(out))
-		}
-	}
-
-	// .secrets.baseline
-	baseline := filepath.Join(root, ".secrets.baseline")
-	if _, err := os.Stat(baseline); os.IsNotExist(err) {
-		fmt.Println("  [FAIL] .secrets.baseline — not found. Run: tsguard secrets --init")
+	// Opengrep project-local SAST binary (required for security gate).
+	opengrepBin := opengrepBinaryPath(root)
+	if out, _, err := RunSilent("", opengrepBin, "--version"); err != nil {
+		fmt.Println("  [FAIL] opengrep — not found (project-local). Run: tsguard setup")
 		failures++
 	} else {
-		fmt.Println("  [OK]   .secrets.baseline")
+		fmt.Printf("  [OK]   opengrep %s (project-local)\n", strings.TrimSpace(strings.Split(out, "\n")[0]))
+	}
+
+	// secretlint (npm dev-dep, required for secrets gate).
+	if out, _, err := RunSilent(root, pkgExec(pm, "secretlint", "--version")...); err != nil {
+		fmt.Println("  [FAIL] secretlint — not found. Run: tsguard setup")
+		failures++
+	} else {
+		fmt.Printf("  [OK]   secretlint (%s)\n", strings.TrimSpace(strings.Split(out, "\n")[0]))
 	}
 
 	fmt.Println()
