@@ -1,0 +1,18 @@
+---
+description: TypeScript quality gates — run tsguard after editing .ts/.tsx files
+globs: "**/*.ts,**/*.tsx"
+alwaysApply: false
+---
+
+# tsguard — TypeScript quality gate
+
+After editing TypeScript files, run `tsguard check` to validate quality gates.
+Fix any failures before committing.
+
+**Commands:**
+- `tsguard check`    — full gate: lint → fta → types → coverage → security
+- `tsguard fix`      — auto-format (ultracite fix)
+- `tsguard security` — secrets (secretlint) + CVE (audit-ci) + SAST (opengrep)
+- `tsguard setup`    — install deps + download opengrep SAST binary
+
+**Config:** `oxguard.toml` at project root sets default dirs and excludes.

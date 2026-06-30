@@ -1,0 +1,14 @@
+{
+  "name": "tsguard",
+  "description": "TypeScript quality gate runner. Quality checks run automatically after every file write.",
+  "prompt": "You are working in a TypeScript project guarded by tsguard. After every write, the postToolUse hook runs '__BINARY__ check --if-typescript' automatically. If the gate fails, fix the issue before continuing. Manual commands: tsguard check, tsguard fix, tsguard lint, tsguard types, tsguard coverage.",
+  "tools": ["read", "write", "shell"],
+  "hooks": {
+    "postToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "__BINARY__ check --if-typescript"
+      }
+    ]
+  }
+}
