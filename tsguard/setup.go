@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -34,30 +32,6 @@ func runSetup(root string, cfg config) int {
 
 	fmt.Println("  [4/4] Opengrep SAST engine (project-local)...")
 	ensureOpengrep(root, cfg)
-
-	baseline := filepath.Join(root, ".secrets.baseline")
-	fmt.Print("  [5/5] .secrets.baseline... ")
-	if _, err := os.Stat(baseline); os.IsNotExist(err) {
-		fmt.Println("creating...")
-		out, scanErr := RunCapture(root, pkgExec(cfg.pkgManager, "secretlint", "--secretlintrc", "/dev/null", "--init-baseline")...)
-		if scanErr != nil {
-			// secretlint doesn't have --init-baseline; create an empty baseline that secretlint will populate.
-			empty := `{"version":"1.0","results":[]}`
-			if writeErr := os.WriteFile(baseline, []byte(empty), 0o644); writeErr != nil {
-				fmt.Printf("  [FAIL] could not write .secrets.baseline: %v\n", writeErr)
-			} else {
-				fmt.Println("  [OK]   .secrets.baseline created (empty)")
-			}
-		} else {
-			if writeErr := os.WriteFile(baseline, []byte(out), 0o644); writeErr != nil {
-				fmt.Printf("  [FAIL] could not write .secrets.baseline: %v\n", writeErr)
-			} else {
-				fmt.Println("  [OK]   .secrets.baseline created")
-			}
-		}
-	} else {
-		fmt.Println("exists")
-	}
 
 	fmt.Println()
 	runHooks(root)
