@@ -1,0 +1,18 @@
+---
+description: Python quality gates — run pyguard after editing .py files
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# pyguard — Python quality gate
+
+After editing Python files, run `pyguard check` to validate quality gates.
+Fix any failures before committing.
+
+**Commands:**
+- `pyguard check`    — full gate: ruff → mypy → radon → types → coverage → security
+- `pyguard fix`      — auto-format (ruff fix)
+- `pyguard security` — secrets (detect-secrets) + CVE (pip-audit) + SAST (bandit)
+- `pyguard setup`    — install dev deps via uv
+
+**Defaults:** dirs `functions,cdk`; adjust with `--dirs` if the project uses a different structure.
