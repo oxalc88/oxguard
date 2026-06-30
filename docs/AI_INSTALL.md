@@ -133,7 +133,7 @@ tsguard hooks   # interactive — re-select your tools to overwrite stale skill 
 pyguard hooks
 ```
 
-**AI agent prompt for updating:**
+**AI agent prompt for updating tsguard:**
 
 ```
 tsguard is already installed on this project. Update to the latest version:
@@ -141,7 +141,7 @@ tsguard is already installed on this project. Update to the latest version:
 1. Re-install the binary:
      curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
 
-2. Re-run setup to sync devDependencies and update the Opengrep binary:
+2. Re-run setup to sync devDependencies and update the Opengrep SAST binary:
      tsguard setup --yes
    (setup is idempotent — only adds what is missing, never removes existing config)
 
@@ -149,8 +149,43 @@ tsguard is already installed on this project. Update to the latest version:
      tsguard doctor
 
 4. Tell the user to run `tsguard hooks` interactively if they want to redeploy
-   updated AI tool skill files. (setup --yes skips the hook/skill installer
-   because stdin is not a TTY in agent mode.)
+   updated AI tool skill files and hooks. (setup --yes skips the hook/skill
+   installer because stdin is not a TTY in agent mode.)
+
+Behavior notes:
+- tsguard scans from the project root (.) by default. node_modules, dist, .next,
+  build, coverage, and AI tool dirs (.claude, .opencode, .kiro, .agents) are always
+  excluded. Pass --dirs src,lib to restrict to specific subdirectories.
+- If the SAST gate prints [SKIP] after update, the Opengrep binary download failed
+  (e.g. offline). Run `tsguard setup` again when network is available.
+
+Report the new version and any changes to the doctor output.
+```
+
+**AI agent prompt for updating pyguard:**
+
+```
+pyguard is already installed on this project. Update to the latest version:
+
+1. Re-install the binary:
+     curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
+
+2. Re-run setup to sync dev dependencies and redeploy analysis helper scripts:
+     pyguard setup --yes
+   (setup is idempotent — only adds what is missing, never removes existing config)
+   If setup updates files in tools/analysis/, commit those changes alongside pyproject.toml.
+
+3. Run doctor to confirm everything is healthy:
+     pyguard doctor
+
+4. Tell the user to run `pyguard hooks` interactively if they want to redeploy
+   updated AI tool skill files and hooks. (setup --yes skips the hook/skill
+   installer because stdin is not a TTY in agent mode.)
+
+Behavior notes:
+- pyguard scans from the project root (.) by default. __pycache__, .venv,
+  node_modules, and common build dirs are always excluded. Pass --dirs src,lib
+  to restrict to specific subdirectories.
 
 Report the new version and any changes to the doctor output.
 ```
