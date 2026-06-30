@@ -119,11 +119,6 @@ func RunCapture(dir string, args ...string) (string, error) {
 	return string(out), err
 }
 
-// toolAvailable returns true if cmd is on PATH and responds to --version.
-func toolAvailable(cmd string) bool {
-	_, _, err := RunSilent("", cmd, "--version")
-	return err == nil
-}
 
 // RunStreaming executes a command with output streamed directly to stdout/stderr.
 // Used for long-running interactive commands like npm install.
