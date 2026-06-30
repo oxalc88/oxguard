@@ -32,25 +32,27 @@ func runSetup(root string, cfg config) int {
 	}
 	fmt.Println("  [OK]   node_modules ready")
 
-	fmt.Println("  [4/5] Python helper tools...")
-	ensurePythonHelperTools(cfg)
+	fmt.Println("  [4/5] Opengrep SAST engine (project-local)...")
+	ensureOpengrep(root, cfg)
 
 	baseline := filepath.Join(root, ".secrets.baseline")
 	fmt.Print("  [5/5] .secrets.baseline... ")
 	if _, err := os.Stat(baseline); os.IsNotExist(err) {
 		fmt.Println("creating...")
-		if !toolAvailable("detect-secrets") {
-			fmt.Println("  [SKIP] detect-secrets not installed — run setup again after installing it")
-		} else {
-			out, scanErr := RunCapture(root, "detect-secrets", "scan")
-			if scanErr != nil {
-				fmt.Println("  [FAIL] detect-secrets scan failed")
+		out, scanErr := RunCapture(root, pkgExec(cfg.pkgManager, "secretlint", "--secretlintrc", "/dev/null", "--init-baseline")...)
+		if scanErr != nil {
+			// secretlint doesn't have --init-baseline; create an empty baseline that secretlint will populate.
+			empty := `{"version":"1.0","results":[]}`
+			if writeErr := os.WriteFile(baseline, []byte(empty), 0o644); writeErr != nil {
+				fmt.Printf("  [FAIL] could not write .secrets.baseline: %v\n", writeErr)
 			} else {
-				if writeErr := os.WriteFile(baseline, []byte(out), 0o644); writeErr != nil {
-					fmt.Printf("  [FAIL] could not write baseline: %v\n", writeErr)
-				} else {
-					fmt.Println("  [OK]   .secrets.baseline created")
-				}
+				fmt.Println("  [OK]   .secrets.baseline created (empty)")
+			}
+		} else {
+			if writeErr := os.WriteFile(baseline, []byte(out), 0o644); writeErr != nil {
+				fmt.Printf("  [FAIL] could not write .secrets.baseline: %v\n", writeErr)
+			} else {
+				fmt.Println("  [OK]   .secrets.baseline created")
 			}
 		}
 	} else {
