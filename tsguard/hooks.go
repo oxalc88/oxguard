@@ -41,6 +41,7 @@ func runHooks(root string) int {
 			fmt.Println("  [OK]   .claude/settings.local.json (Claude Code PostToolUse)")
 			generated++
 		}
+		deployClaudeSkill(root)
 	}
 
 	if selected["2"] {
@@ -51,6 +52,11 @@ func runHooks(root string) int {
 			fmt.Println("  [OK]   .vscode/tasks.json (tsguard check + tsguard fix tasks)")
 			generated++
 		}
+		if err := hooks.GenerateCopilotInstructions(root); err != nil {
+			fmt.Printf("  [WARN] Copilot instructions: %v\n", err)
+		} else {
+			fmt.Println("  [OK]   .github/copilot-instructions.md")
+		}
 	}
 
 	if selected["3"] {
@@ -59,6 +65,11 @@ func runHooks(root string) int {
 		} else {
 			fmt.Println("  [OK]   .cursor/hooks.json (afterFileEdit)")
 			generated++
+		}
+		if err := hooks.GenerateCursorRule(root); err != nil {
+			fmt.Printf("  [WARN] Cursor rule: %v\n", err)
+		} else {
+			fmt.Println("  [OK]   .cursor/rules/tsguard.mdc")
 		}
 	}
 
