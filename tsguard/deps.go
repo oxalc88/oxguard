@@ -113,23 +113,21 @@ func ensureOpengrep(root string, cfg config) bool {
 		return false
 	}
 
-	// Download binary.
+	// Download binary, chmod, then atomically rename into place.
 	tmpBin := binaryPath + ".tmp"
-	if err := downloadFile(tmpBin, baseURL+"/"+assetName); err != nil {
-		fmt.Printf("  [SKIP] opengrep — download failed: %v\n", err)
+	failTmp := func(msg string, err error) bool {
+		fmt.Printf("  [SKIP] opengrep — %s: %v\n", msg, err)
 		_ = os.Remove(tmpBin)
 		return false
 	}
-
+	if err := downloadFile(tmpBin, baseURL+"/"+assetName); err != nil {
+		return failTmp("download failed", err)
+	}
 	if err := os.Chmod(tmpBin, 0o755); err != nil {
-		fmt.Printf("  [SKIP] opengrep — chmod failed: %v\n", err)
-		_ = os.Remove(tmpBin)
-		return false
+		return failTmp("chmod failed", err)
 	}
 	if err := os.Rename(tmpBin, binaryPath); err != nil {
-		fmt.Printf("  [SKIP] opengrep — could not install binary: %v\n", err)
-		_ = os.Remove(tmpBin)
-		return false
+		return failTmp("could not install binary", err)
 	}
 
 	// Write to .gitignore so the binary is not committed.
