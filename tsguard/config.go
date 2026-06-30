@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +35,7 @@ func loadFileConfig(root string) fileConfig {
 		return fileConfig{}
 	}
 	var fc fileConfig
-	if _, err := toml.Decode(string(data), &fc); err != nil {
+	if _, err := toml.NewDecoder(bytes.NewReader(data)).Decode(&fc); err != nil {
 		fmt.Fprintf(os.Stderr, "tsguard: warning — oxguard.toml parse error: %v\n", err)
 		return fileConfig{}
 	}
@@ -51,9 +52,15 @@ func buildConfig(cli config, root string) config {
 	file := loadFileConfig(root)
 
 	cfg := config{
-		timeout:     300,
-		ftaScoreCap: 60,
-		excludeDirs: append([]string{}, defaultExcludes...),
+		timeout:      300,
+		ftaScoreCap:  60,
+		excludeDirs:  append([]string{}, defaultExcludes...),
+		ifTypeScript: cli.ifTypeScript,
+		initFlag:     cli.initFlag,
+		logFile:      cli.logFile,
+		tailLines:    cli.tailLines,
+		allowPipe:    cli.allowPipe,
+		assumeYes:    cli.assumeYes,
 	}
 
 	// File config: dirs replace default; scalars override default.
@@ -74,7 +81,7 @@ func buildConfig(cli config, root string) config {
 	if cli.dirs != nil {
 		cfg.dirs = cli.dirs
 	}
-	if len(cli.excludeDirs) > 0 {
+	if cli.excludeDirs != nil {
 		cfg.excludeDirs = append(cfg.excludeDirs, cli.excludeDirs...)
 	}
 	if cli.timeout > 0 {
@@ -83,12 +90,6 @@ func buildConfig(cli config, root string) config {
 	if cli.ftaScoreCap > 0 {
 		cfg.ftaScoreCap = cli.ftaScoreCap
 	}
-	cfg.ifTypeScript = cli.ifTypeScript
-	cfg.initFlag = cli.initFlag
-	cfg.logFile = cli.logFile
-	cfg.tailLines = cli.tailLines
-	cfg.allowPipe = cli.allowPipe
-	cfg.assumeYes = cli.assumeYes
 
 	return cfg
 }
