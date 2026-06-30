@@ -76,6 +76,7 @@ func GenerateCopilotInstructions(root string, content []byte) error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write(append([]byte("\n"), content...))
+	f.WriteString("\n")
+	_, err = f.Write(content)
 	return err
 }

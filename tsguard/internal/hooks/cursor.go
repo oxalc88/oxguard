@@ -9,9 +9,6 @@ import (
 // using content from the caller's embedded skill/cursor.mdc.
 func GenerateCursorRule(root string, content []byte) error {
 	rulesDir := filepath.Join(root, "..", ".cursor", "rules")
-	if err := os.MkdirAll(rulesDir, 0o755); err != nil {
-		return err
-	}
 	return writeHookFile(filepath.Join(rulesDir, "tsguard.mdc"), string(content))
 }
 
