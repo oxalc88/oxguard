@@ -79,6 +79,18 @@ A function that passes cyclomatic complexity but fails Halstead has too many dis
 concepts crammed into one place — even if the control flow is linear, the cognitive load
 makes mistakes likely.
 
+**Test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and the `tests/`
+directory are excluded from all three radon gates (cc, mi, hal) and from the Halstead
+script by default. Test files are intentionally repetitive — many similar cases,
+parameterized fixtures — so complexity metrics don't apply meaningfully. Ruff and coverage
+still gate test code. Configure in `pyproject.toml`:
+
+```toml
+[tool.pyguard]
+exclude-tests = false          # re-enable complexity gating on test files
+exclude = ["*/fixtures/*"]     # add project-specific patterns without touching the default set
+```
+
 ---
 
 ## FTA Score (tsguard)
@@ -143,3 +155,7 @@ results: dict[str, UserRecord]
 
 Deep nesting means the type hint is doing the job that a named type should do. Enforcing
 a depth limit pushes toward explicit, readable data models.
+
+The same test-file exclusion that applies to the radon gates (`test_*.py`, `*_test.py`,
+`conftest.py`, `tests/`) also applies here — test fixtures and parametrize helpers often
+use complex type annotations by design.

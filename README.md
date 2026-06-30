@@ -43,6 +43,19 @@ pyguard security     # security gates only
 pyguard types        # type-annotation complexity only
 ```
 
+**Complexity gates — test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and
+the `tests/` directory are excluded from radon cc/mi/hal, Halstead, and type-annotation
+complexity gates by default. Test files are intentionally repetitive; complexity metrics
+don't apply meaningfully to them. Ruff and coverage gates still cover test code.
+
+Configure per-project in `pyproject.toml`:
+
+```toml
+[tool.pyguard]
+exclude-tests = false          # re-enable complexity gating on test files
+exclude = ["*/fixtures/*"]     # add project-specific patterns (e.g. fixtures, stubs)
+```
+
 pyguard ships Python helper scripts (in `pyguard/analysis/`) that are invoked at
 runtime. `pyguard setup` deploys them automatically to the consuming project's
 `tools/analysis/` directory.

@@ -3,6 +3,33 @@
 All notable changes to oxguard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- **tsguard — FTA gate excludes conventional test files by default** — `*.test.*`,
+  `*.spec.*`, and directories `__tests__/`, `__mocks__/`, `__fixtures__/` are excluded
+  from FTA scoring. Test files are intentionally repetitive; the maintainability index
+  doesn't apply to them. Lint and coverage gates still enforce quality on test code.
+  Project-root `fta.json` exclusions are merged in automatically. Configure per-project
+  in `oxguard.toml`:
+
+  ```toml
+  fta-exclude-tests = false          # re-enable FTA scoring on test files
+  fta-exclude = ["*.pbt.ts"]         # add project-specific patterns
+  ```
+
+- **pyguard — complexity gates exclude conventional test files by default** — `test_*.py`,
+  `*_test.py`, `conftest.py`, and the `tests/` directory are excluded from radon cc/mi/hal,
+  Halstead, and type-annotation complexity gates. Ruff and coverage still gate test code.
+  Configure per-project in `pyproject.toml`:
+
+  ```toml
+  [tool.pyguard]
+  exclude-tests = false          # re-enable complexity gating on test files
+  exclude = ["*/fixtures/*"]     # add project-specific patterns
+  ```
+
 ## [0.5.0] — 2026-06-30
 
 ### Added
