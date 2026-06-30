@@ -68,7 +68,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	cfg := parseFlags(args)
+	cliCfg := parseFlags(args)
 
 	root, err := findProjectRoot()
 	if err != nil {
@@ -77,6 +77,7 @@ func main() {
 		os.Exit(exitUnknown)
 	}
 
+	cfg := buildConfig(cliCfg, root)
 	cfg.pkgManager = detectPackageManager(root)
 
 	if cfg.ifTypeScript {
@@ -187,13 +188,11 @@ type config struct {
 	pkgManager   string
 }
 
+// parseFlags parses CLI arguments and returns only explicitly-set values.
+// Zero values (nil slices, 0 ints, false bools) mean "not provided by caller".
+// buildConfig applies defaults and merges with oxguard.toml before dispatch.
 func parseFlags(args []string) config {
-	cfg := config{
-		dirs:        []string{"src", "cdk"},
-		excludeDirs: []string{"node_modules", "dist", ".next", "build", "coverage", ".agents", ".claude", ".opencode", ".kiro", "skills"},
-		timeout:     300,
-		ftaScoreCap: 60,
-	}
+	cfg := config{}
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--dirs":
