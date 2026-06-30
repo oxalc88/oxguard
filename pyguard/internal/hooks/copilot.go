@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func GenerateCopilotHook(root string) error {
@@ -54,4 +55,27 @@ func GenerateCopilotHook(root string) error {
 }
 `, pyguardBinJSON, pyguardBinJSON)
 	return writeHookFile(filepath.Join(vscodeDir, "tasks.json"), tasksContent)
+}
+
+// GenerateCopilotInstructions appends pyguard usage instructions to
+// .github/copilot-instructions.md using content from the caller's embedded
+// skill/copilot.md. Creates the file if absent; idempotent via marker check.
+func GenerateCopilotInstructions(root string, content []byte) error {
+	ghDir := filepath.Join(root, "..", ".github")
+	if err := os.MkdirAll(ghDir, 0o755); err != nil {
+		return err
+	}
+	dest := filepath.Join(ghDir, "copilot-instructions.md")
+	existing, _ := os.ReadFile(dest)
+	marker := "## Python quality gates (pyguard)"
+	if strings.Contains(string(existing), marker) {
+		return nil
+	}
+	f, err := os.OpenFile(dest, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write(append([]byte("\n"), content...))
+	return err
 }

@@ -3,9 +3,10 @@ package hooks
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
-func GenerateKiroHook(root string) error {
+func GenerateKiroHook(root string, agentTemplate []byte) error {
 	binJSON := jsonEscapePath(pyguardBinary(root))
 
 	hooksDir := filepath.Join(root, "..", ".kiro", "hooks")
@@ -29,20 +30,6 @@ func GenerateKiroHook(root string) error {
 		return err
 	}
 
-	agentContent := fmt.Sprintf(`{
-  "name": "pyguard",
-  "description": "Python quality gate runner. Quality checks run automatically after every file write.",
-  "prompt": "You are working in a Python project guarded by pyguard. After every write, the postToolUse hook runs '%s check --if-python' automatically. If the gate fails, fix the issue before continuing. Manual commands: pyguard check, pyguard fix, pyguard ruff, pyguard mypy, pyguard coverage.",
-  "tools": ["read", "write", "shell"],
-  "hooks": {
-    "postToolUse": [
-      {
-        "matcher": "fs_write",
-        "command": "%s check --if-python"
-      }
-    ]
-  }
-}
-`, binJSON, binJSON)
+	agentContent := strings.ReplaceAll(string(agentTemplate), "__BINARY__", binJSON)
 	return writeHookFile(filepath.Join(agentsDir, "pyguard.json"), agentContent)
 }

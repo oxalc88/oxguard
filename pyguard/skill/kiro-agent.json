@@ -1,0 +1,14 @@
+{
+  "name": "pyguard",
+  "description": "Python quality gate runner. Quality checks run automatically after every file write.",
+  "prompt": "You are working in a Python project guarded by pyguard. After every write, the postToolUse hook runs '__BINARY__ check --if-python' automatically. If the gate fails, fix the issue before continuing. Manual commands: __BINARY__ check, __BINARY__ fix, __BINARY__ ruff, __BINARY__ mypy, __BINARY__ coverage.",
+  "tools": ["read", "write", "shell"],
+  "hooks": {
+    "postToolUse": [
+      {
+        "matcher": "fs_write",
+        "command": "__BINARY__ check --if-python"
+      }
+    ]
+  }
+}

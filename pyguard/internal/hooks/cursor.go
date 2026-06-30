@@ -6,6 +6,16 @@ import (
 	"path/filepath"
 )
 
+// GenerateCursorRule writes a Cursor agent rule to .cursor/rules/pyguard.mdc
+// using content from the caller's embedded skill/cursor.mdc.
+func GenerateCursorRule(root string, content []byte) error {
+	rulesDir := filepath.Join(root, "..", ".cursor", "rules")
+	if err := os.MkdirAll(rulesDir, 0o755); err != nil {
+		return err
+	}
+	return writeHookFile(filepath.Join(rulesDir, "pyguard.mdc"), string(content))
+}
+
 func GenerateCursorHook(root string) error {
 	cursorDir := filepath.Join(root, "..", ".cursor")
 	if err := os.MkdirAll(cursorDir, 0o755); err != nil {

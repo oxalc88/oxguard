@@ -51,6 +51,7 @@ func runHooks(root string) int {
 			fmt.Println("  [OK]   .claude/settings.local.json (Claude Code PostToolUse)")
 			generated++
 		}
+		deployClaudeSkill(root)
 	}
 
 	if selected["2"] {
@@ -61,6 +62,11 @@ func runHooks(root string) int {
 			fmt.Println("  [OK]   .vscode/tasks.json (pyguard check + pyguard fix tasks)")
 			generated++
 		}
+		if err := hooks.GenerateCopilotInstructions(root, copilotInstructionsContent); err != nil {
+			fmt.Printf("  [WARN] Copilot instructions: %v\n", err)
+		} else {
+			fmt.Println("  [OK]   .github/copilot-instructions.md")
+		}
 	}
 
 	if selected["3"] {
@@ -70,10 +76,15 @@ func runHooks(root string) int {
 			fmt.Println("  [OK]   .cursor/hooks.json (afterFileEdit)")
 			generated++
 		}
+		if err := hooks.GenerateCursorRule(root, cursorRuleContent); err != nil {
+			fmt.Printf("  [WARN] Cursor rule: %v\n", err)
+		} else {
+			fmt.Println("  [OK]   .cursor/rules/pyguard.mdc")
+		}
 	}
 
 	if selected["4"] {
-		if err := hooks.GenerateCodexHook(root); err != nil {
+		if err := hooks.GenerateCodexHook(root, codexSkillContent); err != nil {
 			fmt.Printf("  [FAIL] Codex hook: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .codex/hooks.json (PostToolUse)")
@@ -84,7 +95,7 @@ func runHooks(root string) int {
 	}
 
 	if selected["5"] {
-		if err := hooks.GenerateOpenCodePlugin(root); err != nil {
+		if err := hooks.GenerateOpenCodePlugin(root, opencodePluginContent); err != nil {
 			fmt.Printf("  [FAIL] OpenCode plugin: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .opencode/plugins/pyguard/index.ts")
@@ -94,7 +105,7 @@ func runHooks(root string) int {
 	}
 
 	if selected["6"] {
-		if err := hooks.GenerateKiroHook(root); err != nil {
+		if err := hooks.GenerateKiroHook(root, kiroAgentContent); err != nil {
 			fmt.Printf("  [FAIL] Kiro hook: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .kiro/hooks/pyguard.kiro.hook (IDE hook — auto-active)")
