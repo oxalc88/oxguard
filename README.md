@@ -57,9 +57,9 @@ runtime. `pyguard setup` deploys them automatically to the consuming project's
 | Maintainability (FTA) | `fta` (from `fta-cli`) | Files too complex to maintain — catches what cyclomatic alone misses |
 | Types | tsc --noEmit | Type errors |
 | Coverage | vitest / jest / mocha+c8 / ava+c8 — 80% floor | Untested code paths |
-| Security — static | semgrep | XSS, `eval()`, path traversal, insecure patterns |
-| Security — CVEs | npm audit | Known vulnerabilities in dependencies |
-| Security — secrets | detect-secrets | Credentials accidentally committed |
+| Security — static | Opengrep (project-local binary, LGPL) | XSS, `eval()`, path traversal, weak crypto, injection, framework patterns — bandit-class coverage |
+| Security — CVEs | npm/pnpm/yarn audit + audit-ci | Known vulnerabilities in dependencies |
+| Security — secrets | secretlint | Credentials accidentally committed |
 
 Informational:
 
@@ -72,7 +72,7 @@ Informational:
 tsguard check        # full gate (lint → fta → types → coverage → security)
 tsguard fix          # auto-format (ultracite fix)
 tsguard audit        # informational: dead code + duplicates
-tsguard security     # security gates only
+tsguard security     # security: secretlint + audit/audit-ci + opengrep SAST
 tsguard fta          # FTA score gate only
 tsguard complexity   # compatibility alias: complexity is enforced by ultracite check
 ```
@@ -105,12 +105,16 @@ pyguard detects pytest from `pyproject.toml` dev-group dependencies and config f
 If only `unittest` test files are found (no pytest markers), pytest is used as the runner
 since it discovers and runs unittest tests natively.
 
-The security gate (`semgrep`, `detect-secrets`) requires Python tooling. `tsguard setup`
-installs both automatically via `uv tool install` (falling back to `pipx`). If the
-tools are missing when `tsguard check` runs, tsguard will attempt to install them
-on-the-fly before running the gate. If neither `uv` nor `pipx` is available, the gate
-prints `[SKIP]` and continues — install them manually with
-`uv tool install semgrep detect-secrets` to make the gate hard.
+The security gate requires **no Python or global installs**. All tools land in the project's
+own stores:
+
+- **Secrets** (`secretlint`): added as a npm devDependency by `tsguard setup` → lives in `node_modules`.
+- **CVEs** (PM-native `audit` + `audit-ci`): also npm devDependencies.
+- **SAST** (Opengrep): `tsguard setup` downloads a self-contained binary
+  (~50 MB) into `node_modules/.cache/oxguard/opengrep` — no `pip`, no `uv`, no global writes.
+  The binary bundles its own runtime (Nuitka-compiled). If the binary is absent when
+  `tsguard check` runs, the gate prints `[SKIP]` and continues — run `tsguard setup` to
+  download it.
 
 ## Install
 
@@ -184,8 +188,9 @@ pyguard and tsguard enforce the same quality goals but reach them with different
   Halstead per-function, maintainability index per-file). tsguard combines all three into a
   single FTA score per file. See [docs/metrics.md](docs/metrics.md) for what each measures.
 
-- **Security**: pyguard uses bandit (Python-specific). tsguard uses semgrep
-  (language-agnostic, JS/TS rules). Same class of problems caught.
+- **Security**: pyguard uses bandit (Python AST, blocking) + optional Opengrep deep pass.
+  tsguard uses Opengrep (semgrep-compatible engine, project-local binary, blocking) — same
+  class of problems caught, same depth, zero Python required on the dev machine.
 
 - **Dead code**: pyguard uses vulture (Python AST). tsguard uses knip (TypeScript-aware,
   also catches unused deps). tsguard additionally runs jscpd for copy-paste detection.
