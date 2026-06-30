@@ -13,26 +13,26 @@ func runSetup(root string, cfg config) int {
 	fmt.Println("tsguard setup")
 	fmt.Println("─────────")
 
-	fmt.Println("  [1/5] Node.js 22...")
+	fmt.Println("  [1/4] Node.js (22+)...")
 	if !checkNode() {
 		return 2
 	}
 
 	// Reconcile before npm install so a single sync covers newly added deps.
-	fmt.Println("  [2/5] devDependency manifest...")
+	fmt.Println("  [2/4] devDependency manifest...")
 	if err := ensureNpmDevDeps(root, cfg); err != nil {
 		fmt.Printf("  [FAIL] devDependency check failed: %v\n", err)
 		return 1
 	}
 
-	fmt.Printf("  [3/5] %s install...\n", cfg.pkgManager)
+	fmt.Printf("  [3/4] %s install...\n", cfg.pkgManager)
 	if err := RunStreaming(root, cfg.pkgManager, "install"); err != nil {
 		fmt.Printf("  [FAIL] %s install failed: %v\n", cfg.pkgManager, err)
 		return 1
 	}
 	fmt.Println("  [OK]   node_modules ready")
 
-	fmt.Println("  [4/5] Opengrep SAST engine (project-local)...")
+	fmt.Println("  [4/4] Opengrep SAST engine (project-local)...")
 	ensureOpengrep(root, cfg)
 
 	baseline := filepath.Join(root, ".secrets.baseline")
