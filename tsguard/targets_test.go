@@ -304,6 +304,114 @@ func TestRunFTAUsesFtaBinaryByDefault(t *testing.T) {
 	t.Fatalf("expected 'npx fta --score-cap 60 src' in log, got: %v", readCommandLog(t, logPath))
 }
 
+// TestRunFTAWithExclusionGeneratesConfigPath verifies that when ftaExcludeTests is true,
+// runFTA passes --config-path and writes the fta.json with conventional test globs.
+func TestRunFTAWithExclusionGeneratesConfigPath(t *testing.T) {
+	r, logPath := newTestRunner(t)
+	r.ftaExcludeTests = true
+
+	if code := runFTA(r, []string{"src"}, 60); code != 0 {
+		t.Fatalf("runFTA returned %d", code)
+	}
+
+	// Command must contain --config-path.
+	var ftaEntry string
+	for _, entry := range readCommandLog(t, logPath) {
+		if strings.Contains(entry, "fta") {
+			ftaEntry = entry
+			break
+		}
+	}
+	if ftaEntry == "" {
+		t.Fatal("no fta command logged")
+	}
+	if !strings.Contains(ftaEntry, "--config-path") {
+		t.Fatalf("expected --config-path in fta command, got: %q", ftaEntry)
+	}
+
+	// Generated fta.json must contain the conventional test globs.
+	configPath := filepath.Join(r.root, opengrepCacheDir, "fta.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("generated fta.json not found: %v", err)
+	}
+	for _, glob := range conventionalTestGlobs {
+		if !strings.Contains(string(data), glob) {
+			t.Errorf("fta.json missing conventional glob %q", glob)
+		}
+	}
+}
+
+// TestRunFTANoConfigWhenExclusionDisabled verifies that ftaExcludeTests=false (zero value)
+// produces no --config-path in the fta command — matching the pre-exclusion behavior.
+func TestRunFTANoConfigWhenExclusionDisabled(t *testing.T) {
+	r, logPath := newTestRunner(t)
+	// r.ftaExcludeTests = false (zero value) — exclusion off
+
+	if code := runFTA(r, []string{"src"}, 60); code != 0 {
+		t.Fatalf("runFTA returned %d", code)
+	}
+
+	for _, entry := range readCommandLog(t, logPath) {
+		if strings.Contains(entry, "--config-path") {
+			t.Fatalf("unexpected --config-path in fta command when exclusion disabled: %q", entry)
+		}
+	}
+}
+
+// TestRunFTAMergesProjectFtaJson verifies that a project-root fta.json has its
+// exclude_filenames merged into the generated config when test exclusion is on.
+func TestRunFTAMergesProjectFtaJson(t *testing.T) {
+	r, _ := newTestRunner(t)
+	r.ftaExcludeTests = true
+
+	// Write a project-root fta.json with a custom glob.
+	projectFtaJSON := `{"exclude_filenames":["*.fixtures.ts"]}`
+	if err := os.WriteFile(filepath.Join(r.root, "fta.json"), []byte(projectFtaJSON), 0o644); err != nil {
+		t.Fatalf("write project fta.json: %v", err)
+	}
+
+	if code := runFTA(r, []string{"src"}, 60); code != 0 {
+		t.Fatalf("runFTA returned %d", code)
+	}
+
+	data, err := os.ReadFile(filepath.Join(r.root, opengrepCacheDir, "fta.json"))
+	if err != nil {
+		t.Fatalf("generated fta.json not found: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "*.fixtures.ts") {
+		t.Errorf("generated fta.json missing merged project glob *.fixtures.ts; got:\n%s", content)
+	}
+	if !strings.Contains(content, "*.test.ts") {
+		t.Errorf("generated fta.json missing conventional glob *.test.ts; got:\n%s", content)
+	}
+}
+
+// TestRunFTAExtraExcludeFromConfig verifies that fta-exclude globs from oxguard.toml
+// appear in the generated fta.json even when test exclusion is disabled.
+func TestRunFTAExtraExcludeFromConfig(t *testing.T) {
+	r, _ := newTestRunner(t)
+	r.ftaExcludeTests = false
+	r.ftaExclude = []string{"*.pbt.ts", "*.bench.ts"}
+
+	if code := runFTA(r, []string{"src"}, 60); code != 0 {
+		t.Fatalf("runFTA returned %d", code)
+	}
+
+	data, err := os.ReadFile(filepath.Join(r.root, opengrepCacheDir, "fta.json"))
+	if err != nil {
+		t.Fatalf("generated fta.json not found: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "*.pbt.ts") {
+		t.Errorf("fta.json missing fta-exclude glob *.pbt.ts; got:\n%s", content)
+	}
+	if strings.Contains(content, "*.test.ts") {
+		t.Errorf("fta.json should not contain *.test.ts when exclusion disabled; got:\n%s", content)
+	}
+}
+
 // TestNoNpxInPnpmCheckRun verifies no bare npx calls appear in a pnpm check run.
 func TestNoNpxInPnpmCheckRun(t *testing.T) {
 	r, logPath := newTestRunner(t)

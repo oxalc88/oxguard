@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -80,13 +81,84 @@ func runComplexity(r *Runner, _ []string) int {
 	return runLint(r)
 }
 
+// ftaConfig is the fta.json schema subset tsguard writes for exclusion control.
+// fta appends user-provided values to its built-in defaults (dist/bin/build, .d.ts/.min.js/.bundle.js).
+type ftaConfig struct {
+	ExcludeFilenames   []string `json:"exclude_filenames,omitempty"`
+	ExcludeDirectories []string `json:"exclude_directories,omitempty"`
+}
+
+// conventionalTestGlobs are universally-conventional test file names in the JS/TS ecosystem.
+// Project-specific patterns (*.pbt.ts, *.bench.ts, etc.) belong in oxguard.toml fta-exclude.
+var conventionalTestGlobs = []string{
+	"*.test.ts", "*.test.tsx", "*.test.js", "*.test.jsx",
+	"*.spec.ts", "*.spec.tsx", "*.spec.js", "*.spec.jsx",
+}
+
+// conventionalTestDirs are directory names that universally hold test infrastructure.
+var conventionalTestDirs = []string{"__tests__", "__mocks__", "__fixtures__"}
+
+// writeFTAConfig generates a project-local fta.json in node_modules/.cache/oxguard/ and
+// returns its absolute path. Returns "" when nothing needs to be excluded (no config written).
+// When --config-path is passed fta no longer auto-discovers the project root fta.json, so
+// any existing project-root fta.json is read and merged in to preserve its exclusions.
+func writeFTAConfig(root string, excludeTests bool, extraExclude []string) (string, error) {
+	var excludeFilenames, excludeDirs []string
+
+	if excludeTests {
+		excludeFilenames = append(excludeFilenames, conventionalTestGlobs...)
+		excludeDirs = append(excludeDirs, conventionalTestDirs...)
+	}
+	excludeFilenames = append(excludeFilenames, extraExclude...)
+
+	// Fold in any project-root fta.json — fta reads only one config file.
+	if data, err := os.ReadFile(filepath.Join(root, "fta.json")); err == nil {
+		var proj ftaConfig
+		if json.Unmarshal(data, &proj) == nil {
+			excludeFilenames = append(excludeFilenames, proj.ExcludeFilenames...)
+			excludeDirs = append(excludeDirs, proj.ExcludeDirectories...)
+		}
+	}
+
+	if len(excludeFilenames) == 0 && len(excludeDirs) == 0 {
+		return "", nil
+	}
+
+	cacheDir := filepath.Join(root, opengrepCacheDir)
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return "", err
+	}
+	data, err := json.MarshalIndent(ftaConfig{
+		ExcludeFilenames:   excludeFilenames,
+		ExcludeDirectories: excludeDirs,
+	}, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	configPath := filepath.Join(cacheDir, "fta.json")
+	return configPath, os.WriteFile(configPath, data, 0o644)
+}
+
 // runFTA runs the Fast TypeScript Analyzer for Halstead + cyclomatic + LOC score.
 // Fails if any file's FTA score exceeds scoreCap (default 60 = "Needs Improvement" tier).
+// Conventional test files are excluded by default (see r.ftaExcludeTests); add project-
+// specific patterns via oxguard.toml fta-exclude.
 func runFTA(r *Runner, dirs []string, scoreCap int) int {
 	scoreCapStr := strconv.Itoa(scoreCap)
+
+	configPath, err := writeFTAConfig(r.root, r.ftaExcludeTests, r.ftaExclude)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tsguard: warning — could not write fta config (%v); running without exclusions\n", err)
+		configPath = ""
+	}
+
 	for _, dir := range dirs {
-		res := r.Run("fta "+dir, pkgExec(r.pkgManager, "fta", "--score-cap", scoreCapStr, dir)...)
-		if !res.ok {
+		args := pkgExec(r.pkgManager, "fta", "--score-cap", scoreCapStr)
+		if configPath != "" {
+			args = append(args, "--config-path", configPath)
+		}
+		args = append(args, dir)
+		if !r.Run("fta "+dir, args...).ok {
 			return 1
 		}
 	}

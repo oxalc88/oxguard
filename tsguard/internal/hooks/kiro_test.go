@@ -13,7 +13,8 @@ func TestGenerateKiroHook(t *testing.T) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatalf("setup: create proj dir: %v", err)
 	}
-	if err := GenerateKiroHook(proj); err != nil {
+	agentTemplate := []byte(`{"name":"tsguard","command":"__BINARY__ check"}`)
+	if err := GenerateKiroHook(proj, agentTemplate); err != nil {
 		t.Fatalf("GenerateKiroHook: %v", err)
 	}
 

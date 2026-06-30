@@ -23,10 +23,12 @@ var defaultExcludes = []string{
 // CLI flags always take precedence over file config; file config takes precedence
 // over built-in defaults. Missing or unparseable file silently returns zero values.
 type fileConfig struct {
-	Dirs        []string `toml:"dirs"`
-	Exclude     []string `toml:"exclude"`
-	FTAScoreCap int      `toml:"fta-score-cap"`
-	Timeout     int      `toml:"timeout"`
+	Dirs            []string `toml:"dirs"`
+	Exclude         []string `toml:"exclude"`
+	FTAScoreCap     int      `toml:"fta-score-cap"`
+	Timeout         int      `toml:"timeout"`
+	FtaExcludeTests *bool    `toml:"fta-exclude-tests"` // nil = use default (true)
+	FtaExclude      []string `toml:"fta-exclude"`        // extra globs appended to defaults
 }
 
 // loadFileConfig reads oxguard.toml from root. Missing file is silently ignored.
@@ -53,15 +55,16 @@ func buildConfig(cli config, root string) config {
 	file := loadFileConfig(root)
 
 	cfg := config{
-		timeout:      300,
-		ftaScoreCap:  60,
-		excludeDirs:  append([]string{}, defaultExcludes...),
-		ifTypeScript: cli.ifTypeScript,
-		initFlag:     cli.initFlag,
-		logFile:      cli.logFile,
-		tailLines:    cli.tailLines,
-		allowPipe:    cli.allowPipe,
-		assumeYes:    cli.assumeYes,
+		timeout:         300,
+		ftaScoreCap:     60,
+		excludeDirs:     append([]string{}, defaultExcludes...),
+		ftaExcludeTests: true, // default: skip conventional test files from FTA scoring
+		ifTypeScript:    cli.ifTypeScript,
+		initFlag:        cli.initFlag,
+		logFile:         cli.logFile,
+		tailLines:       cli.tailLines,
+		allowPipe:       cli.allowPipe,
+		assumeYes:       cli.assumeYes,
 	}
 
 	// File config: dirs replace default; scalars override default.
@@ -77,6 +80,10 @@ func buildConfig(cli config, root string) config {
 	if file.Timeout > 0 {
 		cfg.timeout = file.Timeout
 	}
+	if file.FtaExcludeTests != nil {
+		cfg.ftaExcludeTests = *file.FtaExcludeTests
+	}
+	cfg.ftaExclude = append(cfg.ftaExclude, file.FtaExclude...)
 
 	// CLI always wins. nil slice = flag was not passed.
 	if cli.dirs != nil {

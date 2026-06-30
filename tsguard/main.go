@@ -119,7 +119,7 @@ func dispatch(cmd string, cfg config, root string) int {
 		}
 	}
 
-	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs}
+	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs, ftaExcludeTests: cfg.ftaExcludeTests, ftaExclude: cfg.ftaExclude}
 
 	switch cmd {
 	case "check":
@@ -175,17 +175,19 @@ var heavyGates = map[string]bool{
 
 // config holds parsed flags.
 type config struct {
-	dirs         []string
-	excludeDirs  []string
-	timeout      int
-	ifTypeScript bool
-	initFlag     bool
-	logFile      string
-	tailLines    int
-	allowPipe    bool
-	ftaScoreCap  int
-	assumeYes    bool
-	pkgManager   string
+	dirs            []string
+	excludeDirs     []string
+	timeout         int
+	ifTypeScript    bool
+	initFlag        bool
+	logFile         string
+	tailLines       int
+	allowPipe       bool
+	ftaScoreCap     int
+	assumeYes       bool
+	pkgManager      string
+	ftaExcludeTests bool     // exclude conventional test files from FTA (default true via buildConfig)
+	ftaExclude      []string // additional fta-exclude globs from oxguard.toml
 }
 
 // parseFlags parses CLI arguments and returns only explicitly-set values.
