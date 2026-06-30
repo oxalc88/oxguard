@@ -109,6 +109,17 @@ that have grown genuinely hard to change safely.
 Because FTA operates per-file, it catches the same class of problem as pyguard's MI — a
 file that accumulates too much responsibility over time.
 
+**Test file exclusion:** `*.test.*` and `*.spec.*` files are excluded from FTA scoring by
+default — test files are intentionally repetitive (many similar test cases, property
+generators, fixtures) so FTA's maintainability index doesn't apply meaningfully to them.
+Lint and coverage gates still enforce quality on test code. To add project-specific
+patterns or re-enable test scoring, use `oxguard.toml`:
+
+```toml
+fta-exclude-tests = false          # re-enable FTA on all test files
+fta-exclude = ["*.pbt.ts"]         # add project-specific patterns without touching the default set
+```
+
 ---
 
 ## Type Annotation Complexity (pyguard)

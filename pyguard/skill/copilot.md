@@ -9,3 +9,11 @@ Fix any failures before committing. Key commands:
 - `pyguard setup`    — install dev deps via uv
 
 Default dirs: `.` (project root) — use `--dirs` to restrict to specific subdirectories.
+
+Complexity gates (radon cc/mi/hal, Halstead, type annotations) skip `test_*.py`, `*_test.py`, `conftest.py`, and `tests/` by default. Configure in `pyproject.toml`:
+
+```toml
+[tool.pyguard]
+exclude-tests = false          # re-enable complexity gating on test files
+exclude = ["*/fixtures/*"]     # add project-specific exclusion patterns
+```

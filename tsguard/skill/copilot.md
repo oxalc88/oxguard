@@ -9,3 +9,10 @@ Fix any failures before committing. Key commands:
 - `tsguard setup`    — install deps + download opengrep binary
 
 Project config: `oxguard.toml` at repo root overrides default dirs and excludes.
+
+FTA gate skips `*.test.*` and `*.spec.*` files by default. Configure in `oxguard.toml`:
+
+```toml
+fta-exclude-tests = false    # re-enable FTA on test files
+fta-exclude = ["*.pbt.ts"]   # add project-specific exclusion patterns
+```

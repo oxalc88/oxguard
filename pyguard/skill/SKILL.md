@@ -67,6 +67,16 @@ Flags adicionales que el usuario puede pasar:
 - `--dirs <d1,d2,...>` — default `.` (raíz del proyecto); usa esto si quieres restringir a subdirectorios específicos
 - `--timeout <s>` — default 300; no cambies sin que el usuario lo pida
 
+Config persistente: pyguard lee `[tool.pyguard]` en `pyproject.toml` automáticamente. Claves útiles:
+
+```toml
+[tool.pyguard]
+exclude-tests = false          # re-habilita radon/complexity en archivos de test (default: true = excluidos)
+exclude = ["*/fixtures/*"]     # patrones adicionales para excluir (ej. fixtures, stubs)
+```
+
+Por defecto, `test_*.py`, `*_test.py`, `conftest.py` y el directorio `tests/` quedan fuera de radon cc/mi/hal y los gates de Halstead/type-complexity — son repetitivos por diseño. Ruff y coverage siguen cubriendo los tests.
+
 ## Paso 4: ejecutar con log-file
 
 `--allow-pipe` es **obligatorio** para evitar el exit 5 (pyguard detecta que stdout es un pipe).

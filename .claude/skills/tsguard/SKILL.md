@@ -69,7 +69,17 @@ Flags adicionales:
 - `--max-fta-score <n>` — default `60`
 - `--timeout <s>` — default 300
 
-Config persistente: si el proyecto tiene `oxguard.toml` en la raíz, tsguard lo lee automáticamente. CLI siempre gana sobre el archivo.
+Config persistente: si el proyecto tiene `oxguard.toml` en la raíz, tsguard lo lee automáticamente. CLI siempre gana sobre el archivo. Claves útiles:
+
+```toml
+dirs            = ["src", "lib"]   # directorios a escanear (default: .)
+exclude         = ["generated"]    # directorios adicionales a excluir
+fta-score-cap   = 50               # cap FTA más estricto (default: 60)
+fta-exclude-tests = false          # re-habilita FTA en archivos de test (default: true = excluidos)
+fta-exclude     = ["*.pbt.ts"]     # patrones adicionales excluidos del FTA (ej. property-based tests)
+```
+
+Por defecto, `*.test.*` y `*.spec.*` quedan fuera del gate FTA — los tests son repetitivos por diseño y la métrica de mantenibilidad no aplica a ellos. Lint y coverage siguen cubriendo los tests.
 
 ## Paso 4: ejecutar con log-file
 

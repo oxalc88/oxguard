@@ -87,6 +87,17 @@ tsguard check --max-fta-score 50      # tighten FTA complexity cap (default: 60)
 tsguard check --tail 30               # show only the last 30 lines of each tool's output
 ```
 
+**FTA gate — test file exclusion:** `*.test.*` and `*.spec.*` files are excluded from FTA
+scoring by default. Test files are intentionally repetitive and the maintainability index
+doesn't apply meaningfully to them. Lint and coverage gates still cover test files.
+
+Tune via `oxguard.toml` at the project root:
+
+```toml
+fta-exclude-tests = false          # re-enable FTA on test files
+fta-exclude = ["*.pbt.ts"]         # add project-specific patterns (e.g. property-based tests)
+```
+
 **Coverage gate** — runner detection and threshold enforcement:
 
 tsguard reads `package.json` to detect the test runner (devDependencies and config files).
