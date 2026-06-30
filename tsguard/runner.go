@@ -21,6 +21,7 @@ type Runner struct {
 	logFile     string   // path to append full output (empty = no log file)
 	tailLines   int      // print only the last N lines to stdout (0 = all)
 	pkgManager  string
+	dirs        []string // source directories to scan (default: src,cdk)
 	excludeDirs []string // directories excluded from all security/scan tools
 }
 
