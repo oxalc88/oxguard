@@ -1,12 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 // runCheck runs the full quality gate: lint (includes Ultracite/Biome complexity) → fta → types → coverage → security.
@@ -53,8 +51,14 @@ func runFix(r *Runner) int {
 }
 
 // runLint runs lint + format check via ultracite check.
+// Scopes to the project's source dirs and respects exclude dirs (fixes vendored-dir noise).
 func runLint(r *Runner) int {
-	res := r.Run("ultracite check", pkgExec(r.pkgManager, "ultracite", "check")...)
+	args := pkgExec(r.pkgManager, "ultracite", "check")
+	// Pass source dirs so ultracite doesn't lint the entire repo root.
+	if len(r.dirs) > 0 {
+		args = append(args, r.dirs...)
+	}
+	res := r.Run("ultracite check", args...)
 	if !res.ok {
 		return 1
 	}
@@ -159,183 +163,105 @@ func runCoverageWithWrapper(r *Runner, runner string) int {
 	return 0
 }
 
-// runSecurity runs detect-secrets → semgrep → npm audit, all as hard gates.
+// runSecurity runs secretlint → npm audit + audit-ci → opengrep SAST.
+// All are hard gates (blocking); opengrep [SKIP]s gracefully if binary is absent.
 func runSecurity(r *Runner, initFlag bool) int {
 	fmt.Println("  security:")
-	if code := runSecrets(r, initFlag); code != 0 {
-		return code
+	if initFlag {
+		return runSecretsInit(r)
 	}
-	if code := runSemgrep(r); code != 0 {
+	if code := runSecretlint(r); code != 0 {
 		return code
 	}
 	if code := runNpmAudit(r); code != 0 {
 		return code
 	}
+	if code := runOpengrep(r); code != 0 {
+		return code
+	}
 	return 0
 }
 
-func runSemgrep(r *Runner) int {
-	if !ensureSinglePythonTool("semgrep") {
+// runSecretlint scans for hardcoded credentials using secretlint (npm-native, no Python).
+func runSecretlint(r *Runner) int {
+	// secretlint scans all tracked files; exclude dirs using --ignore-path or pattern args.
+	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore", "**/*")
+	res := r.Run("secretlint", args...)
+	if !res.ok {
+		return 1
+	}
+	return 0
+}
+
+// runSecretsInit is the legacy entry point (tsguard secrets --init).
+// With secretlint, there is no persistent baseline to create — secretlint scans
+// all files on each run. This command now runs secretlint in dry-run mode and
+// reports findings without failing, so the developer can see the state.
+func runSecretsInit(r *Runner) int {
+	fmt.Println("  Scanning for secrets (secretlint)...")
+	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore", "**/*")
+	r.Run("secretlint scan", args...)
+	fmt.Println("  [OK]   secretlint scan complete (no baseline needed)")
+	return 0
+}
+
+// runNpmAudit runs the PM-native dependency vulnerability scan (hard gate for moderate+).
+// Also runs audit-ci for threshold enforcement and allowlist support.
+func runNpmAudit(r *Runner) int {
+	// PM-native audit.
+	var auditArgs []string
+	switch r.pkgManager {
+	case "pnpm":
+		auditArgs = []string{"pnpm", "audit", "--audit-level", "moderate"}
+	case "yarn":
+		auditArgs = []string{"yarn", "npm", "audit", "--severity", "moderate"}
+	default:
+		auditArgs = []string{"npm", "audit", "--audit-level=moderate"}
+	}
+	res := r.Run("dependency audit", auditArgs...)
+	if !res.ok {
+		return 1
+	}
+
+	// audit-ci: threshold enforcement with allowlist support (.auditcirc.json if present).
+	auditCIArgs := pkgExec(r.pkgManager, "audit-ci", "--moderate")
+	r.Run("audit-ci", auditCIArgs...) // advisory — don't fail the gate (audit already gated above)
+	return 0
+}
+
+// runOpengrep runs the Opengrep SAST engine against the project's scanned dirs.
+// Uses the project-local binary (node_modules/.cache/oxguard/opengrep).
+// [SKIP]s gracefully if the binary is absent — developer is directed to run setup.
+func runOpengrep(r *Runner) int {
+	binaryPath := opengrepBinaryPath(r.root)
+	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		fmt.Println("  [SKIP] opengrep — binary not found. Run: tsguard setup")
 		return 0
 	}
-	args := []string{"semgrep", "--config=p/javascript", "--config=p/typescript", "--error", "--quiet"}
+
+	// Vendor rules from the project store; fall back to p/javascript + p/typescript.
+	rulesDir := filepath.Join(r.root, "node_modules/.cache/oxguard/rules")
+	var configArgs []string
+	if _, err := os.Stat(rulesDir); err == nil {
+		configArgs = []string{"--config", rulesDir}
+	} else {
+		configArgs = []string{"--config", "p/javascript", "--config", "p/typescript"}
+	}
+
+	args := []string{binaryPath, "scan"}
+	args = append(args, configArgs...)
+	args = append(args, "--error", "--quiet")
 	for _, dir := range r.excludeDirs {
 		args = append(args, "--exclude", dir)
 	}
-	args = append(args, ".")
-	res := r.Run("semgrep", args...)
+	// Scan the project's source dirs.
+	args = append(args, r.dirs...)
+
+	res := r.Run("opengrep SAST", args...)
 	if !res.ok {
 		return 1
 	}
 	return 0
-}
-
-func runNpmAudit(r *Runner) int {
-	var args []string
-	switch r.pkgManager {
-	case "pnpm":
-		args = []string{"pnpm", "audit", "--audit-level", "moderate"}
-	case "yarn":
-		args = []string{"yarn", "npm", "audit", "--severity", "moderate"}
-	default:
-		args = []string{"npm", "audit", "--audit-level=moderate"}
-	}
-	res := r.Run("dependency audit", args...)
-	if !res.ok {
-		return 1
-	}
-	return 0
-}
-
-// runSecrets checks for credential leaks. Fails hard if .secrets.baseline is missing.
-func runSecrets(r *Runner, initFlag bool) int {
-	baseline := filepath.Join(r.root, ".secrets.baseline")
-
-	if initFlag {
-		// tsguard secrets --init: create baseline explicitly
-		fmt.Print("  Creating .secrets.baseline...")
-		out, err := RunCapture(r.root, append([]string{"detect-secrets", "scan"}, detectSecretsExcludeArgs(r.excludeDirs)...)...)
-		if err != nil {
-			fmt.Printf(" failed\n  [FAIL] detect-secrets scan failed\n")
-			fmt.Println("         Install detect-secrets: pip install detect-secrets")
-			return 1
-		}
-		if err := os.WriteFile(baseline, []byte(out), 0o644); err != nil {
-			fmt.Printf(" failed\n  [FAIL] could not write .secrets.baseline: %v\n", err)
-			return 1
-		}
-		fmt.Println("\n  [OK]   .secrets.baseline created")
-		return 0
-	}
-
-	if !ensureSinglePythonTool("detect-secrets") {
-		return 0
-	}
-
-	// Read and parse the baseline before running the slow scan so we fail fast on missing/corrupt files.
-	baselineData, err := os.ReadFile(baseline)
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("  [FAIL] secrets — .secrets.baseline not found")
-			fmt.Println("         Run: tsguard secrets --init")
-		} else {
-			fmt.Printf("  [FAIL] secrets — could not read .secrets.baseline: %v\n", err)
-		}
-		return 1
-	}
-	var known secretsReport
-	if err := json.Unmarshal(baselineData, &known); err != nil {
-		fmt.Printf("  [FAIL] secrets — could not parse .secrets.baseline: %v\n", err)
-		return 1
-	}
-
-	tempBaselinePath, err := seedTempBaseline(baselineData)
-	if err != nil {
-		fmt.Printf("  [FAIL] detect-secrets scan: could not prepare temp baseline: %v\n", err)
-		return 1
-	}
-	defer os.Remove(tempBaselinePath)
-
-	scanArgs := append([]string{"detect-secrets", "scan", "--baseline", tempBaselinePath}, detectSecretsExcludeArgs(r.excludeDirs)...)
-	_, _, scanErr := RunSilent(r.root, scanArgs...)
-	if scanErr != nil {
-		fmt.Println("  [FAIL] detect-secrets scan failed")
-		return 1
-	}
-
-	currentData, err := os.ReadFile(tempBaselinePath)
-	if err != nil {
-		fmt.Printf("  [FAIL] detect-secrets scan: could not read updated baseline: %v\n", err)
-		return 1
-	}
-	var current secretsReport
-	if err := json.Unmarshal(currentData, &current); err != nil {
-		fmt.Printf("  [FAIL] detect-secrets scan: could not parse updated baseline: %v\n", err)
-		return 1
-	}
-	var newFound []string
-	for file, entries := range current.Results {
-		if len(entries) == 0 {
-			continue
-		}
-		knownHashes := make(map[string]bool)
-		for _, e := range known.Results[file] {
-			knownHashes[e.HashedSecret] = true
-		}
-		for _, e := range entries {
-			if !knownHashes[e.HashedSecret] {
-				newFound = append(newFound, fmt.Sprintf("  %s:%d [%s]", file, e.LineNumber, e.Type))
-			}
-		}
-	}
-	if len(newFound) > 0 {
-		fmt.Printf("  [FAIL] detect-secrets — %d new potential secret(s) found:\n", len(newFound))
-		for _, s := range newFound {
-			fmt.Println(s)
-		}
-		fmt.Println("         To update baseline: tsguard secrets --init")
-		return 1
-	}
-	fmt.Println("  [OK]   detect-secrets")
-	return 0
-}
-
-type secretsReport struct {
-	Results map[string][]secretEntry `json:"results"`
-}
-
-type secretEntry struct {
-	HashedSecret string `json:"hashed_secret"`
-	Type         string `json:"type"`
-	LineNumber   int    `json:"line_number"`
-}
-
-// detectSecretsExcludeArgs returns --exclude-files <regex> args for detect-secrets, or nil if dirs is empty.
-func detectSecretsExcludeArgs(dirs []string) []string {
-	if len(dirs) == 0 {
-		return nil
-	}
-	return []string{"--exclude-files", strings.Join(dirs, "|")}
-}
-
-// seedTempBaseline writes data to a fresh temp file and returns its path.
-// The caller is responsible for removing the file (e.g. via defer os.Remove).
-func seedTempBaseline(data []byte) (string, error) {
-	f, err := os.CreateTemp("", "tsguard-secrets-*.baseline")
-	if err != nil {
-		return "", err
-	}
-	path := f.Name()
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		os.Remove(path)
-		return "", err
-	}
-	if err := f.Close(); err != nil {
-		os.Remove(path)
-		return "", err
-	}
-	return path, nil
 }
 
 // runAudit runs informational analysis: dead-code + duplicates.
