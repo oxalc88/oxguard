@@ -21,9 +21,9 @@ Quality gates (replaces npm scripts):
   tsguard complexity     compatibility alias; complexity is enforced by ultracite check
   tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)
   tsguard coverage       run tests with coverage (vitest --coverage)
-  tsguard security       security: detect-secrets (hard) + npm audit (warning)
-  tsguard npm-audit      dependency vulnerability scan (warning only)
-  tsguard secrets        credential scan (detect-secrets)
+  tsguard security       security: secretlint + npm/pnpm audit + audit-ci + opengrep SAST
+  tsguard npm-audit      dependency vulnerability scan (npm/pnpm/yarn audit + audit-ci)
+  tsguard secrets        credential scan (secretlint)
   tsguard dead-code      detect unused exports/deps (knip)
   tsguard duplicates     detect copy-paste code (jscpd)
   tsguard audit          informational: dead-code + duplicates
@@ -118,7 +118,7 @@ func dispatch(cmd string, cfg config, root string) int {
 		}
 	}
 
-	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, excludeDirs: cfg.excludeDirs}
+	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs}
 
 	switch cmd {
 	case "check":
@@ -140,7 +140,10 @@ func dispatch(cmd string, cfg config, root string) int {
 	case "npm-audit":
 		return runNpmAudit(r)
 	case "secrets":
-		return runSecrets(r, cfg.initFlag)
+		if cfg.initFlag {
+			return runSecretsInit(r)
+		}
+		return runSecretlint(r)
 	case "dead-code":
 		return runDeadCode(r)
 	case "duplicates":
@@ -187,7 +190,7 @@ type config struct {
 func parseFlags(args []string) config {
 	cfg := config{
 		dirs:        []string{"src", "cdk"},
-		excludeDirs: []string{"node_modules", "dist", ".next", "build", "coverage"},
+		excludeDirs: []string{"node_modules", "dist", ".next", "build", "coverage", ".agents", ".claude", ".opencode", ".kiro", "skills"},
 		timeout:     300,
 		ftaScoreCap: 60,
 	}
