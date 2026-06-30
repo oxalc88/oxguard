@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 )
@@ -138,9 +139,10 @@ func ensureOpengrep(root string, cfg config) bool {
 	return true
 }
 
-// downloadFile downloads url to destPath via HTTP GET.
+// downloadFile downloads url to destPath via HTTP GET with a 3-minute timeout.
 func downloadFile(destPath, url string) error {
-	resp, err := http.Get(url) //nolint:gosec,noctx
+	client := &http.Client{Timeout: 3 * time.Minute}
+	resp, err := client.Get(url) //nolint:gosec,noctx
 	if err != nil {
 		return err
 	}
