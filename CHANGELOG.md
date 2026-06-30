@@ -3,7 +3,7 @@
 All notable changes to oxguard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.5.2] — 2026-06-30
 
 ### Changed
 
