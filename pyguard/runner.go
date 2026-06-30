@@ -16,10 +16,12 @@ import (
 
 // Runner executes subprocesses from the project root.
 type Runner struct {
-	root      string
-	timeout   int    // seconds per tool
-	logFile   string // path to append full output (empty = no log file)
-	tailLines int    // print only the last N lines to stdout (0 = all)
+	root         string
+	timeout      int      // seconds per tool
+	logFile      string   // path to append full output (empty = no log file)
+	tailLines    int      // print only the last N lines to stdout (0 = all)
+	excludeTests bool     // exclude conventional test files from radon/complexity gates
+	exclude      []string // additional exclude globs from [tool.pyguard] exclude
 }
 
 // Result holds the outcome of a single tool run.

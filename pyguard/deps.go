@@ -225,3 +225,27 @@ func detectPythonTestRunner(root string) string {
 
 	return ""
 }
+
+// pyguardFileConfig holds values read from [tool.pyguard] in pyproject.toml.
+type pyguardFileConfig struct {
+	ExcludeTests *bool    `toml:"exclude-tests"` // nil = use default (true)
+	Exclude      []string `toml:"exclude"`        // extra globs for radon/complexity gates
+}
+
+// loadPyguardConfig reads [tool.pyguard] from pyproject.toml.
+// Missing or unparseable sections return zero values without error.
+func loadPyguardConfig(root string) pyguardFileConfig {
+	data, err := os.ReadFile(filepath.Join(root, "pyproject.toml"))
+	if err != nil {
+		return pyguardFileConfig{}
+	}
+	var raw struct {
+		Tool struct {
+			Pyguard pyguardFileConfig `toml:"pyguard"`
+		} `toml:"tool"`
+	}
+	if err := toml.Unmarshal(data, &raw); err != nil {
+		return pyguardFileConfig{}
+	}
+	return raw.Tool.Pyguard
+}

@@ -83,6 +83,15 @@ func main() {
 		os.Exit(exitUnknown)
 	}
 
+	// Merge [tool.pyguard] from pyproject.toml — file config > built-in defaults.
+	pgCfg := loadPyguardConfig(root)
+	if pgCfg.ExcludeTests != nil {
+		cfg.excludeTests = *pgCfg.ExcludeTests
+	} else {
+		cfg.excludeTests = true // default: skip conventional test files from complexity gates
+	}
+	cfg.exclude = append(cfg.exclude, pgCfg.Exclude...)
+
 	// --if-python: exit 0 if the edited file (from stdin JSON) is not .py
 	if cfg.ifPython {
 		if !editedFileIsPython() {
@@ -124,7 +133,7 @@ func dispatch(cmd string, args []string, cfg config, root string) int {
 		}
 	}
 
-	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines}
+	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, excludeTests: cfg.excludeTests, exclude: cfg.exclude}
 
 	switch cmd {
 	// Quality gates
@@ -191,14 +200,16 @@ var heavyGates = map[string]bool{
 
 // config holds parsed flags.
 type config struct {
-	dirs      []string
-	timeout   int
-	ifPython  bool
-	initFlag  bool   // --init for pyguard secrets
-	logFile   string // --log-file path
-	tailLines int    // --tail N
-	allowPipe bool   // --allow-pipe
-	assumeYes bool   // --yes / -y: skip interactive prompts
+	dirs         []string
+	timeout      int
+	ifPython     bool
+	initFlag     bool     // --init for pyguard secrets
+	logFile      string   // --log-file path
+	tailLines    int      // --tail N
+	allowPipe    bool     // --allow-pipe
+	assumeYes    bool     // --yes / -y: skip interactive prompts
+	excludeTests bool     // exclude conventional test files from radon/complexity gates
+	exclude      []string // additional exclude globs from [tool.pyguard]
 }
 
 func parseFlags(args []string) config {
