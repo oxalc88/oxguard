@@ -32,3 +32,19 @@ absent; discovered docs with rg --files and inspected their read_when metadata.
 
 Release setup requires npm scope ownership and the NPM_TOKEN Actions secret.
 See docs/guides/npm-distribution.md for token setup and partial-publish recovery.
+
+## pnpm verification follow-up
+
+1. Test packed installation under pnpm's isolated dependency layout, including
+   transitive optional native dependency resolution and exit-code forwarding. Done.
+2. Add pnpm execution to the distribution CI and document verified versions. Done.
+3. Run npm regression and workflow checks, then commit the follow-up. Done.
+
+Packed installation tests pass locally on macOS arm64 with npm 11.16.0 and
+pnpm 10.34.5/12.6.0. Both pnpm versions resolve the native package transitively
+with scripts disabled, run version/help, forward native exit codes 3 and 37
+through pnpm exec, and pass the launcher stream/signal/error checks. Native
+manifests contain no analyzer dependencies or install scripts, and no Opengrep
+cache is created. Workflow lint and JavaScript syntax/whitespace checks pass.
+CI covers all three managers on Linux, macOS and Windows. No publishing or
+global package-manager configuration changes were made.

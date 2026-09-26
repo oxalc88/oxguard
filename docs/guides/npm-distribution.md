@@ -12,6 +12,19 @@ runs the Go CLI; npm installation does not run setup, modify other project
 configuration, download binaries in a lifecycle hook, or add analyzers.
 Explicit Go `setup` behavior is unchanged.
 
+For pnpm projects:
+
+```sh
+pnpm add -D @oxguard/tsguard
+pnpm exec tsguard check
+pnpm exec tsguard audit
+```
+
+Only the launcher and the matching platform's Go binary are installed. Opengrep,
+ts-morph and the other analyzer tools are not dependencies of these packages.
+No setup command or postinstall hook runs. Explicit `tsguard setup` still has
+its existing tool-installation behavior; it is not needed to install the CLI.
+
 ## Package structure
 
 Generated packages live under `dist/npm/` (ignored by git):
@@ -65,6 +78,20 @@ code 3, consumer package stability, platform metadata, missing and
 mismatched native packages, unsupported platforms, startup errors, arguments,
 stdin/stdout/stderr, and exit codes 0, 1, 3, 4, 5 and 37 using a small native fixture. Unix runners
 also test signal forwarding and termination. Temporary files are removed.
+
+To run the same verification with pnpm installed:
+
+```sh
+TSGUARD_PACKAGE_MANAGER=pnpm node --test npm/distribution.test.cjs
+```
+
+In PowerShell, set `$env:TSGUARD_PACKAGE_MANAGER = 'pnpm'` before running the test.
+The pnpm test adds only the main tarball as a direct devDependency. A local
+override in the temporary test consumer supplies its unpublished native optional
+dependency. This verifies resolution under pnpm's isolated dependency layout
+rather than relying on a native dependency installed at the project root.
+Consumer install scripts are disabled. No local override is needed for published
+packages. CI exercises npm and pnpm 10.34.5/12.6.0 on Linux, macOS and Windows.
 
 To retain tarballs for manual testing, for example on macOS arm64:
 

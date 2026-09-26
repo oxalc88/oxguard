@@ -8,6 +8,14 @@ npx tsguard check
 npx tsguard audit
 ```
 
+With pnpm:
+
+```sh
+pnpm add -D @oxguard/tsguard
+pnpm exec tsguard check
+pnpm exec tsguard audit
+```
+
 The small Node launcher runs the matching Go binary with the caller's arguments,
 working directory, environment and terminal streams. The five native packages are
 optional dependencies pinned to the exact launcher version, restricted by npm
