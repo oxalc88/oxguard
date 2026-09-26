@@ -10,25 +10,34 @@ on:
         required: true
 
 jobs:
+  npm-check:
+    uses: ./.github/workflows/npm.yml
+    with:
+      tag: ${{ inputs.tag || github.ref_name }}
+
   build:
     name: Build ${{ matrix.tool }} ${{ matrix.include_os.os }}/${{ matrix.include_os.arch }}
     runs-on: ubuntu-latest
+    needs: npm-check
     strategy:
       matrix:
         tool: [pyguard, tsguard]
         include_os:
-          - {os: linux,   arch: amd64, ext: tar.gz}
-          - {os: linux,   arch: arm64, ext: tar.gz}
-          - {os: darwin,  arch: amd64, ext: tar.gz}
-          - {os: darwin,  arch: arm64, ext: tar.gz}
-          - {os: windows, arch: amd64, ext: zip}
+          - {os: linux,   arch: amd64, ext: tar.gz, npm: linux-x64}
+          - {os: linux,   arch: arm64, ext: tar.gz, npm: linux-arm64}
+          - {os: darwin,  arch: amd64, ext: tar.gz, npm: darwin-x64}
+          - {os: darwin,  arch: arm64, ext: tar.gz, npm: darwin-arm64}
+          - {os: windows, arch: amd64, ext: zip, npm: win32-x64}
     env:
       GOOS:   ${{ matrix.include_os.os }}
       GOARCH: ${{ matrix.include_os.arch }}
-      TAG:    ${{ github.ref_name || inputs.tag }}
+      TAG:    ${{ inputs.tag || github.ref_name }}
+      CGO_ENABLED: 0
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - uses: actions/setup-go@v6
         with:
@@ -42,7 +51,7 @@ jobs:
           cd ${{ matrix.tool }}
           go build \
             -trimpath \
-            -ldflags "-s -w -X main.version=${{ env.TAG }}" \
+            -ldflags "-s -w -X main.version=$TAG" \
             -o "../dist/${BIN}" \
             .
 
@@ -52,7 +61,6 @@ jobs:
           OS=${{ matrix.include_os.os }}
           ARCH=${{ matrix.include_os.arch }}
           EXT=${{ matrix.include_os.ext }}
-          TAG=${{ env.TAG }}
           NAME="${TOOL}-${TAG}-${OS}-${ARCH}"
           OUTDIR="dist/${NAME}"
           mkdir -p "$OUTDIR"
@@ -83,6 +91,33 @@ jobs:
           path: dist/${{ matrix.tool }}-*.*
           retention-days: 1
 
+      - uses: actions/setup-node@v4
+        if: matrix.tool == 'tsguard'
+        with:
+          node-version: 24
+
+      - name: Pack npm distribution
+        if: matrix.tool == 'tsguard'
+        env:
+          PLATFORM: ${{ matrix.include_os.npm }}
+        run: |
+          BIN=tsguard
+          [ "$GOOS" = "windows" ] && BIN=tsguard.exe
+          mkdir -p "dist/binaries/$PLATFORM"
+          cp "dist/$BIN" "dist/binaries/$PLATFORM/$BIN"
+          node npm/prepare.cjs "$TAG" dist/binaries dist/npm "$PLATFORM"
+          npm pack "./dist/npm/tsguard-$PLATFORM" --pack-destination dist/npm
+          if [ "$PLATFORM" = "linux-x64" ]; then
+            npm pack ./dist/npm/tsguard --pack-destination dist/npm
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.tool == 'tsguard'
+        with:
+          name: npm-${{ matrix.include_os.npm }}
+          path: dist/npm/*.tgz
+          retention-days: 1
+
   release:
     name: Publish release
     needs: build
@@ -92,21 +127,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - uses: actions/download-artifact@v8
         with:
+          pattern: '*guard-*'
           path: dist
           merge-multiple: true
 
       - name: Generate combined checksums.txt
         run: |
           cd dist
-          cat *.sha256 > checksums.txt
+          cat ./*.sha256 > checksums.txt
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.ref_name || inputs.tag }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
             dist/*.tar.gz
             dist/*.zip
@@ -115,3 +153,35 @@ jobs:
             install.sh
             install.ps1
           generate_release_notes: true
+
+  npm-publish:
+    name: Publish npm packages
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: npm-*
+          path: dist/npm
+          merge-multiple: true
+      - name: Publish native packages before launcher
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION="${TAG#v}"
+          DIST_TAG=latest
+          case "$VERSION" in *-*) DIST_TAG=next ;; esac
+          for PLATFORM in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win32-x64; do
+            test -f "dist/npm/oxguard-tsguard-$PLATFORM-$VERSION.tgz"
+          done
+          test -f "dist/npm/oxguard-tsguard-$VERSION.tgz"
+          for PLATFORM in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win32-x64; do
+            npm publish "dist/npm/oxguard-tsguard-$PLATFORM-$VERSION.tgz" --access public --tag "$DIST_TAG"
+          done
+          npm publish "dist/npm/oxguard-tsguard-$VERSION.tgz" --access public --tag "$DIST_TAG"

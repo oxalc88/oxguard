@@ -19,3 +19,6 @@ __pycache__/
 
 # Go build artifacts (any test binaries)
 *.test
+
+# Generated npm/release artifacts
+/dist/

@@ -1,4 +1,4 @@
-module github.com/oxDevelop/oxguard/tsguard
+module github.com/oxalc88/oxguard/tsguard
 
 go 1.25.0
 

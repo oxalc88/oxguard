@@ -1,0 +1,31 @@
+name: npm distribution checks
+on:
+  push:
+  pull_request:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: tsguard/go.mod
+          cache-dependency-path: tsguard/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test npm/distribution.test.cjs

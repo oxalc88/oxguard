@@ -142,6 +142,23 @@ own stores:
 
 ## Install
 
+TypeScript projects can install the Go CLI through npm (Node.js 18+):
+
+```bash
+npm install -D @oxguard/tsguard
+npx tsguard check
+npx tsguard audit
+```
+
+The npm package selects the native binary for your OS and architecture. It has
+no install scripts and does not automatically run setup or install analyzer
+dependencies. Existing CLI behavior is unchanged; explicit `tsguard setup`
+still configures project tools as described below. See the
+[npm distribution guide](docs/guides/npm-distribution.md) for local tarball tests
+and release configuration.
+
+Standalone installation from GitHub Releases remains available:
+
 ```bash
 # TypeScript project
 curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
