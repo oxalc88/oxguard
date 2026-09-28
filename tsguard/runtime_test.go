@@ -37,6 +37,16 @@ func TestStandaloneSASTRetainsMissingEngineBehavior(t *testing.T) {
 	}
 }
 
+
+func TestTypeScriptGlobUsesPortableSeparatorsForWindowsPathWithSpaces(t *testing.T) {
+	root := `C:\Users\runneradmin\AppData\Local\Temp\tsguard-npm\consumer with spaces`
+	got := typescriptGlob(root, "src", "**", "*.ts")
+	want := "C:/Users/runneradmin/AppData/Local/Temp/tsguard-npm/consumer with spaces/src/**/*.ts"
+	if got != want {
+		t.Fatalf("typescript glob = %q, want %q", got, want)
+	}
+}
+
 func TestPackagedTypesPreservesProjectConfiguration(t *testing.T) {
 	r, _ := newTestRunner(t)
 	node := filepath.Join(r.root, "bin", "node")
