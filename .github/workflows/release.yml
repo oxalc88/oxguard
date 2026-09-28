@@ -105,6 +105,7 @@ jobs:
           [ "$GOOS" = "windows" ] && BIN=tsguard.exe
           mkdir -p "dist/binaries/$PLATFORM"
           cp "dist/$BIN" "dist/binaries/$PLATFORM/$BIN"
+          node npm/fetch-native.cjs dist/binaries "$PLATFORM"
           node npm/prepare.cjs "$TAG" dist/binaries dist/npm "$PLATFORM"
           npm pack "./dist/npm/tsguard-$PLATFORM" --pack-destination dist/npm
           if [ "$PLATFORM" = "linux-x64" ]; then

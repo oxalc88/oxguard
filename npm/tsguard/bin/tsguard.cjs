@@ -3,6 +3,7 @@
 
 const { spawn } = require('node:child_process');
 const { constants } = require('node:os');
+const path = require('node:path');
 const { version, optionalDependencies } = require('../package.json');
 
 const name = `@oxguard/tsguard-${process.platform}-${process.arch}`;
@@ -24,7 +25,16 @@ try {
   fail(`missing native package ${name}@${version}. Reinstall with npm install -D @oxguard/tsguard --include=optional (do not use --omit=optional).`);
 }
 
-const child = spawn(binary, process.argv.slice(2), { stdio: 'inherit' });
+const nativeRoot = path.dirname(path.dirname(binary));
+const musl = process.platform === 'linux' && !process.report.getReport().header.glibcVersionRuntime;
+const child = spawn(binary, process.argv.slice(2), {
+  stdio: 'inherit',
+  env: { ...process.env,
+    TSGUARD_RUNTIME: path.resolve(__dirname, '..'),
+    TSGUARD_NODE: process.execPath,
+    TSGUARD_OPENGREP: path.join(nativeRoot, 'bin', `opengrep${musl ? '-musl' : ''}${process.platform === 'win32' ? '.exe' : ''}`),
+  },
+});
 const handlers = new Map();
 for (const signal of ['SIGINT', 'SIGTERM', ...(process.platform === 'win32' ? [] : ['SIGHUP'])]) {
   const handler = () => child.kill(signal);

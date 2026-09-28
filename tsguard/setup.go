@@ -8,6 +8,13 @@ import (
 
 // runSetup bootstraps the full dev environment (idempotent).
 func runSetup(root string, cfg config) int {
+	if packagedRuntime() != "" {
+		fmt.Println("tsguard setup — npm-owned toolchain")
+		if code := runDoctor(root, cfg.pkgManager); code != 0 {
+			return code
+		}
+		return runHooks(root)
+	}
 	fmt.Println("tsguard setup")
 	fmt.Println("─────────")
 

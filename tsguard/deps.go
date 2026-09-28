@@ -34,13 +34,16 @@ var requiredNpmDevDeps = []string{
 // opengrep delivery: pinned version downloaded project-local (no pip, no global install).
 // Binary lands in node_modules/.cache/oxguard/opengrep (not committed, .gitignore'd).
 const (
-	opengrepVersion = "v1.23.0"
+	opengrepVersion  = "v1.23.0"
 	opengrepCacheDir = "node_modules/.cache/oxguard"
 	opengrepBinary   = "opengrep"
 )
 
 // opengrepBinaryPath returns the project-local Opengrep binary path.
 func opengrepBinaryPath(root string) string {
+	if packagedRuntime() != "" && os.Getenv("TSGUARD_OPENGREP") != "" {
+		return os.Getenv("TSGUARD_OPENGREP")
+	}
 	name := opengrepBinary
 	if runtime.GOOS == "windows" {
 		name += ".exe"
@@ -157,7 +160,6 @@ func downloadFile(destPath, url string) error {
 	return err
 }
 
-
 // addToGitignore appends line to .gitignore if it is not already present.
 func addToGitignore(root, line string) {
 	gitignorePath := filepath.Join(root, ".gitignore")
@@ -242,7 +244,6 @@ func ensureNpmDevDeps(root string, cfg config) error {
 	fmt.Println("  [OK]   devDependencies added")
 	return nil
 }
-
 
 // confirmYesNo prints a y/n prompt and returns the user's choice.
 // Returns defaultYes immediately when assumeYes is set, CI=true, or stdin is not a TTY.
@@ -446,6 +447,12 @@ func detectPackageManager(root string) string {
 // pkgExec returns a command slice for running a locally-installed tool with the
 // project's package manager (npx for npm, pnpm exec for pnpm, yarn exec for yarn).
 func pkgExec(pm string, args ...string) []string {
+	if packagedRuntime() != "" && len(args) > 0 {
+		switch args[0] {
+		case "biome", "tsc", "vitest", "fta", "knip", "jscpd", "secretlint", "audit-ci":
+			return packagedCommand(args[0], args[1:]...)
+		}
+	}
 	switch pm {
 	case "pnpm":
 		return append([]string{"pnpm", "exec"}, args...)

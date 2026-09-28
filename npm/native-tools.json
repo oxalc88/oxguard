@@ -1,0 +1,19 @@
+{
+  "linux-x64": {
+    "opengrep": { "asset": "opengrep_manylinux_x86", "sha256": "1f06548af379ab6080698a609612890ffad2d92dc2172f1e97d38d48096d5ef8" },
+    "opengrep-musl": { "asset": "opengrep_musllinux_x86", "sha256": "8e78a6774495ecf48a48c3c4e8beb4840229086a248687ac242e8fcee12732b4" }
+  },
+  "linux-arm64": {
+    "opengrep": { "asset": "opengrep_manylinux_aarch64", "sha256": "ddf4935b138a2e825e6860529df1fb031524f7a2da8933ab7b2a16e5939c5178" },
+    "opengrep-musl": { "asset": "opengrep_musllinux_aarch64", "sha256": "dd09f0842a643c6556b491b5f2bde42983ba8c10080b35ec72a1eb7e74dc47b4" }
+  },
+  "darwin-x64": {
+    "opengrep": { "asset": "opengrep_osx_x86", "sha256": "2fa99169e34e9f233fd7412d5cdc167114ba752a2510da3ce322b272c15ab755" }
+  },
+  "darwin-arm64": {
+    "opengrep": { "asset": "opengrep_osx_arm64", "sha256": "945739e56fec4aab28da296811f3473a0ff733af3dc2371d150b071430265c5f" }
+  },
+  "win32-x64": {
+    "opengrep.exe": { "asset": "opengrep_windows_x86.exe", "sha256": "7cbe02d9cc3fb812adce8720fc46515bb6a954a4ceeb3856d3a099d783749aae" }
+  }
+}

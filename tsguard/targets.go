@@ -42,6 +42,9 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 
 // runFix runs auto-formatter: ultracite fix (biome format + lint --fix).
 func runFix(r *Runner) int {
+	if packagedRuntime() != "" {
+		return r.runPackagedBiome(true)
+	}
 	fmt.Println("tsguard fix")
 	res := r.Run("ultracite fix", pkgExec(r.pkgManager, "ultracite", "fix")...)
 	if !res.ok {
@@ -53,6 +56,9 @@ func runFix(r *Runner) int {
 // runLint runs lint + format check via ultracite check.
 // Scopes to the project's source dirs and respects exclude dirs (fixes vendored-dir noise).
 func runLint(r *Runner) int {
+	if packagedRuntime() != "" {
+		return r.runPackagedBiome(false)
+	}
 	args := pkgExec(r.pkgManager, "ultracite", "check")
 	// Pass source dirs so ultracite doesn't lint the entire repo root.
 	if len(r.dirs) > 0 {
@@ -67,6 +73,9 @@ func runLint(r *Runner) int {
 
 // runTypes runs strict type checking.
 func runTypes(r *Runner) int {
+	if packagedRuntime() != "" {
+		return r.runPackagedTypes()
+	}
 	res := r.Run("tsc --noEmit", pkgExec(r.pkgManager, "tsc", "--noEmit")...)
 	if !res.ok {
 		return 1
@@ -110,6 +119,9 @@ func runFTA(r *Runner, dirs []string, scoreCap int) int {
 // c8 or nyc must be present to wrap the runner — fails hard if neither is found.
 func runCoverage(r *Runner) int {
 	runner := detectTestRunner(r.root)
+	if packagedRuntime() != "" && runner == "" {
+		runner = "vitest"
+	}
 	switch runner {
 	case "vitest":
 		if err := checkVitestVersionMatch(r.root); err != nil {
@@ -122,6 +134,9 @@ func runCoverage(r *Runner) int {
 			"--coverage.thresholds.branches=80",
 			"--coverage.thresholds.statements=80",
 		)
+		if packagedRuntime() != "" && !hasProjectConfig(r.root, "vitest.config.ts", "vitest.config.js", "vitest.config.mts", "vitest.config.mjs", "vite.config.ts", "vite.config.js", "vite.config.mjs", "vite.config.mts") {
+			args = append(args, "--config", filepath.Join(packagedRuntime(), "config", "vitest.config.mjs"))
+		}
 		res := r.Run("vitest --coverage", args...)
 		if !res.ok {
 			return 1
@@ -201,6 +216,14 @@ func runSecurity(r *Runner, initFlag bool) int {
 func runSecretlint(r *Runner) int {
 	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore")
 	args = append(args, r.dirs...)
+	if packagedRuntime() != "" {
+		var err error
+		args, err = r.packagedSecretArgs()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "tsguard: default secrets config: %v\n", err)
+			return 1
+		}
+	}
 	res := r.Run("secretlint", args...)
 	if !res.ok {
 		return 1
@@ -212,6 +235,9 @@ func runSecretlint(r *Runner) int {
 // secretlint requires no persistent baseline — it scans on every run.
 // This command runs a scan and reports findings for developer review.
 func runSecretsInit(r *Runner) int {
+	if packagedRuntime() != "" {
+		return runSecretlint(r)
+	}
 	fmt.Println("  Scanning for secrets (secretlint)...")
 	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore")
 	args = append(args, r.dirs...)
@@ -250,6 +276,10 @@ func runNpmAudit(r *Runner) int {
 func runOpengrep(r *Runner) int {
 	binaryPath := opengrepBinaryPath(r.root)
 	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		if packagedRuntime() != "" {
+			fmt.Fprintln(os.Stderr, "tsguard: bundled Opengrep is missing; reinstall @oxguard/tsguard with optional dependencies enabled")
+			return 1
+		}
 		fmt.Println("  [SKIP] opengrep — binary not found. Run: tsguard setup")
 		return 0
 	}

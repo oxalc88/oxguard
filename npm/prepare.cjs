@@ -29,21 +29,28 @@ function prepare(tag, binaries, output, selected = platforms) {
   }
   const main = path.join(output, 'tsguard');
   writePackage(main, {
-    ...common, name: '@oxguard/tsguard', engines: { node: '>=18' },
-    bin: { tsguard: 'bin/tsguard.cjs' }, files: ['bin'],
+    ...common, name: '@oxguard/tsguard', engines: { node: '^22.12.0 || ^24.0.0 || >=26.0.0' },
+    bin: { tsguard: 'bin/tsguard.cjs' }, files: ['bin', 'config'],
+    dependencies: require('./toolchain.json'),
     optionalDependencies: Object.fromEntries(platforms.map(p => [`@oxguard/tsguard-${p}`, version])),
   });
   fs.mkdirSync(path.join(main, 'bin'), { recursive: true });
-  fs.copyFileSync(path.join(__dirname, 'tsguard/bin/tsguard.cjs'), path.join(main, 'bin/tsguard.cjs'));
+  fs.cpSync(path.join(__dirname, 'tsguard/bin'), path.join(main, 'bin'), { recursive: true });
+  fs.cpSync(path.join(__dirname, 'tsguard/config'), path.join(main, 'config'), { recursive: true });
   fs.chmodSync(path.join(main, 'bin/tsguard.cjs'), 0o755);
   for (const platform of selected) {
     const [os, cpu] = platform.split('-');
     const directory = path.join(output, `tsguard-${platform}`);
-    writePackage(directory, { ...common, name: `@oxguard/tsguard-${platform}`, os: [os], cpu: [cpu], files: ['bin'] });
+    writePackage(directory, { ...common, name: `@oxguard/tsguard-${platform}`, os: [os], cpu: [cpu], files: ['bin', 'licenses'] });
     const bin = os === 'win32' ? 'tsguard.exe' : 'tsguard';
     fs.mkdirSync(path.join(directory, 'bin'), { recursive: true });
     fs.copyFileSync(path.join(binaries, platform, bin), path.join(directory, 'bin', bin));
     fs.chmodSync(path.join(directory, 'bin', bin), 0o755);
+    for (const engine of [os === 'win32' ? 'opengrep.exe' : 'opengrep', ...(os === 'linux' ? ['opengrep-musl'] : [])]) {
+      fs.copyFileSync(path.join(binaries, platform, engine), path.join(directory, 'bin', engine));
+      fs.chmodSync(path.join(directory, 'bin', engine), 0o755);
+    }
+    fs.cpSync(path.join(binaries, platform, 'licenses'), path.join(directory, 'licenses'), { recursive: true });
   }
 }
 

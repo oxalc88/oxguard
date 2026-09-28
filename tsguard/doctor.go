@@ -13,6 +13,10 @@ func runDoctor(root, pm string) int {
 	fmt.Println("──────────")
 
 	failures := 0
+	location, repair := "project-local", "Run: tsguard setup"
+	if packagedRuntime() != "" {
+		location, repair = "bundled", "Reinstall @oxguard/tsguard with optional dependencies enabled"
+	}
 
 	// Node.js >= 22
 	if !checkNode() {
@@ -40,12 +44,12 @@ func runDoctor(root, pm string) int {
 	for _, tool := range []struct{ name, cmd string }{
 		{"tsc", "tsc"},
 		{"vitest", "vitest"},
-		{"ultracite", "ultracite"},
+		{lintDoctorTool(), lintDoctorTool()},
 		{"fta", "fta"},
 	} {
 		out, _, err := RunSilent(root, pkgExec(pm, tool.cmd, "--version")...)
 		if err != nil {
-			fmt.Printf("  [FAIL] %s — not found. Run: tsguard setup\n", tool.name)
+			fmt.Printf("  [FAIL] %s — not found. %s\n", tool.name, repair)
 			failures++
 		} else {
 			version := strings.TrimSpace(strings.Split(out, "\n")[0])
@@ -60,25 +64,42 @@ func runDoctor(root, pm string) int {
 	} {
 		out, _, err := RunSilent(root, pkgExec(pm, tool.cmd, "--version")...)
 		if err != nil {
-			fmt.Printf("  [SKIP] %s — not installed (optional, needed for tsguard audit)\n", tool.name)
+			if packagedRuntime() != "" {
+				fmt.Printf("  [FAIL] %s — missing from packaged toolchain; reinstall @oxguard/tsguard\n", tool.name)
+				failures++
+			} else {
+				fmt.Printf("  [SKIP] %s — not installed (optional, needed for tsguard audit)\n", tool.name)
+			}
 		} else {
 			version := strings.TrimSpace(strings.Split(out, "\n")[0])
 			fmt.Printf("  [OK]   %s (%s)\n", tool.name, version)
+		}
+	}
+	if packagedRuntime() != "" {
+		if _, _, err := RunSilent(root, packagedCommand("audit-ci", "--version")...); err != nil {
+			fmt.Println("  [FAIL] audit-ci — missing from packaged toolchain")
+			failures++
+		}
+		for _, module := range []string{"@vitest/coverage-v8", "@secretlint/secretlint-rule-preset-recommend", "ultracite/biome/core"} {
+			if _, err := runtimeModule(root, module); err != nil {
+				fmt.Printf("  [FAIL] %s — missing from packaged toolchain\n", module)
+				failures++
+			}
 		}
 	}
 
 	// Opengrep project-local SAST binary (required for security gate).
 	opengrepBin := opengrepBinaryPath(root)
 	if out, _, err := RunSilent("", opengrepBin, "--version"); err != nil {
-		fmt.Println("  [FAIL] opengrep — not found (project-local). Run: tsguard setup")
+		fmt.Printf("  [FAIL] opengrep — not found (%s). %s\n", location, repair)
 		failures++
 	} else {
-		fmt.Printf("  [OK]   opengrep %s (project-local)\n", strings.TrimSpace(strings.Split(out, "\n")[0]))
+		fmt.Printf("  [OK]   opengrep %s (%s)\n", strings.TrimSpace(strings.Split(out, "\n")[0]), location)
 	}
 
 	// secretlint (npm dev-dep, required for secrets gate).
 	if out, _, err := RunSilent(root, pkgExec(pm, "secretlint", "--version")...); err != nil {
-		fmt.Println("  [FAIL] secretlint — not found. Run: tsguard setup")
+		fmt.Printf("  [FAIL] secretlint — not found. %s\n", repair)
 		failures++
 	} else {
 		fmt.Printf("  [OK]   secretlint (%s)\n", strings.TrimSpace(strings.Split(out, "\n")[0]))
@@ -88,8 +109,15 @@ func runDoctor(root, pm string) int {
 	if failures == 0 {
 		fmt.Println("  All checks passed.")
 	} else {
-		fmt.Printf("  %d issue(s) found. Run tsguard setup to fix.\n", failures)
+		fmt.Printf("  %d issue(s) found. %s\n", failures, repair)
 		return 1
 	}
 	return 0
+}
+
+func lintDoctorTool() string {
+	if packagedRuntime() != "" {
+		return "biome"
+	}
+	return "ultracite"
 }

@@ -9,6 +9,7 @@ const { test } = require('node:test');
 const { once } = require('node:events');
 const { createRequire } = require('node:module');
 const { prepare, platforms } = require('./prepare.cjs');
+const { fetchNative } = require('./fetch-native.cjs');
 
 const root = path.resolve(__dirname, '..');
 const host = `${process.platform}-${process.arch}`;
@@ -28,9 +29,36 @@ function run(command, args, cwd, expected = 0) {
   return result;
 }
 
+test('packaged adapter preserves a declared project compiler', t => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'tsguard-compiler-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const owned = path.join(temporary, 'owned');
+  const project = path.join(temporary, 'project');
+  fs.mkdirSync(path.join(owned, 'bin'), { recursive: true });
+  fs.mkdirSync(project);
+  const adapter = path.join(owned, 'bin/tool.cjs');
+  fs.copyFileSync(path.join(__dirname, 'tsguard/bin/tool.cjs'), adapter);
+  function compiler(directory, label) {
+    const packageDirectory = path.join(directory, 'node_modules/typescript');
+    fs.mkdirSync(path.join(packageDirectory, 'bin'), { recursive: true });
+    fs.writeFileSync(path.join(packageDirectory, 'package.json'), JSON.stringify({ name: 'typescript', bin: { tsc: 'bin/tsc.cjs' } }));
+    fs.writeFileSync(path.join(packageDirectory, 'bin/tsc.cjs'), `console.log(${JSON.stringify(label)});\n`);
+  }
+  compiler(owned, 'owned compiler');
+  compiler(project, 'project compiler');
+  const manifest = path.join(project, 'package.json');
+  fs.writeFileSync(manifest, '{}');
+  assert.equal(run(process.execPath, [adapter, 'tsc', '--version'], project).stdout.trim(), 'owned compiler');
+  fs.writeFileSync(manifest, JSON.stringify({ devDependencies: { typescript: '5.8.3' } }));
+  assert.equal(run(process.execPath, [adapter, 'tsc', '--version'], project).stdout.trim(), 'project compiler');
+});
+
 test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: 240000 }, async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'tsguard-npm-'));
-  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  t.after(() => {
+    if (process.env.TSGUARD_KEEP_TEST_DIR) t.diagnostic(`Test artifacts: ${temporary}`);
+    else fs.rmSync(temporary, { recursive: true, force: true });
+  });
   const binaries = path.join(temporary, 'binaries');
   const packages = path.join(temporary, 'packages');
   const consumer = path.join(temporary, 'consumer with spaces');
@@ -38,6 +66,12 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   fs.mkdirSync(consumer);
   const nativeBinary = path.join(binaries, host, binaryName);
   run('go', ['build', '-trimpath', '-ldflags', `-X main.version=v${version}`, '-o', nativeBinary, '.'], path.join(root, 'tsguard'));
+  // Reuse verified build inputs across test runs; consumer installation stays script-free.
+  const engines = path.join(root, 'dist/binaries');
+  await fetchNative(engines, host);
+  for (const file of fs.readdirSync(path.join(engines, host))) {
+    if (file.startsWith('opengrep') || file === 'licenses') fs.cpSync(path.join(engines, host, file), path.join(binaries, host, file), { recursive: true });
+  }
   prepare(`v${version}`, binaries, packages, [host]);
   assert.throws(() => prepare('v01.2.3', binaries, packages), /Invalid release version/);
   assert.throws(() => prepare('v1.2.3-01', binaries, packages), /Invalid release version/);
@@ -48,12 +82,17 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   for (const platform of platforms) {
     fs.mkdirSync(path.join(binaries, platform), { recursive: true });
     fs.copyFileSync(nativeBinary, path.join(binaries, platform, platform.startsWith('win32') ? 'tsguard.exe' : 'tsguard'));
+    if (platform !== host) {
+      fs.copyFileSync(path.join(binaries, host, process.platform === 'win32' ? 'opengrep.exe' : 'opengrep'), path.join(binaries, platform, platform.startsWith('win32') ? 'opengrep.exe' : 'opengrep'));
+      if (platform.startsWith('linux')) fs.copyFileSync(nativeBinary, path.join(binaries, platform, 'opengrep-musl'));
+      fs.cpSync(path.join(binaries, host, 'licenses'), path.join(binaries, platform, 'licenses'), { recursive: true });
+    }
   }
   prepare(`v${version}`, binaries, packages);
   const manifest = JSON.parse(fs.readFileSync(path.join(packages, 'tsguard/package.json')));
   assert.equal(Object.keys(manifest.optionalDependencies).length, 5);
   assert.equal(manifest.scripts, undefined);
-  assert.equal(manifest.dependencies, undefined);
+  for (const version of Object.values(manifest.dependencies)) assert.match(version, /^\d+\.\d+\.\d+$/);
   for (const platform of platforms) {
     const native = JSON.parse(fs.readFileSync(path.join(packages, `tsguard-${platform}/package.json`)));
     assert.equal(native.version, manifest.version);
@@ -66,7 +105,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const tarballs = ['tsguard', `tsguard-${host}`].map(name => {
     const packed = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary], path.join(packages, name)).stdout)[0];
     assert.ok(packed.files.some(file => file.path.startsWith('bin/')));
-    assert.ok(!packed.files.some(file => file.path.endsWith('.go') || file.path.includes('test')));
+    assert.ok(!packed.files.some(file => file.path.endsWith('.go') || file.path.endsWith('.test.cjs') || file.path.startsWith('testdata/')));
     return path.join(temporary, packed.filename);
   });
   fs.writeFileSync(path.join(consumer, 'package.json'), JSON.stringify({ name: 'consumer', private: true, version: '1.0.0' }));
@@ -75,12 +114,12 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     // Only this temporary consumer overrides the unpublished native version.
     fs.writeFileSync(path.join(consumer, 'pnpm-workspace.yaml'),
       `overrides:\n  ${JSON.stringify(`@oxguard/tsguard-${host}`)}: ${JSON.stringify(`file:${tarballs[1].replaceAll('\\', '/')}`)}\n`);
-    run('pnpm', ['add', '-D', '--offline', '--ignore-scripts', '--store-dir', path.join(temporary, 'store'), tarballs[0]], consumer);
+    run('pnpm', ['add', '-D', '--ignore-scripts', '--store-dir', path.join(temporary, 'store'), tarballs[0]], consumer);
     const consumerManifest = JSON.parse(fs.readFileSync(path.join(consumer, 'package.json')));
     assert.deepEqual(Object.keys(consumerManifest.devDependencies), ['@oxguard/tsguard']);
   } else {
-    // Both tarballs are supplied locally: unpublished optional versions never need the registry.
-    run('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '-D', ...tarballs], consumer);
+  // Both tarballs are supplied locally; owned tools still resolve from the registry.
+    run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '-D', ...tarballs], consumer);
     const other = platforms.find(platform => platform !== host);
     const otherPack = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary], path.join(packages, `tsguard-${other}`)).stdout)[0];
     assert.match(run('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', path.join(temporary, otherPack.filename)], consumer, 1).stderr, /EBADPLATFORM/);
@@ -98,6 +137,36 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const launcher = path.join(installed, 'tsguard/bin/tsguard.cjs');
   const nativeDirectory = path.dirname(createRequire(fs.realpathSync(launcher)).resolve(`@oxguard/tsguard-${host}/package.json`));
   const installedBinary = path.join(nativeDirectory, 'bin', binaryName);
+
+  // Exercise the actual gates with no analyzer listed as a consumer dependency.
+  fs.mkdirSync(path.join(consumer, 'src'));
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
+  fs.writeFileSync(path.join(consumer, 'src/add.test.ts'), 'import { expect, test } from "vitest";\nimport { add } from "./add";\ntest("adds", () => { expect(add(1, 2)).toBe(3); });\n');
+  const execute = (args, expected = 0) => run(executor, [...execArgs, 'tsguard', ...args, '--allow-pipe', '--dirs', 'src'], consumer, expected);
+  execute(['doctor']);
+  execute(['fix']);
+  execute(['lint']);
+  execute(['types']);
+  execute(['fta']);
+  execute(['coverage']);
+  execute(['secrets']);
+  const audit = execute(['audit']).stdout;
+  assert.match(audit, /\[(?:OK|FAIL)\].*knip/);
+  assert.match(audit, /\[OK\].*jscpd/);
+  // Use a local test rule to exercise the real SAST engine without depending on
+  // the live rule registry. Vulnerability auditing still uses the PM registry.
+  const rules = path.join(consumer, 'node_modules/.cache/oxguard/rules');
+  fs.mkdirSync(rules, { recursive: true });
+  fs.writeFileSync(path.join(rules, 'test.yaml'), 'rules:\n  - id: tsguard-test-eval\n    languages: [typescript, javascript]\n    message: Avoid eval\n    severity: ERROR\n    pattern: eval($X)\n');
+  assert.match(execute(['check']).stdout, /All checks passed/);
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const unsafe = eval("1+1");\n');
+  assert.match(execute(['security'], 1).stdout, /\[FAIL\].*opengrep SAST/);
+  assert.equal(fs.readFileSync(path.join(consumer, 'package.json'), 'utf8'), packageBefore);
+  assert.equal(fs.existsSync(path.join(consumer, 'biome.json')), false);
+  assert.equal(fs.existsSync(path.join(consumer, 'tsconfig.json')), false);
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const broken: number = "not a number";\n');
+  execute(['types'], 1);
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
   run('go', ['build', '-o', installedBinary, path.join(__dirname, 'testdata/cli.go')], root);
   for (const code of [0, 1, 3, 4, 5]) {
     run(process.execPath, [launcher, 'exit', String(code), 'ok'], consumer, code);
