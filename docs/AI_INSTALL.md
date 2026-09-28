@@ -16,9 +16,11 @@ your project type.
 ## TypeScript project → install tsguard
 
 For npm-based distribution, use `npm install -D @oxguard/tsguard` and invoke
-commands with `npx tsguard`. This installation does not run setup or add analyzer
-dependencies. The standalone installation and explicit setup prompt below
-remain available. See [npm distribution](guides/npm-distribution.md).
+commands with `npx tsguard`, or use `pnpm add -D @oxguard/tsguard` and
+`pnpm exec tsguard`. The package owns its required toolchain, including Opengrep,
+so commands are available immediately. Installation does not run setup or add individual
+analyzer entries to the consuming manifest. The standalone installation prompt below
+remains available. See [npm distribution](guides/npm-distribution.md).
 
 ```
 You are setting up tsguard (TypeScript quality gate) for this project.

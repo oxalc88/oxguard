@@ -125,12 +125,16 @@ in their own config still fail at the higher value.
 | none found | gate fails with install hint |
 | runner found, no wrapper | gate fails — add `c8` to devDependencies |
 
+With an npm installation and no declared project runner, coverage uses the
+package-owned Vitest/V8 defaults instead.
+
 pyguard detects pytest from `pyproject.toml` dev-group dependencies and config files.
 If only `unittest` test files are found (no pytest markers), pytest is used as the runner
 since it discovers and runs unittest tests natively.
 
-The security gate requires **no Python or global installs**. All tools land in the project's
-own stores:
+The security gate requires **no Python or global installs**. In npm installations,
+tools are owned by `@oxguard/tsguard` and Opengrep ships in its native package.
+Standalone `tsguard setup` uses the project's own stores:
 
 - **Secrets** (`secretlint`): added as a npm devDependency by `tsguard setup` → lives in `node_modules`.
 - **CVEs** (PM-native `audit` + `audit-ci`): also npm devDependencies.
@@ -142,7 +146,8 @@ own stores:
 
 ## Install
 
-TypeScript projects can install the Go CLI through npm (Node.js 18+):
+TypeScript projects can install the complete Go-powered toolchain through npm
+(Node.js 22.12+ on the 22.x line, 24.x, or 26+):
 
 ```bash
 npm install -D @oxguard/tsguard
@@ -150,10 +155,13 @@ npx tsguard check
 npx tsguard audit
 ```
 
-The npm package selects the native binary for your OS and architecture. It has
-no install scripts and does not automatically run setup or install analyzer
-dependencies. Existing CLI behavior is unchanged; explicit `tsguard setup`
-still configures project tools as described below. See the
+The npm package selects the native Go/Opengrep binaries for your OS and architecture
+and owns the required analyzer dependencies. No separate setup is needed to run
+the commands. Tools are transitive dependencies of `@oxguard/tsguard`, rather than
+individual entries added to your project's manifest. Existing project configs take
+precedence; missing configs use cache-local defaults. npm/pnpm installation runs
+no setup or install hooks. Explicit `tsguard setup` verifies tools and offers hooks
+in npm mode; standalone installation retains the setup behavior below. See the
 [npm distribution guide](docs/guides/npm-distribution.md) for local tarball tests
 and release configuration.
 
