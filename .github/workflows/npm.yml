@@ -33,6 +33,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Go regression tests
+        if: matrix.manager.name == 'npm' && runner.os != 'Windows'
+        run: go test ./...
+        working-directory: tsguard
       - name: Install pnpm test tool
         if: matrix.manager.name == 'pnpm'
         run: npm install --global pnpm@${{ matrix.manager.version }}
