@@ -134,7 +134,7 @@ Before the first release:
    permissions. Include scope access for creating the new packages. For
    unattended publishing with 2FA enabled, enable the token's Bypass 2FA option
    and ensure package/organization policy permits token publishing.
-3. Add the token as the repository Actions secret `NPM_TOKEN`. The workflow
+3. Add the token as the repository Actions secret `MAEZSAEN_TOKEN`. The workflow
    uses setup-node's registry configuration and `NODE_AUTH_TOKEN`; no env files
    need editing. Rotate the token before its configured expiration.
 4. Push a new version tag, or run Release manually with that tag.

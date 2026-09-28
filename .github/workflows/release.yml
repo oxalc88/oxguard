@@ -172,7 +172,7 @@ jobs:
           merge-multiple: true
       - name: Publish native packages before launcher
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.MAEZSAEN_TOKEN }}
         run: |
           VERSION="${TAG#v}"
           DIST_TAG=latest
