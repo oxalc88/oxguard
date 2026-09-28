@@ -86,7 +86,7 @@ func (r *Runner) runPackagedBiome(fix bool) int {
 }
 
 func typescriptGlob(parts ...string) string {
-	return filepath.Join(parts...)
+	return strings.ReplaceAll(filepath.Join(parts...), "\\", "/")
 }
 
 func (r *Runner) runPackagedTypes() int {
@@ -96,7 +96,7 @@ func (r *Runner) runPackagedTypes() int {
 		for _, dir := range r.dirs {
 			include = append(include, typescriptGlob(r.root, dir, "**", "*.ts"), typescriptGlob(r.root, dir, "**", "*.tsx"))
 		}
-		exclude := []string{filepath.ToSlash(filepath.Join(r.root, "**", "*.test.*")), filepath.ToSlash(filepath.Join(r.root, "**", "*.spec.*"))}
+		exclude := []string{typescriptGlob(r.root, "**", "*.test.*"), typescriptGlob(r.root, "**", "*.spec.*")}
 		for _, dir := range r.excludeDirs {
 			exclude = append(exclude, typescriptGlob(r.root, "**", dir, "**"))
 		}
