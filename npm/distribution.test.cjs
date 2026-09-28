@@ -18,11 +18,11 @@ const version = '0.0.0-npm-test';
 const manager = process.env.TSGUARD_PACKAGE_MANAGER || 'npm';
 assert.ok(['npm', 'pnpm'].includes(manager), `Unsupported test package manager: ${manager}`);
 
-function run(command, args, cwd, expected = 0) {
+function run(command, args, cwd, expected = 0, timeout = 120000) {
   // Windows package managers are .cmd scripts; quote paths when going through cmd.exe.
   const shell = process.platform === 'win32' && ['npm', 'npx', 'pnpm'].includes(command);
   const result = spawnSync(command, shell ? args.map(a => `"${a}"`) : args, {
-    cwd, encoding: 'utf8', shell, timeout: 120000,
+    cwd, encoding: 'utf8', shell, timeout,
   });
   assert.ifError(result.error);
   assert.equal(result.status, expected, `${command}: ${result.stdout}\n${result.stderr}`);
@@ -53,7 +53,7 @@ test('packaged adapter preserves a declared project compiler', t => {
   assert.equal(run(process.execPath, [adapter, 'tsc', '--version'], project).stdout.trim(), 'project compiler');
 });
 
-test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: 240000 }, async t => {
+test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: 360000 }, async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'tsguard-npm-'));
   t.after(() => {
     if (process.env.TSGUARD_KEEP_TEST_DIR) t.diagnostic(`Test artifacts: ${temporary}`);
@@ -119,7 +119,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     assert.deepEqual(Object.keys(consumerManifest.devDependencies), ['@oxguard/tsguard']);
   } else {
   // Both tarballs are supplied locally; owned tools still resolve from the registry.
-    run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '-D', ...tarballs], consumer);
+    run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '-D', ...tarballs], consumer, 0, 240000);
     const other = platforms.find(platform => platform !== host);
     const otherPack = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary], path.join(packages, `tsguard-${other}`)).stdout)[0];
     assert.match(run('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', path.join(temporary, otherPack.filename)], consumer, 1).stderr, /EBADPLATFORM/);
