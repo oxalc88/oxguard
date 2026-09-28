@@ -85,16 +85,20 @@ func (r *Runner) runPackagedBiome(fix bool) int {
 	return 0
 }
 
+func typescriptGlob(parts ...string) string {
+	return strings.ReplaceAll(filepath.Join(parts...), "\\", "/")
+}
+
 func (r *Runner) runPackagedTypes() int {
 	args := []string{"--noEmit"}
 	if !hasProjectConfig(r.root, "tsconfig.json") {
 		include := []string{}
 		for _, dir := range r.dirs {
-			include = append(include, filepath.Join(r.root, dir, "**", "*.ts"), filepath.Join(r.root, dir, "**", "*.tsx"))
+			include = append(include, typescriptGlob(r.root, dir, "**", "*.ts"), typescriptGlob(r.root, dir, "**", "*.tsx"))
 		}
-		exclude := []string{filepath.ToSlash(filepath.Join(r.root, "**", "*.test.*")), filepath.ToSlash(filepath.Join(r.root, "**", "*.spec.*"))}
+		exclude := []string{typescriptGlob(r.root, "**", "*.test.*"), typescriptGlob(r.root, "**", "*.spec.*")}
 		for _, dir := range r.excludeDirs {
-			exclude = append(exclude, filepath.Join(r.root, "**", dir, "**"))
+			exclude = append(exclude, typescriptGlob(r.root, "**", dir, "**"))
 		}
 		file, err := writeRuntimeConfig(r.root, "tsconfig.json", map[string]any{
 			"compilerOptions": map[string]any{"strict": true, "noEmit": true, "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "skipLibCheck": true, "jsx": "react-jsx"},
