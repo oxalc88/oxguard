@@ -22,40 +22,50 @@ var defaultExcludes = []string{
 
 // fileConfig holds values read from oxguard.toml at the project root.
 // CLI flags always take precedence over file config; file config takes precedence
-// over built-in defaults. Missing or unparseable file silently returns zero values.
+// over built-in defaults. The builder chooses human fallback or structured failure.
 type fileConfig struct {
 	Dirs            []string `toml:"dirs"`
 	Exclude         []string `toml:"exclude"`
 	FTAScoreCap     int      `toml:"fta-score-cap"`
 	Timeout         int      `toml:"timeout"`
 	FtaExcludeTests *bool    `toml:"fta-exclude-tests"` // nil = use default (true)
-	FtaExclude      []string `toml:"fta-exclude"`        // extra globs appended to defaults
+	FtaExclude      []string `toml:"fta-exclude"`       // extra globs appended to defaults
 }
 
-// loadFileConfig reads oxguard.toml from root. Missing file is silently ignored.
-func loadFileConfig(root string) fileConfig {
+// loadFileConfig reads oxguard.toml; buildConfig treats a missing file as defaults.
+func loadFileConfig(root string) (fileConfig, error) {
 	data, err := os.ReadFile(filepath.Join(root, "oxguard.toml"))
 	if err != nil {
-		return fileConfig{}
+		return fileConfig{}, err
 	}
 	var fc fileConfig
 	if _, err := toml.NewDecoder(bytes.NewReader(data)).Decode(&fc); err != nil {
-		fmt.Fprintf(os.Stderr, "tsguard: warning — oxguard.toml parse error: %v\n", err)
-		return fileConfig{}
+		return fileConfig{}, err
 	}
-	return fc
+	return fc, nil
 }
 
 // buildConfig merges built-in defaults, oxguard.toml, and CLI flags in priority order.
 //
-//   dirs:    CLI > file > default (replacement, not additive)
-//   exclude: default + file + CLI (always additive; base set always applies)
-//   scalars: CLI > file > default
-//   booleans: always from CLI (zero value = not passed)
-func buildConfig(cli config, root string) config {
-	file := loadFileConfig(root)
+//	dirs:    CLI > file > default (replacement, not additive)
+//	exclude: default + file + CLI (always additive; base set always applies)
+//	scalars: CLI > file > default
+//	booleans: always from CLI (zero value = not passed)
+func buildConfig(cli config, root string) (config, error) {
+	file, err := loadFileConfig(root)
+	if err != nil && !os.IsNotExist(err) {
+		if cli.output == "agent" || cli.output == "json" {
+			return config{}, fmt.Errorf("oxguard.toml: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "tsguard: warning — oxguard.toml parse error: %v\n", err)
+	}
+	if (cli.output == "agent" || cli.output == "json") && (file.Timeout < 0 || file.FTAScoreCap < 0) {
+		return config{}, fmt.Errorf("oxguard.toml: timeout and fta-score-cap must be positive")
+	}
 
 	cfg := config{
+		output:          cli.output,
+		root:            cli.root,
 		timeout:         300,
 		ftaScoreCap:     60,
 		excludeDirs:     append([]string{}, defaultExcludes...),
@@ -100,7 +110,7 @@ func buildConfig(cli config, root string) config {
 		cfg.ftaScoreCap = cli.ftaScoreCap
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 // ftaConfig is the fta.json schema subset tsguard writes for exclusion control.

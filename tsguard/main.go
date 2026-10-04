@@ -3,9 +3,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -34,6 +36,8 @@ Environment setup:
   tsguard hooks          generate AI tool hook configs
 
 Flags:
+  --output <mode>  human (default), agent (bounded), or json (complete result)
+  --root <path>    explicit project root containing package.json
   --dirs <d1,d2>    override target directories (default: . — project root)
   --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)
   --timeout <s>     per-tool timeout in seconds (default: 300)
@@ -45,9 +49,10 @@ Flags:
 
 Note: never pipe tsguard through an external tail (tsguard check 2>&1 | tail -50).
       Use tsguard check --tail 50 or tsguard check --log-file /tmp/tsguard.log --tail 50.
-      For heavy gates (check, security, coverage) tsguard refuses to run when
+      In human mode, heavy gates (check, security, coverage) refuse to run when
       stdout is a pipe; use --allow-pipe to override.
-      Lighter commands warn on piped stdout but still run.
+      Lighter human commands warn on piped stdout but still run.
+      Agent and JSON modes accept piped stdout.
 `
 
 func main() {
@@ -68,49 +73,94 @@ func main() {
 		os.Exit(0)
 	}
 
-	cliCfg := parseFlags(args)
-
-	root, err := findProjectRoot()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Run tsguard from inside a TypeScript project directory.\n")
-		os.Exit(exitUnknown)
-	}
-
-	cfg := buildConfig(cliCfg, root)
-	cfg.pkgManager = detectPackageManager(root)
-
-	if cfg.ifTypeScript {
-		if !editedFileIsTypeScript() {
-			os.Exit(0)
-		}
-	}
-
-	// doctor is read-only — exempt from the instance lock.
-	if cmd == "doctor" {
-		os.Exit(runDoctor(root, cfg.pkgManager))
-	}
-
-	// Instance lock — prevents concurrent tsguard runs from stacking up.
-	release, lockErr := acquireLock(root)
-	if lockErr != nil {
-		fmt.Fprintf(os.Stderr, "tsguard: %v\n", lockErr)
-		os.Exit(exitLocked)
-	}
-
-	code := dispatch(cmd, cfg, root)
-	release()
-	os.Exit(code)
+	os.Exit(runCLI(cmd, args))
 }
 
-func dispatch(cmd string, cfg config, root string) int {
-	if !cfg.allowPipe {
+func runCLI(cmd string, args []string) int {
+	cliCfg, err := parseFlags(args)
+	result := newRunResult(cmd)
+	finish := func(code int) int {
+		result.finish(code)
+		if cliCfg.output == "agent" || cliCfg.output == "json" {
+			if err := reportResult(os.Stdout, cliCfg.output, result); err != nil {
+				return 1
+			}
+		}
+		return code
+	}
+	fail := func(code int, category, message string) int {
+		result.execution("invocation", category, message)
+		if cliCfg.output != "agent" && cliCfg.output != "json" {
+			fmt.Fprintf(os.Stderr, "error: %s\n", message)
+		}
+		return finish(code)
+	}
+	if err != nil {
+		return fail(exitUnknown, "invalid_configuration", err.Error())
+	}
+	if !analysisCommands[cmd] && cmd != "doctor" && cmd != "setup" && cmd != "hooks" {
+		return fail(exitUnknown, "invalid_configuration", "unknown command: "+cmd)
+	}
+	if cliCfg.output != "human" && !analysisCommands[cmd] {
+		return fail(exitUnknown, "invalid_configuration", "--output agent/json is supported only for analysis commands")
+	}
+	root := cliCfg.root
+	if root == "" {
+		root, err = findProjectRoot()
+	} else {
+		root, err = filepath.Abs(root)
+		if err == nil {
+			var info os.FileInfo
+			info, err = os.Stat(filepath.Join(root, "package.json"))
+			if err == nil && info.IsDir() {
+				err = fmt.Errorf("package.json must be a file")
+			}
+		}
+	}
+	if err != nil {
+		return fail(exitUnknown, "invalid_configuration", "TypeScript project root: "+err.Error())
+	}
+	cfg, err := buildConfig(cliCfg, root)
+	if err != nil {
+		return fail(exitUnknown, "invalid_configuration", err.Error())
+	}
+	cfg.pkgManager = detectPackageManager(root)
+	if cfg.ifTypeScript && !editedFileIsTypeScript() {
+		result.Status = "skipped"
+		return finish(0)
+	}
+	if cmd == "doctor" {
+		return runDoctor(root, cfg.pkgManager)
+	}
+	release, lockErr := acquireLock(root)
+	if lockErr != nil {
+		category := "lock_failure"
+		var held *lockHeldError
+		if errors.As(lockErr, &held) {
+			category = "lock_contention"
+		}
+		return fail(exitLocked, category, lockErr.Error())
+	}
+	code := dispatchResult(cmd, cfg, root, result)
+	release()
+	return finish(code)
+}
+
+var analysisCommands = map[string]bool{
+	"check": true, "fix": true, "lint": true, "types": true, "complexity": true,
+	"fta": true, "coverage": true, "security": true, "npm-audit": true,
+	"secrets": true, "dead-code": true, "duplicates": true, "audit": true,
+}
+
+func dispatchResult(cmd string, cfg config, root string, result *RunResult) int {
+	if !cfg.allowPipe && cfg.output == "human" {
 		if info, err := os.Stdout.Stat(); err == nil && info.Mode()&os.ModeNamedPipe != 0 {
 			if heavyGates[cmd] {
 				fmt.Fprintln(os.Stderr,
 					"tsguard: stdout is a pipe for a long-running gate. Piping through\n"+
 						"     tail/head can wedge the PTY (see project CLAUDE.md).\n"+
 						"     Use --tail N or --log-file, or pass --allow-pipe to override.")
+				result.execution("invocation", "pipe_refused", "Heavy gate refused piped stdout; use --allow-pipe.")
 				return exitPipeRefused
 			}
 			fmt.Fprintln(os.Stderr,
@@ -119,7 +169,7 @@ func dispatch(cmd string, cfg config, root string) int {
 		}
 	}
 
-	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs, ftaExcludeTests: cfg.ftaExcludeTests, ftaExclude: cfg.ftaExclude}
+	r := &Runner{outputMode: cfg.output, result: result, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs, ftaExcludeTests: cfg.ftaExcludeTests, ftaExclude: cfg.ftaExclude}
 
 	switch cmd {
 	case "check":
@@ -175,6 +225,8 @@ var heavyGates = map[string]bool{
 
 // config holds parsed flags.
 type config struct {
+	output          string
+	root            string
 	dirs            []string
 	excludeDirs     []string
 	timeout         int
@@ -193,51 +245,76 @@ type config struct {
 // parseFlags parses CLI arguments and returns only explicitly-set values.
 // Zero values (nil slices, 0 ints, false bools) mean "not provided by caller".
 // buildConfig applies defaults and merges with oxguard.toml before dispatch.
-func parseFlags(args []string) config {
-	cfg := config{}
+func parseFlags(args []string) (config, error) {
+	cfg := config{output: "human"}
+	// Determine the error reporter even when an earlier argument is invalid.
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--output" && (args[i+1] == "json" || args[i+1] == "agent") {
+			cfg.output = args[i+1]
+		}
+	}
 	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--dirs":
-			if i+1 < len(args) {
-				i++
-				cfg.dirs = strings.Split(args[i], ",")
-			}
-		case "--exclude":
-			if i+1 < len(args) {
-				i++
-				cfg.excludeDirs = append(cfg.excludeDirs, strings.Split(args[i], ",")...)
-			}
-		case "--timeout":
-			if i+1 < len(args) {
-				i++
-				fmt.Sscanf(args[i], "%d", &cfg.timeout)
-			}
-		case "--tail":
-			if i+1 < len(args) {
-				i++
-				fmt.Sscanf(args[i], "%d", &cfg.tailLines)
-			}
-		case "--log-file":
-			if i+1 < len(args) {
-				i++
-				cfg.logFile = args[i]
-			}
+		flag := args[i]
+		switch flag {
 		case "--if-typescript":
 			cfg.ifTypeScript = true
+			continue
 		case "--init":
 			cfg.initFlag = true
+			continue
 		case "--allow-pipe":
 			cfg.allowPipe = true
+			continue
 		case "--yes", "-y":
 			cfg.assumeYes = true
-		case "--max-fta-score":
-			if i+1 < len(args) {
-				i++
-				fmt.Sscanf(args[i], "%d", &cfg.ftaScoreCap)
+			continue
+		case "--dirs", "--exclude", "--timeout", "--tail", "--log-file", "--max-fta-score", "--root", "--output":
+		default:
+			return cfg, fmt.Errorf("unknown argument: %s", flag)
+		}
+		if i+1 >= len(args) || strings.HasPrefix(args[i+1], "--") || args[i+1] == "" {
+			return cfg, fmt.Errorf("missing value for %s", flag)
+		}
+		i++
+		value := args[i]
+		switch flag {
+		case "--dirs", "--exclude":
+			dirs := strings.Split(value, ",")
+			for _, dir := range dirs {
+				if strings.TrimSpace(dir) == "" {
+					return cfg, fmt.Errorf("empty directory in %s", flag)
+				}
+			}
+			if flag == "--dirs" {
+				cfg.dirs = dirs
+			} else {
+				cfg.excludeDirs = append(cfg.excludeDirs, dirs...)
+			}
+		case "--log-file":
+			cfg.logFile = value
+		case "--root":
+			cfg.root = value
+		case "--output":
+			if value != "human" && value != "agent" && value != "json" {
+				return cfg, fmt.Errorf("invalid output mode %q (use human, agent, or json)", value)
+			}
+			cfg.output = value
+		default:
+			n, err := strconv.Atoi(value)
+			if err != nil || n < 0 || (n == 0 && flag != "--tail") {
+				return cfg, fmt.Errorf("invalid value for %s: %s", flag, value)
+			}
+			switch flag {
+			case "--timeout":
+				cfg.timeout = n
+			case "--tail":
+				cfg.tailLines = n
+			case "--max-fta-score":
+				cfg.ftaScoreCap = n
 			}
 		}
 	}
-	return cfg
+	return cfg, nil
 }
 
 func findProjectRoot() (string, error) {
