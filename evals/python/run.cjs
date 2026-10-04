@@ -84,7 +84,6 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
         if (c.json) {
           const normalized = JSON.parse(response.stdout);
           entry.errors.push(...validate(c, normalized, response, root));
-          for (const expected of c.expected.measurements || []) if (!normalized.measurements.some(m => m.metric === expected.metric && m.location.file === expected.file && m.location.symbol === expected.symbol && m.value === expected.value)) entry.errors.push(`Missing known measurement: ${JSON.stringify(expected)}`);
           const again = checked(invoke(args, root, c.missing_tool ? { PATH: path.join(temporary, 'no-tools') } : {}), 'repeat JSON');
           if (again.status !== response.status || !isDeepStrictEqual(JSON.parse(again.stdout), JSON.parse(response.stdout))) entry.errors.push('Normalized result changed across identical runs');
         }

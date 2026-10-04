@@ -105,7 +105,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const tarballs = ['tsguard', `tsguard-${host}`].map(name => {
     const packed = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary], path.join(packages, name)).stdout)[0];
     assert.ok(packed.files.some(file => file.path.startsWith('bin/')));
-    assert.ok(!packed.files.some(file => file.path.endsWith('.go') || file.path.endsWith('.test.cjs') || file.path.startsWith('testdata/')));
+    assert.ok(!packed.files.some(file => file.path.endsWith('.go') || file.path.endsWith('.test.cjs') || file.path.startsWith('testdata/') || file.path.startsWith('evals/') || file.path.includes('/fixtures/')));
     return path.join(temporary, packed.filename);
   });
   fs.writeFileSync(path.join(consumer, 'package.json'), JSON.stringify({ name: 'consumer', private: true, version: '1.0.0' }));
@@ -144,6 +144,12 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const nativeDirectory = path.dirname(createRequire(fs.realpathSync(launcher)).resolve(`@oxguard/tsguard-${host}/package.json`));
   const installedBinary = path.join(nativeDirectory, 'bin', binaryName);
 
+  // One local provider is shared by scored evals and integration checks.
+  // It runs in a child process because the native evaluator is synchronous.
+  const auditRegistry = spawn(process.execPath, [path.join(__dirname, 'testdata/audit-registry.cjs')], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
+  t.after(() => auditRegistry.kill());
+  const [auditProvider] = await once(auditRegistry, 'message');
+
   // Evaluate through the packed, installed launcher, before fixtures replace
   // the real binary later in this integration test. Keep scoring separate from
   // packaging assertions and record the exact revision/corpus/toolchain.
@@ -152,7 +158,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     const { compare, markdown } = require('../evals/compare.cjs');
     const reportDirectory = path.resolve(root, process.env.OXGUARD_EVAL_REPORT_DIR, `${manager}-${host}`);
     fs.mkdirSync(reportDirectory, { recursive: true });
-    const candidate = evaluate({ command: [process.execPath, launcher], revision: process.env.OXGUARD_EVAL_REVISION || run('git', ['rev-parse', 'HEAD'], root).stdout.trim() });
+    const candidate = evaluate({ command: [process.execPath, launcher], auditRegistry: auditProvider.registry, revision: process.env.OXGUARD_EVAL_REVISION || run('git', ['rev-parse', 'HEAD'], root).stdout.trim() });
     assert.deepEqual(candidate.toolchain, require('./toolchain.json'));
     fs.writeFileSync(path.join(reportDirectory, 'candidate.json'), JSON.stringify(candidate, null, 2) + '\n');
     const baselineRef = process.env.OXGUARD_EVAL_BASELINE_REF;
@@ -168,7 +174,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
         run('go', ['build', '-trimpath', '-ldflags', `-X main.version=v${version}`, '-o', baselineBinary, '.'], path.join(baselineSource, 'tsguard'));
         fs.copyFileSync(baselineBinary, installedBinary);
         let baseline;
-        try { baseline = evaluate({ command: [process.execPath, launcher], suite: 'baseline', revision: run('git', ['rev-parse', 'HEAD'], baselineSource).stdout.trim() }); }
+        try { baseline = evaluate({ command: [process.execPath, launcher], auditRegistry: auditProvider.registry, suite: 'baseline', revision: run('git', ['rev-parse', 'HEAD'], baselineSource).stdout.trim() }); }
         finally { fs.copyFileSync(nativeBinary, installedBinary); }
         fs.writeFileSync(path.join(reportDirectory, 'baseline.json'), JSON.stringify(baseline, null, 2) + '\n');
         const comparison = compare(baseline, candidate);
@@ -198,9 +204,6 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   assert.match(audit, /\[OK\].*jscpd/);
   // Use local providers so live rule/advisory changes do not block real SAST.
   // Installation above still uses the PM registry; only audit responses are fixed.
-  const auditRegistry = spawn(process.execPath, [path.join(__dirname, 'testdata/audit-registry.cjs')], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
-  t.after(() => auditRegistry.kill());
-  const [auditProvider] = await once(auditRegistry, 'message');
   // pnpm 12 does not apply npm_config_registry to audit. Use the shared
   // project config so both PMs and audit-ci's child PM see this provider.
   fs.writeFileSync(path.join(consumer, '.npmrc'), `registry=${auditProvider.registry}\n`);

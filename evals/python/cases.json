@@ -593,6 +593,14 @@
             "status": "passed",
             "normalization": "complete"
           }
+        ],
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
         ]
       }
     },
@@ -613,7 +621,9 @@
             "gate": "coverage",
             "rule": "pyguard.coverage.lines_threshold_failed",
             "category": "quality",
-            "status": "blocking"
+            "status": "blocking",
+            "observed": 75,
+            "threshold": 80
           }
         ],
         "assessment": "complete",
@@ -622,6 +632,14 @@
             "name": "coverage",
             "status": "failed",
             "normalization": "complete"
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 75,
+            "threshold": 80
           }
         ]
       }
@@ -653,6 +671,61 @@
             "name": "deps",
             "status": "advisory",
             "normalization": "complete"
+          }
+        ]
+      }
+    },
+    {
+      "id": "coverage.boundary",
+      "fixture": "coverage-boundary",
+      "command": "coverage",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 80,
+            "threshold": 80
+          }
+        ]
+      }
+    },
+    {
+      "id": "coverage.test_failure",
+      "fixture": "coverage-failed-test",
+      "command": "coverage",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "pyguard.tests.failed",
+            "category": "quality",
+            "status": "blocking",
+            "file": "tests/test_main.py",
+            "line": 6
+          }
+        ],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 100,
+            "threshold": 80
           }
         ]
       }

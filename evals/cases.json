@@ -540,6 +540,400 @@
       "detection": true,
       "basis": "historical_contract_or_regression",
       "repeat": true
+    },
+    {
+      "id": "coverage.functions.60",
+      "fixture": "coverage-contract",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.functions_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 60,
+            "threshold": 80
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.lines_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 60,
+            "threshold": 80
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.statements_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 60,
+            "threshold": 80
+          }
+        ],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 60,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.functions",
+            "file": "",
+            "value": 60,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.statements",
+            "file": "",
+            "value": 60,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.branches",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      },
+      "files": {
+        "src/functions.test.ts": "import { test, expect } from \"vitest\";\nimport { fn1, fn2, fn3, fn4, fn5 } from \"./functions\";\ntest(\"known functions\", () => {\n  expect(fn1()).toBe(1);\n  expect(fn2()).toBe(2);\n  expect(fn3()).toBe(3);\n});\n"
+      },
+      "agent": true
+    },
+    {
+      "id": "coverage.functions.80",
+      "fixture": "coverage-contract",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 80,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.functions",
+            "file": "",
+            "value": 80,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.statements",
+            "file": "",
+            "value": 80,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.branches",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      },
+      "files": {
+        "src/functions.test.ts": "import { test, expect } from \"vitest\";\nimport { fn1, fn2, fn3, fn4, fn5 } from \"./functions\";\ntest(\"known functions\", () => {\n  expect(fn1()).toBe(1);\n  expect(fn2()).toBe(2);\n  expect(fn3()).toBe(3);\n  expect(fn4()).toBe(4);\n});\n"
+      },
+      "agent": false,
+      "repeat": true
+    },
+    {
+      "id": "coverage.functions.100",
+      "fixture": "coverage-contract",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.functions",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.statements",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.branches",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      },
+      "files": {
+        "src/functions.test.ts": "import { test, expect } from \"vitest\";\nimport { fn1, fn2, fn3, fn4, fn5 } from \"./functions\";\ntest(\"known functions\", () => {\n  expect(fn1()).toBe(1);\n  expect(fn2()).toBe(2);\n  expect(fn3()).toBe(3);\n  expect(fn4()).toBe(4);\n  expect(fn5()).toBe(5);\n});\n"
+      },
+      "agent": false
+    },
+    {
+      "id": "coverage.test_failure",
+      "fixture": "coverage-contract",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "tsguard.tests.failed",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/functions.test.ts"
+          }
+        ],
+        "assessment": "complete"
+      },
+      "files": {
+        "src/functions.test.ts": "import { test, expect } from \"vitest\";\nimport { fn1, fn2, fn3, fn4, fn5 } from \"./functions\";\ntest(\"known functions\", () => {\n  expect(fn1()).toBe(1);\n  expect(fn2()).toBe(2);\n  expect(fn3()).toBe(3);\n  expect(fn4()).toBe(4);\n  expect(fn5()).toBe(999);\n});\n"
+      }
+    },
+    {
+      "id": "coverage.no_tests",
+      "fixture": "types-clean",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "error",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "tsguard.execution.invalid_configuration",
+            "category": "invalid_configuration",
+            "status": "execution_error"
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.functions_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 0,
+            "threshold": 80
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.lines_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 0,
+            "threshold": 80
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.statements_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 0,
+            "threshold": 80
+          }
+        ],
+        "assessment": "incomplete"
+      },
+      "agent": true
+    },
+    {
+      "id": "security.clean",
+      "fixture": "security-contract",
+      "command": "security",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete"
+      },
+      "local_rules": true,
+      "audit_registry": "clean",
+      "files": {}
+    },
+    {
+      "id": "security.multiple",
+      "fixture": "security-contract",
+      "command": "security",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "security",
+            "rule": "node_modules..cache.oxguard.rules.oxguard-eval-no-eval",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          },
+          {
+            "gate": "security",
+            "rule": "node_modules..cache.oxguard.rules.oxguard-eval-no-eval",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 2
+          }
+        ],
+        "assessment": "complete"
+      },
+      "local_rules": true,
+      "audit_registry": "clean",
+      "files": {
+        "src/index.ts": "export const unsafe = eval(\"1+1\");\nexport const alsoUnsafe = eval(\"2+2\");\n"
+      },
+      "repeat": true
+    },
+    {
+      "id": "secrets.clean",
+      "fixture": "security-contract",
+      "command": "secrets",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete"
+      },
+      "files": {}
+    },
+    {
+      "id": "secrets.blocking",
+      "fixture": "security-contract",
+      "command": "secrets",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "secrets",
+            "rule": "@secretlint/secretlint-rule-privatekey",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/key.txt",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "assessment": "complete",
+        "absent_text": [
+          "MIABCDEFGHIJKLMNOPQRSTUVWXYZ",
+          "found private key:"
+        ]
+      },
+      "files": {
+        "src/key.txt": "-----BEGIN RSA PRIVATE KEY-----\nMIABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx0123456789+/\n-----END RSA PRIVATE KEY-----\n"
+      },
+      "repeat": true
+    },
+    {
+      "id": "dependencies.clean",
+      "fixture": "security-contract",
+      "command": "npm-audit",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete"
+      },
+      "audit_registry": "clean",
+      "files": {}
+    },
+    {
+      "id": "dependencies.vulnerable",
+      "fixture": "security-contract",
+      "command": "npm-audit",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "dependencies",
+            "rule": "tsguard.dependencies.policy_failed",
+            "category": "quality",
+            "status": "blocking"
+          },
+          {
+            "gate": "dependencies",
+            "rule": "GHSA-xxxx-yyyy-zzzz",
+            "category": "quality",
+            "status": "advisory",
+            "file": "package.json"
+          }
+        ],
+        "assessment": "complete"
+      },
+      "audit_registry": "vulnerable",
+      "files": {
+        "package.json": "{\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}\n",
+        "package-lock.json": "{\"name\": \"oxguard-eval-fixture\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}, \"node_modules/oxguard-eval-dependency\": {\"version\": \"1.0.0\"}}}\n"
+      }
+    },
+    {
+      "id": "dependencies.low_advisory",
+      "fixture": "security-contract",
+      "command": "npm-audit",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "advisory",
+        "exit_code": 0,
+        "findings": [
+          {
+            "gate": "dependencies",
+            "rule": "GHSA-xxxx-yyyy-zzzz",
+            "category": "quality",
+            "status": "advisory",
+            "file": "package.json"
+          }
+        ],
+        "assessment": "complete"
+      },
+      "audit_registry": "low",
+      "files": {
+        "package.json": "{\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}\n",
+        "package-lock.json": "{\"name\": \"oxguard-eval-fixture\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}, \"node_modules/oxguard-eval-dependency\": {\"version\": \"1.0.0\"}}}\n"
+      }
     }
   ]
 }

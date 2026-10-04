@@ -25,7 +25,9 @@ function corpusDigest() {
 }
 function projectFinding(f) {
   return { gate: f.gate, rule: f.rule, category: f.category, status: f.status,
-    ...(f.location ? { file: f.location.file, ...(f.location.line ? { line: f.location.line } : {}) } : {}) };
+    ...(f.observed !== undefined ? { observed: f.observed } : {}),
+    ...(f.threshold !== undefined ? { threshold: f.threshold } : {}),
+    ...(f.location ? { file: f.location.file, ...(f.location.line ? { line: f.location.line } : {}), ...(f.location.column ? { column: f.location.column } : {}), ...(f.location.symbol ? { symbol: f.location.symbol } : {}) } : {}) };
 }
 function match(expected, actual) {
   return Object.entries(expected).every(([key, value]) => actual[key] === value);
@@ -53,6 +55,10 @@ function validate(testCase, result, processResult, root) {
   if (errors.some(e => e.endsWith('must be an array'))) return errors;
   if (testCase.expected.assessment) expect(result.assessment === testCase.expected.assessment, 'assessment mismatch');
   if (testCase.expected.gates) expect(isDeepStrictEqual(result.gates, testCase.expected.gates), 'gate execution/normalization mismatch');
+  for (const text of testCase.expected.absent_text || []) expect(!JSON.stringify(result).includes(text), 'normalized result exposed forbidden source text');
+  if (!testCase.criticality) for (const measurement of testCase.expected.measurements || []) {
+    expect(result.measurements.some(m => match(measurement, { ...m, file: m.location?.file, symbol: m.location?.symbol })), `missing known measurement: ${JSON.stringify(measurement)}`);
+  }
   let remaining = result.findings.map(projectFinding);
   for (const finding of testCase.expected.findings) {
     const index = remaining.findIndex(f => match(finding, f));
@@ -82,12 +88,12 @@ function validate(testCase, result, processResult, root) {
   return errors;
 }
 
-function evaluate({ command, revision = 'unspecified', suite = 'candidate', reportFile }) {
+function evaluate({ command, revision = 'unspecified', suite = 'candidate', reportFile, auditRegistry }) {
   if (!Array.isArray(command) || !command.length) throw new Error('command must be a non-empty argv array');
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'oxguard-eval-'));
   const invoke = (args, cwd) => {
     const started = performance.now();
-    const result = spawnSync(command[0], [...command.slice(1), ...args], { cwd, encoding: 'utf8', timeout: 60000, maxBuffer: 8 * 1024 * 1024 });
+    const result = spawnSync(command[0], [...command.slice(1), ...args], { cwd, env: { ...process.env, npm_config_cache: path.join(cwd, 'node_modules/.cache/oxguard/npm-eval') }, encoding: 'utf8', timeout: 60000, maxBuffer: 8 * 1024 * 1024 });
     return { ...result, duration_ms: Math.round(performance.now() - started), stdout: result.stdout || '', stderr: result.stderr || '' };
   };
   try {
@@ -106,7 +112,19 @@ function evaluate({ command, revision = 'unspecified', suite = 'candidate', repo
       }
       const root = path.join(temporary, testCase.id);
       fs.cpSync(path.join(__dirname, 'fixtures', testCase.fixture), root, { recursive: true });
-      for (const [file, content] of Object.entries(testCase.files || {})) fs.writeFileSync(path.join(root, file), content);
+      for (const [file, content] of Object.entries(testCase.files || {})) {
+        fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+        fs.writeFileSync(path.join(root, file), content);
+      }
+      if (testCase.local_rules) {
+        const rules = path.join(root, 'node_modules/.cache/oxguard/rules');
+        fs.mkdirSync(rules, { recursive: true });
+        fs.copyFileSync(path.join(root, 'rule.yaml'), path.join(rules, 'rule.yaml'));
+      }
+      if (testCase.audit_registry) {
+        if (!auditRegistry) { entry.errors.push('Audit evals require the deterministic local provider'); continue; }
+        fs.writeFileSync(path.join(root, '.npmrc'), `registry=${auditRegistry}/${testCase.audit_registry}/\nfetch-retries=0\n`);
+      }
       let invocationRoot = root;
       let cwd = root;
       if (testCase.root_log) { cwd = path.join(root, 'nested'); fs.mkdirSync(cwd); }
@@ -142,7 +160,10 @@ function evaluate({ command, revision = 'unspecified', suite = 'candidate', repo
           entry.duration_ms += agent.duration_ms;
           entry.agent_bytes = Buffer.byteLength(agent.stdout);
           entry.agent_lines = agent.stdout.trimEnd().split('\n').length;
-          if (agent.error || agent.status !== response.status || entry.agent_bytes > 6144 || entry.agent_lines > 26 || !agent.stdout.includes('findings: 12\n') || !agent.stdout.includes('omitted: 2 (use --output json)')) entry.errors.push('agent summary must be bounded and disclose all omitted findings');
+          const count = result.findings.length;
+          const omitted = Math.max(0, count - 10);
+          if (agent.error || agent.status !== response.status || entry.agent_bytes > 6144 || entry.agent_lines > 26 || !agent.stdout.includes(`findings: ${count}\n`) || (omitted && !agent.stdout.includes(`omitted: ${omitted} (use --output json)`)) || (!omitted && agent.stdout.includes('omitted:'))) entry.errors.push('agent summary must be bounded and disclose all omitted findings');
+          if (testCase.expected.assessment && !agent.stdout.includes(`assessment: ${testCase.expected.assessment};`)) entry.errors.push('agent summary must disclose assessment completeness');
         }
       } catch (error) {
         entry.errors.push(error.message);
@@ -165,7 +186,7 @@ function evaluate({ command, revision = 'unspecified', suite = 'candidate', repo
       if (fs.existsSync(packageFile)) toolchain = JSON.parse(fs.readFileSync(packageFile)).dependencies || null;
     }
     const report = { schema_version: '1', corpus_version: corpus.version, corpus_sha256: corpusDigest(), suite, revision,
-      evaluator_sha256: crypto.createHash('sha256').update(fs.readFileSync(__filename)).digest('hex'), toolchain,
+      evaluator_sha256: crypto.createHash('sha256').update(fs.readFileSync(__filename)).update(fs.readFileSync(path.join(__dirname, '../npm/testdata/audit-registry.cjs'))).digest('hex'), toolchain,
       costs: { total_case_duration_ms: times.reduce((sum, value) => sum + value, 0), p50_case_duration_ms: percentile(0.5), p95_case_duration_ms: percentile(0.95), max_agent_bytes: Math.max(0, ...cases.map(c => c.agent_bytes || 0)), max_agent_lines: Math.max(0, ...cases.map(c => c.agent_lines || 0)) },
       environment: { platform: process.platform, arch: process.arch, node: process.version },
       cli_version: version.stdout.trim(), execution_path: 'caller-supplied argv; installed launcher in CI',

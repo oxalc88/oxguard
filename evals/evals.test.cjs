@@ -69,3 +69,14 @@ test('empty or unidentified reports cannot produce a green comparison', () => {
     assert.throws(() => compare(a, b), /Incomparable/);
   }
 });
+
+test('contract eval rejects lost or incorrect coverage values independently of finding counts', () => {
+  const { validate } = require('./run.cjs');
+  const c = { command: 'coverage', expected: { status: 'fail', exit_code: 1, assessment: 'complete', findings: [{ gate: 'coverage', rule: 'tsguard.coverage.lines_threshold_failed', category: 'quality', status: 'blocking', observed: 75, threshold: 80 }], measurements: [{ metric: 'coverage.lines', file: '', value: 75, threshold: 80 }] } };
+  const result = () => ({ schema_version: '1', command: 'coverage', status: 'fail', exit_code: 1, assessment: 'complete', findings: [{ ...c.expected.findings[0], id: 'tsguard.coverage.lines_threshold_failed:' + 'a'.repeat(64), diagnostics: [] }], measurements: [{ metric: 'coverage.lines', location: { file: '' }, value: 75, threshold: 80 }], artifacts: [], diagnostics: [] });
+  assert.deepEqual(validate(c, result(), { status: 1 }, '.'), []);
+  for (const mutate of [r => delete r.findings[0].observed, r => r.findings[0].observed = 80, r => r.findings[0].threshold = 75, r => r.measurements = [], r => r.measurements[0].value = 100, r => r.assessment = 'incomplete']) {
+    const r = result(); mutate(r);
+    assert.ok(validate(c, r, { status: 1 }, '.').length > 0);
+  }
+});
