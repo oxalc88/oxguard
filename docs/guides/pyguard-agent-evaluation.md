@@ -22,7 +22,7 @@ The caller fixture has two distinct function callers of `target`, with two calls
 
 ## Implementation evidence
 
-With the same pinned toolchain, current candidate and rebuilt baseline run the same corpus: all 15 behavior cases are retained, and all 20 current parity cases pass. The original nine requirements pass; five additional JSON checks cover Ruff, Radon failure/boundary, annotations and criticality measurements. Exact rule/location/count expectations are independent fixtures, not snapshots of huge logs. JSON is validated and compared across repeat runs. These small fixtures do not establish production precision/recall.
+With the same pinned toolchain, current candidate and rebuilt baseline run the same corpus: all 15 behavior cases are retained, and all 22 current parity cases pass. The original nine requirements pass; five additional JSON checks cover Ruff, Radon failure/boundary, annotations and criticality measurements. Exact rule/location/count expectations are independent fixtures, not snapshots of huge logs. JSON is validated and compared across repeat runs. These small fixtures do not establish production precision/recall.
 
 The known caller answer remains two. Its invocation now explicitly passes `--dirs functions`, matching the fixture's location; this scope correction does not weaken the expected count. The new criticality JSON case verifies `criticality.in_degree` with `core.target = 2` and advisory findings. The script uses absolute paths and pyan3 function-use edges, excluding namespace containment and repeated-call duplication. Failures produce execution records while the advisory CLI keeps exit 0.
 
