@@ -15,13 +15,19 @@ function digest(files, baseDirectory = __dirname) {
   return hash.digest('hex');
 }
 function walk(dir) { return fs.readdirSync(dir).toSorted().flatMap(name => { const file = path.join(dir, name); return fs.statSync(file).isDirectory() ? walk(file) : [file]; }); }
+function relativeSource(root, file) {
+  return path.relative(fs.realpathSync(root), fs.realpathSync(path.resolve(root, file))).replaceAll('\\', '/');
+}
+function radonValue(json) {
+  return Object.entries(json).find(([file]) => file.replaceAll('\\', '/') === 'src/main.py')?.[1]?.[0]?.complexity;
+}
 function checked(response, context) {
   if (response.error || response.signal || response.status === null) throw new Error(`${context}: ${response.error?.message || response.signal || 'no exit status'}`);
   return response;
 }
 function evaluate({ binary, source, python, revision = 'unspecified', reportDirectory }) {
   binary = path.resolve(binary); source = path.resolve(source); python = path.resolve(python);
-  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'pyguard-evals-'));
+  const temporary = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pyguard-evals-')));
   const env = { ...process.env, PATH: `${path.dirname(python)}${path.delimiter}${process.env.PATH}`, VIRTUAL_ENV: path.dirname(path.dirname(python)), UV_NO_SYNC: '1', UV_OFFLINE: '1', NO_COLOR: '1' };
   const invoke = (argv, cwd, overrides = {}) => {
     const start = performance.now();
@@ -95,11 +101,11 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
           } else if (oracle.status !== (c.expected.findings.length ? 1 : 0)) throw new Error('Analyzer oracle exit mismatch');
           if (c.oracle === 'mypy' || c.oracle === 'ruff') {
             const rows = c.oracle === 'mypy' ? oracle.stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : JSON.parse(oracle.stdout);
-            const findings = rows.map(f => ({ rule: f.code, file: path.relative(root, path.resolve(root, f.file || f.filename)).replaceAll('\\', '/'), line: f.line || f.location.row }));
+            const findings = rows.map(f => ({ rule: f.code, file: relativeSource(root, f.file || f.filename), line: f.line || f.location.row }));
             entry.actual.oracle_findings = findings;
             if (!isDeepStrictEqual(findings, c.expected.findings)) entry.errors.push('Analyzer findings differ from independent answers');
           } else if (c.oracle === 'radon') {
-            entry.actual.complexity = JSON.parse(oracle.stdout)['src/main.py']?.[0]?.complexity;
+            entry.actual.complexity = radonValue(JSON.parse(oracle.stdout));
             if (entry.actual.complexity !== c.expected.complexity) entry.errors.push('Cyclomatic complexity differs from hand-counted answer');
           } else {
             entry.actual.violations = JSON.parse(oracle.stdout);
@@ -164,4 +170,4 @@ if (require.main === module) {
   console.log(JSON.stringify({ behavior: candidate.behavior.totals, parity: candidate.parity.totals, agent_ready: candidate.agent_ready, regression_guard_passed: ready }));
   process.exitCode = ready ? 0 : 1;
 }
-module.exports = { evaluate, guard, checked };
+module.exports = { evaluate, guard, checked, relativeSource, radonValue };

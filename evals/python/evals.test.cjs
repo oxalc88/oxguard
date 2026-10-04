@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { guard, checked, evaluate } = require('./run.cjs');
+const { guard, checked, evaluate, relativeSource, radonValue } = require('./run.cjs');
 const { parity } = require('../parity.cjs');
 const mapping = require('../capabilities.json');
 const python = require('./cases.json');
@@ -49,4 +49,18 @@ test('parity rejects mixed revisions, incomplete reports and forged outcomes', (
   for (const mutate of [r => r[1].revision = 'old', r => r[1].cases = [], r => r[1].cases[0].outcome = 'not_run', r => r[1].environment = { arch: 'arm64' }, r => r[1].cases.push(r[1].cases[0])]) {
     const r = reports(); mutate(r); assert.throws(() => parity(...r));
   }
+});
+test('Radon JSON paths use the same known answer on Windows and Unix', () => {
+  for (const file of ['src/main.py', 'src\\main.py']) assert.equal(radonValue({ [file]: [{ complexity: 12 }] }), 12);
+  assert.equal(radonValue({ 'other.py': [{ complexity: 12 }] }), undefined);
+});
+test('analyzer canonical paths remain project relative through a symlink', t => {
+  const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pyguard-path-test-'));
+  try {
+    fs.mkdirSync(path.join(root, 'src')); fs.writeFileSync(path.join(root, 'src', 'main.py'), '');
+    const alias = path.join(root, 'alias');
+    try { fs.symlinkSync(root, alias, 'dir'); } catch (error) { t.skip(`Symlink unavailable: ${error.code}`); return; }
+    assert.equal(relativeSource(alias, fs.realpathSync(path.join(root, 'src', 'main.py'))), 'src/main.py');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
