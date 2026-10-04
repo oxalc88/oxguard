@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { isDeepStrictEqual } = require('node:util');
 const corpus = require('./cases.json');
+const { generatedInput } = require('./generated-inputs.cjs');
 
 function walk(directory) {
   return fs.readdirSync(directory).sort().flatMap(name => {
@@ -17,7 +18,7 @@ function walk(directory) {
 }
 function corpusDigest() {
   const hash = crypto.createHash('sha256');
-  for (const file of [path.join(__dirname, 'cases.json'), ...walk(path.join(__dirname, 'fixtures'))]) {
+  for (const file of [path.join(__dirname, 'cases.json'), path.join(__dirname, 'generated-inputs.cjs'), ...walk(path.join(__dirname, 'fixtures'))]) {
     hash.update(path.relative(__dirname, file).replaceAll('\\', '/'));
     hash.update('\0'); hash.update(fs.readFileSync(file)); hash.update('\0');
   }
@@ -56,6 +57,7 @@ function validate(testCase, result, processResult, root) {
   if (testCase.expected.assessment) expect(result.assessment === testCase.expected.assessment, 'assessment mismatch');
   if (testCase.expected.gates) expect(isDeepStrictEqual(result.gates, testCase.expected.gates), 'gate execution/normalization mismatch');
   for (const text of testCase.expected.absent_text || []) expect(!JSON.stringify(result).includes(text), 'normalized result exposed forbidden source text');
+  for (const kind of Object.values(testCase.generated_files || {})) expect(!JSON.stringify(result).includes(generatedInput(kind).forbiddenText), 'normalized result exposed generated source text');
   if (!testCase.criticality) for (const measurement of testCase.expected.measurements || []) {
     expect(result.measurements.some(m => match(measurement, { ...m, file: m.location?.file, symbol: m.location?.symbol })), `missing known measurement: ${JSON.stringify(measurement)}`);
   }
@@ -115,6 +117,10 @@ function evaluate({ command, revision = 'unspecified', suite = 'candidate', repo
       for (const [file, content] of Object.entries(testCase.files || {})) {
         fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
         fs.writeFileSync(path.join(root, file), content);
+      }
+      for (const [file, kind] of Object.entries(testCase.generated_files || {})) {
+        fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+        fs.writeFileSync(path.join(root, file), generatedInput(kind).content);
       }
       if (testCase.local_rules) {
         const rules = path.join(root, 'node_modules/.cache/oxguard/rules');

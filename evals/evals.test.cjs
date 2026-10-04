@@ -4,6 +4,21 @@ const assert = require('node:assert/strict');
 const { compare } = require('./compare.cjs');
 const { detection, corpusDigest, evaluate } = require('./run.cjs');
 const corpus = require('./cases.json');
+test('secret detector input is generated, invalid as a real key, and redacted', () => {
+  const { generatedInput } = require('./generated-inputs.cjs');
+  const { validate } = require('./run.cjs');
+  const crypto = require('node:crypto');
+  const fs = require('node:fs');
+  const input = generatedInput('synthetic_private_key');
+  assert.throws(() => crypto.createPrivateKey(input.content));
+  assert.throws(() => generatedInput('unknown'), /Unknown generated eval input/);
+  assert.ok(!fs.readFileSync(require.resolve('./cases.json'), 'utf8').includes(input.content.split('\n')[0]));
+  const c = { command: 'secrets', generated_files: { 'src/key.txt': 'synthetic_private_key' }, expected: { status: 'pass', exit_code: 0, findings: [] } };
+  const result = { schema_version: '1', command: 'secrets', status: 'pass', exit_code: 0, findings: [], measurements: [], artifacts: [], diagnostics: [] };
+  assert.deepEqual(validate(c, result, { status: 0 }, '.'), []);
+  result.extra = input.forbiddenText;
+  assert.ok(validate(c, result, { status: 0 }, '.').includes('normalized result exposed generated source text'));
+});
 function report(outcomes) {
   return { schema_version: '1', corpus_sha256: corpusDigest(), revision: 'test', evaluator_sha256: 'oracle', environment: { platform: 'test', arch: 'test', node: 'test' }, toolchain: { typescript: '5.9.3' }, totals: { fail: outcomes.filter(x => x === 'fail').length, unsupported: outcomes.filter(x => x === 'unsupported').length }, cases: outcomes.map((outcome, i) => ({ id: String(i), outcome, duration_ms: 1, stdout_bytes: 2 })) };
 }

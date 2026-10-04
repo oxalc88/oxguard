@@ -853,14 +853,14 @@
         ],
         "assessment": "complete",
         "absent_text": [
-          "MIABCDEFGHIJKLMNOPQRSTUVWXYZ",
           "found private key:"
         ]
       },
-      "files": {
-        "src/key.txt": "-----BEGIN RSA PRIVATE KEY-----\nMIABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx0123456789+/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx0123456789+/\n-----END RSA PRIVATE KEY-----\n"
-      },
-      "repeat": true
+      "files": {},
+      "repeat": true,
+      "generated_files": {
+        "src/key.txt": "synthetic_private_key"
+      }
     },
     {
       "id": "dependencies.clean",
