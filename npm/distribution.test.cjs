@@ -164,6 +164,9 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const auditRegistry = spawn(process.execPath, [path.join(__dirname, 'testdata/audit-registry.cjs')], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
   t.after(() => auditRegistry.kill());
   const [auditProvider] = await once(auditRegistry, 'message');
+  // pnpm 12 does not apply npm_config_registry to audit. Use the shared
+  // project config so both PMs and audit-ci's child PM see this provider.
+  fs.writeFileSync(path.join(consumer, '.npmrc'), `registry=${auditProvider.registry}\n`);
   const originalRegistry = process.env.npm_config_registry;
   process.env.npm_config_registry = auditProvider.registry;
   t.after(() => {
