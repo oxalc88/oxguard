@@ -174,6 +174,7 @@ func (r *Runner) RunTool(spec toolSpec, name string, args ...string) Result {
 	if r.result != nil {
 		r.result.Findings = append(r.result.Findings, normalized.Findings...)
 		r.result.Measurements = append(r.result.Measurements, normalized.Measurements...)
+		r.result.Artifacts = append(r.result.Artifacts, normalized.Artifacts...)
 	}
 	output = cbuf.tail(r.tailLines)
 	reportHumanTool(os.Stdout, name, normalized, r.logFile, output)

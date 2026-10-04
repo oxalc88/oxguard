@@ -64,6 +64,10 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	}
 	var adapterErr error
 	switch spec.adapter {
+	case "criticality":
+		if res.ok {
+			adapterErr = r.normalizeCriticality(stdout, refs)
+		}
 	case "tsc":
 		reader := bufio.NewReader(stdout)
 		for {

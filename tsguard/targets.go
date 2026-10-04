@@ -325,10 +325,11 @@ func runOpengrep(r *Runner) int {
 	return 0
 }
 
-// runAudit runs informational analysis: dead-code + duplicates.
+// runAudit runs informational analysis: criticality + dead-code + duplicates.
 // Never fails (exit 0 always) — these are advisory.
 func runAudit(r *Runner, dirs []string) int {
 	r.println("tsguard audit (informational)")
+	runCriticality(r)
 	runDeadCode(r)
 	runDuplicates(r, dirs)
 	return 0

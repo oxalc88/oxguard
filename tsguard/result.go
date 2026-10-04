@@ -25,6 +25,7 @@ type Location struct {
 	File   string `json:"file"`
 	Line   int    `json:"line,omitempty"` // one-based; omitted when unknown
 	Column int    `json:"column,omitempty"`
+	Symbol string `json:"symbol,omitempty"`
 }
 
 type Finding struct {
@@ -49,7 +50,7 @@ type Measurement struct {
 	Location  Location `json:"location"`
 	Value     float64  `json:"value"`
 	Unit      string   `json:"unit"`
-	Threshold float64  `json:"threshold"`
+	Threshold float64  `json:"threshold,omitempty"`
 }
 
 type Artifact struct {
@@ -142,6 +143,14 @@ func (r *RunResult) finish(code int) {
 
 func relativePath(root, path string) string {
 	if filepath.IsAbs(path) {
+		// macOS exposes temporary roots through /var -> /private/var. Compare
+		// physical paths so explicit roots and invocation-cwd logs agree.
+		if physical, err := filepath.EvalSymlinks(root); err == nil {
+			root = physical
+		}
+		if physical, err := filepath.EvalSymlinks(path); err == nil {
+			path = physical
+		}
 		if rel, err := filepath.Rel(root, path); err == nil {
 			path = rel
 		}

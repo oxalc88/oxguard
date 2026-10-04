@@ -28,7 +28,8 @@ Quality gates (replaces npm scripts):
   tsguard secrets        credential scan (secretlint)
   tsguard dead-code      detect unused exports/deps (knip)
   tsguard duplicates     detect copy-paste code (jscpd)
-  tsguard audit          informational: dead-code + duplicates
+  tsguard criticality    informational: function/method caller ranking
+  tsguard audit          informational: criticality + dead-code + duplicates
 
 Environment setup:
   tsguard setup          npm install, configure AI tool hooks
@@ -149,7 +150,7 @@ func runCLI(cmd string, args []string) int {
 var analysisCommands = map[string]bool{
 	"check": true, "fix": true, "lint": true, "types": true, "complexity": true,
 	"fta": true, "coverage": true, "security": true, "npm-audit": true,
-	"secrets": true, "dead-code": true, "duplicates": true, "audit": true,
+	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true,
 }
 
 func dispatchResult(cmd string, cfg config, root string, result *RunResult) int {
@@ -199,6 +200,8 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		return runDeadCode(r)
 	case "duplicates":
 		return runDuplicates(r, cfg.dirs)
+	case "criticality":
+		return runCriticality(r)
 	case "audit":
 		return runAudit(r, cfg.dirs)
 	case "setup":
