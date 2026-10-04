@@ -76,7 +76,7 @@ Require existing cases to remain passing and a new capability to have positive, 
 
 ## Python behavior and agent parity
 
-`evals/python/cases.json` contains language-specific controls with the same quality intent: clean/incorrect types and lint, complexity pass/threshold/boundary, annotation depth boundaries, fail-fast, lock/pipe refusal, missing uv and full diagnostic logs. Ruff/mypy JSON, Radon JSON and the owned annotation model independently verify known answers. Those oracle records are **not** normalized PyGuard CLI findings; no CLI precision/recall score is assigned while its result contract is missing.
+`evals/python/cases.json` contains language-specific controls with the same quality intent: clean/incorrect types and lint, complexity pass/threshold/boundary, annotation depth boundaries, fail-fast, lock/pipe refusal, missing uv and full diagnostic logs. Ruff/mypy JSON, Radon JSON and the owned annotation model independently verify known answers. Those oracle records are **not** normalized PyGuard CLI findings. Separate contract cases assert exact normalized records; no aggregate production precision/recall score is claimed.
 
 Python requirements, including transitive dependencies and hashes, are pinned in `evals/python/requirements.txt`. The evaluator checks the installed versions, runs uv offline, and copies helper scripts from the evaluated source into fresh projects, matching setup's deployment location. It does not test release installer or setup dependency installation. These remain separate smoke-test responsibilities.
 
