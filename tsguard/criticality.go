@@ -104,7 +104,7 @@ func (r *Runner) normalizeCriticality(stdout io.Reader, refs []string) error {
 		if category != "tool_missing" && category != "invalid_configuration" && category != "analyzer_failure" {
 			return fmt.Errorf("unknown analyzer error")
 		}
-		r.result.execution("criticality", category, graph.Error.Message)
+		r.result.Execution("criticality", category, graph.Error.Message)
 		r.result.Findings[len(r.result.Findings)-1].Diagnostics = refs
 		return nil
 	}
@@ -132,13 +132,13 @@ func (r *Runner) normalizeCriticality(stdout io.Reader, refs []string) error {
 		fmt.Fprintf(&report, "| %d | `%s` | %d |\n", selected, label, function.Callers)
 		observed := float64(function.Callers)
 		location := function.Location
-		r.result.addFinding(Finding{Level: "structure", Gate: "criticality", Rule: "tsguard.criticality.ranked", Severity: "info", Status: "advisory", Category: "quality", Location: &location, Observed: &observed, Evidence: fmt.Sprintf("%s has %d distinct callers (rank %d).", function.Location.Symbol, function.Callers, selected), Diagnostics: refs})
+		r.result.AddFinding(Finding{Level: "structure", Gate: "criticality", Rule: "tsguard.criticality.ranked", Severity: "info", Status: "advisory", Category: "quality", Location: &location, Observed: &observed, Evidence: fmt.Sprintf("%s has %d distinct callers (rank %d).", function.Location.Symbol, function.Callers, selected), Diagnostics: refs})
 	}
 	if selected == 0 {
 		report.WriteString("\nNo functions with resolved callers in this scope.\n")
 	}
 	if err := os.WriteFile(filepath.Join(r.root, "CRITICALITY.md"), []byte(report.String()), 0o644); err != nil {
-		r.result.execution("criticality", "artifact_failure", "Cannot write CRITICALITY.md.")
+		r.result.Execution("criticality", "artifact_failure", "Cannot write CRITICALITY.md.")
 		return nil
 	}
 	r.result.Artifacts = append(r.result.Artifacts, Artifact{Kind: "criticality", Path: "CRITICALITY.md"})

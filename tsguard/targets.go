@@ -292,7 +292,7 @@ func runOpengrep(r *Runner) int {
 		}
 		r.println("  [SKIP] opengrep — binary not found. Run: tsguard setup")
 		if r.machine() {
-			r.result.execution("security", "tool_missing", "Opengrep is missing; standalone mode skipped SAST.")
+			r.result.Execution("security", "tool_missing", "Opengrep is missing; standalone mode skipped SAST.")
 		}
 		return 0
 	}

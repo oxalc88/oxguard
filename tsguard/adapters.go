@@ -44,7 +44,7 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 		if category != "quality" {
 			findingStatus = "execution_error"
 		}
-		r.result.addFinding(Finding{Gate: spec.gate, Rule: rule, Severity: severity,
+		r.result.AddFinding(Finding{Gate: spec.gate, Rule: rule, Severity: severity,
 			Status: findingStatus, Category: category, Evidence: evidence, Location: location, Diagnostics: refs})
 	}
 	if res.category != "" {
@@ -186,7 +186,7 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 				if severity != "warning" && severity != "info" {
 					severity = "error"
 				}
-				r.result.addFinding(Finding{Gate: spec.gate, Rule: d.Rule, Severity: severity, Status: status, Category: "quality", Evidence: d.Extra.Message,
+				r.result.AddFinding(Finding{Gate: spec.gate, Rule: d.Rule, Severity: severity, Status: status, Category: "quality", Evidence: d.Extra.Message,
 					Location: &Location{File: relativePath(r.root, d.Path), Line: d.Start.Line, Column: d.Start.Column}, Diagnostics: refs})
 			}
 			for _, e := range report.Errors {
@@ -203,7 +203,7 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	}
 	if !res.ok && len(r.result.Findings) == start {
 		// Unknown tool details are never confidently labelled source-code defects.
-		r.result.addFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".failed", Severity: "error", Status: status,
+		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".failed", Severity: "error", Status: status,
 			Category: "unclassified_failure", Evidence: "Analyzer failed; inspect diagnostics for this gate.", Diagnostics: refs})
 	}
 }
@@ -212,7 +212,7 @@ func (r *Runner) addFTA(spec toolSpec, file string, value, threshold float64, re
 	location := Location{File: relativePath(r.root, filepath.Join(spec.subject, file))}
 	r.result.Measurements = append(r.result.Measurements, Measurement{Metric: "fta.score", Level: "code", Location: location, Value: value, Unit: "score", Threshold: threshold})
 	if value > threshold {
-		r.result.addFinding(Finding{Gate: "fta", Rule: "tsguard.fta.score_exceeded", Severity: "error", Status: status, Category: "quality",
+		r.result.AddFinding(Finding{Gate: "fta", Rule: "tsguard.fta.score_exceeded", Severity: "error", Status: status, Category: "quality",
 			Location: &location, Observed: &value, Threshold: &threshold,
 			Evidence: fmt.Sprintf("FTA score %g exceeds %g.", value, threshold), Diagnostics: refs})
 	}
@@ -220,7 +220,7 @@ func (r *Runner) addFTA(spec toolSpec, file string, value, threshold float64, re
 
 func (r *Runner) executionFailure(gate, category, message string) int {
 	if r.result != nil {
-		r.result.execution(gate, category, message)
+		r.result.Execution(gate, category, message)
 	}
 	return 1
 }
