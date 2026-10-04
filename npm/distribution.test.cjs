@@ -148,7 +148,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   fs.mkdirSync(path.join(consumer, 'src'));
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
   fs.writeFileSync(path.join(consumer, 'src/add.test.ts'), 'import { expect, test } from "vitest";\nimport { add } from "./add";\ntest("adds", () => { expect(add(1, 2)).toBe(3); });\n');
-  const execute = (args, expected = 0) => run(executor, [...execArgs, 'tsguard', ...args, '--allow-pipe', '--dirs', 'src'], consumer, expected);
+  const execute = (args, expected = 0) => run(executor, [...execArgs, 'tsguard', ...args, '--allow-pipe', ...(args.includes('--dirs') ? [] : ['--dirs', 'src'])], consumer, expected);
   execute(['doctor']);
   execute(['fix']);
   execute(['lint']);
@@ -197,6 +197,37 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     for (const diagnostic of result.diagnostics) assert.ok(fs.existsSync(path.join(consumer, diagnostic.path)));
     return result;
   };
+  // Real compiler-backed call resolution: imports, methods, aliases, nested
+  // functions, repeated call sites, recursion, exclusions and zero callers.
+  fs.mkdirSync(path.join(consumer, 'calls/ignored'), { recursive: true });
+  fs.writeFileSync(path.join(consumer, 'calls/core.ts'), 'export function target() { return 1; }\nexport class Service { method() { return target(); } }\nexport function unused() { return 0; }\nexport function recursive() { return recursive(); }\n');
+  fs.writeFileSync(path.join(consumer, 'calls/use.ts'), 'import { target as alias, Service } from "./core";\nexport function first() { alias(); alias(); new Service().method(); }\nexport const second = () => alias();\nexport function outer() { function nested() { alias(); } return nested(); }\nalias();\n');
+  fs.writeFileSync(path.join(consumer, 'calls/ignored/skip.ts'), 'import { target } from "../core"; export function excluded() { target(); }\n');
+  const criticalArgs = ['criticality', '--dirs', 'calls', '--exclude', 'calls/ignored'];
+  const critical = structured(criticalArgs);
+  assert.equal(critical.status, 'advisory');
+  const inDegree = (symbol) => critical.measurements.find(m => m.metric === 'criticality.in_degree' && m.location.symbol === symbol)?.value;
+  assert.equal(inDegree('target'), 4); // method, first, second, nested; no module caller
+  assert.equal(inDegree('Service.method'), 1);
+  assert.equal(inDegree('unused'), 0);
+  assert.equal(inDegree('recursive'), 1);
+  assert.equal(inDegree('outer.nested'), 1);
+  assert.ok(critical.findings.every(f => f.rule === 'tsguard.criticality.ranked' && f.level === 'structure' && f.status === 'advisory'));
+  assert.ok(critical.artifacts.some(a => a.kind === 'criticality' && a.path === 'CRITICALITY.md'));
+  const criticalReport = fs.readFileSync(path.join(consumer, 'CRITICALITY.md'), 'utf8');
+  assert.match(criticalReport, /\| 1 \| `calls\/core.ts:1 target` \| 4 \|/);
+  assert.deepEqual(structured(criticalArgs).findings.map(f => f.id), critical.findings.map(f => f.id));
+  assert.equal(fs.readFileSync(path.join(consumer, 'CRITICALITY.md'), 'utf8'), criticalReport);
+  const criticalAgent = execute([...criticalArgs, '--output', 'agent']).stdout;
+  assert.ok(Buffer.byteLength(criticalAgent) <= 6144 && criticalAgent.split('\n').length <= 27);
+  assert.match(execute(criticalArgs).stdout, /\[OK\].*criticality.*CRITICALITY.md/);
+  assert.ok(structured(['audit', '--dirs', 'calls', '--exclude', 'calls/ignored']).artifacts.some(a => a.kind === 'criticality'));
+  fs.writeFileSync(path.join(consumer, 'tsconfig.json'), '{broken');
+  const invalidCritical = structured(criticalArgs);
+  assert.equal(invalidCritical.status, 'error');
+  assert.equal(invalidCritical.findings[0].category, 'invalid_configuration');
+  fs.rmSync(path.join(consumer, 'tsconfig.json'));
+  fs.rmSync(path.join(consumer, 'calls'), { recursive: true });
   assert.equal(structured(['types']).status, 'pass');
   assert.ok(['pass', 'advisory'].includes(structured(['check']).status));
   const pipedAgent = run(executor, [...execArgs, 'tsguard', 'check', '--output', 'agent', '--dirs', 'src'], consumer);
