@@ -12,11 +12,11 @@ The default remains human output. Structured output is available for analysis co
 
 ## Shared envelope
 
-See the [Tsguard schema reference](tsguard-result-contract.md) for the common fields and finding identity. Both CLIs return `schema_version`, `status`, `command`, `exit_code`, `findings`, `measurements`, `artifacts` and `diagnostics`, including empty arrays. JSON has complete normalized records for executed gates and no rendered `output` field. A fail-fast check does not claim later gates ran.
+See the [Tsguard schema reference](tsguard-result-contract.md) for the common fields and finding identity. Both CLIs return `schema_version`, `status`, `assessment`, `gates`, `command`, `exit_code`, `findings`, `measurements`, `artifacts` and `diagnostics`, including empty arrays. JSON has complete normalized records for executed gates and no rendered `output` field. A fail-fast check does not claim later gates ran.
 
 Agent output uses the same limits in both languages: ten findings, at most 26 lines and 6 KiB. It includes total findings and `omitted: N (use --output json)` when needed. Retrieve JSON with the same command/root/scope before claiming a complete inventory. Long individual evidence or source labels can be truncated in agent output; JSON retains them.
 
-Finding IDs hash gate, rule and project-relative location, not analyzer prose or absolute roots. Ruff and mypy codes remain their native identifiers. Owned rules include `pyguard.radon.cc_exceeded`, `pyguard.radon.mi_threshold_failed`, `pyguard.halstead.<metric>_exceeded`, `pyguard.types.annotation_complexity`, `pyguard.criticality.ranked` and `pyguard.execution.<category>`. Moving a finding can change its ID; these IDs are not cross-revision baselines.
+Finding IDs hash gate, rule and project-relative location (including symbols and related duplicate locations when present), not analyzer prose or absolute roots. Ruff and mypy codes remain their native identifiers. Owned rules include `pyguard.radon.cc_exceeded`, `pyguard.radon.mi_threshold_failed`, `pyguard.halstead.<metric>_exceeded`, `pyguard.types.annotation_complexity`, `pyguard.criticality.ranked` and `pyguard.execution.<category>`. Moving a finding can change its ID; these IDs are not cross-revision baselines.
 
 ## Adapters and limits
 
@@ -27,7 +27,13 @@ Finding IDs hash gate, rule and project-relative location, not analyzer prose or
 | Radon | Native CC/MI JSON: measurements and existing threshold failures |
 | Owned annotation/Halstead helpers | Versioned JSON findings with locations, observed values and thresholds; annotations include remediation |
 | pyan3 criticality | Versioned JSON with distinct caller measurements, advisory ranked findings and a generated CRITICALITY.md reference |
-| Coverage, Bandit, pip-audit, secrets, vulture, deptry and unsupported details | Stable gate-level fallback plus raw diagnostic references; no fragile exhaustive prose parser |
+| pytest / coverage.py | Native JSON global/per-file coverage, existing 80% floor and JUnit test failures/execution errors |
+| Bandit | Native JSON `test_id`, severity, locations and scanner errors |
+| pip-audit | Native vulnerability IDs, package identity and fixed-version remediation; skipped dependencies are execution errors |
+| detect-secrets | Owned JSON over native scan records, preserving baseline comparison and excluding secret values/hashes |
+| Vulture | Native API items with CLI configuration, exclusions and confidence; advisory |
+| deptry | Native JSON `DEP` codes, modules and locations; advisory |
+| Unsupported details | Stable partial gate-level fallback with diagnostic references |
 
 Known executable/module absence, uv dependency transport failures, analyzer configuration exits, timeouts and malformed structured output have execution categories. A failed unsupported analyzer produces `pyguard.<gate>.failed` with `unclassified_failure`; do not assume it is a source defect. This deliberately incomplete normalization avoids delegating unlimited logs to the LLM. Analyzer versions must support the requested native structured formats; invalid output produces `adapter_failure`, not a false pass. Real evals pin Ruff 0.14.0, mypy 1.18.2, Radon 6.0.1 and pyan3 1.2.0.
 
@@ -50,3 +56,9 @@ Criticality passes explicit CLI `--dirs` to the existing pyan3 analyzer. It uses
 This is static analyzer evidence, not proof of runtime targets. Python dynamic dispatch, callbacks and reflection remain limited by pyan3 resolution. No cycles, dependency depth, architectural rules or baseline comparison are added. Criticality retains its legacy `functions`/`cdk` defaults when `--dirs` is omitted; explicit `--dirs` now reaches the script. Other analysis commands retain their project-root defaults. Project test exclusions remain respected by the shared path collector.
 
 Level 1 analyzers are existing. The normalized contract and Python agent parity are implemented by PR #5. The advisory caller milestone is repaired; remaining Level 2 rules and Level 3 are still missing. A unified CLI and Python distribution through uvx remain future work.
+
+## Assessment completion
+
+Both guards expose the same additive schema-1 `assessment` and ordered `gates` fields. Each gate records execution status (`passed`, `advisory`, `failed`, `error` or `not_run`) and normalization (`complete`, `partial` or `not_run`). A complete assessment means all requested gates ran with supported normalization; it does not mean blocking findings passed. Errors, partial adapters and fail-fast steps make the assessment incomplete. The agent summary exposes assessment and not-run/partial counts; JSON names those gates. A failed quality gate can have complete normalization.
+
+Native report artifacts are refreshed under `.pyguard-cache/reports` before execution. Coverage keeps the global 80% floor and adds per-file measurements without per-file thresholds. JUnit supplies test names/locations; collection or execution errors remain execution problems. Authorized `pyguard setup` deployment now includes `vulture_report.py` and the updated secrets adapter. Missing helpers/reports or unsupported formats cannot certify a passing assessment. Raw reports retain additional native fields for drill-down.

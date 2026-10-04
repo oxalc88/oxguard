@@ -25,18 +25,20 @@ Schema version `1` has these fields, including empty arrays on success:
 |---|---|
 | `schema_version` | String `"1"`; breaking contract changes require a new version |
 | `status` | `pass`, `fail`, `error`, `advisory`, or `skipped` |
+| `assessment` | `complete` or `incomplete`; all requested gates must run with supported normalization |
+| `gates` | Ordered execution/normalization records, including fail-fast `not_run` steps |
 | `command` | Requested analysis command |
 | `exit_code` | Compatible process exit code |
 | `findings` | First-class normalized quality or execution records |
-| `measurements` | Native FTA scores and complete function/method `criticality.in_degree` values |
+| `measurements` | FTA scores, global/per-file coverage, duplication percentage and function/method `criticality.in_degree` values |
 | `artifacts` | Generated `CRITICALITY.md` and optional full log-file reference |
 | `diagnostics` | Gate, channel, ID and project-relative path for each raw analyzer stream |
 
-Each finding has `id`, `level`, `gate`, `rule`, `severity`, `status`, `category`, `evidence` and a `diagnostics` array of diagnostic IDs. `location` is optional and contains `file` plus one-based `line` / `column` and a function/method `symbol` when known. FTA findings include numeric `observed` and `threshold`. `remediation` is optional; this contract does not invent a source fix when the analyzer provides none.
+Each finding has `id`, `level`, `gate`, `rule`, `severity`, `status`, `category`, `evidence` and a `diagnostics` array of diagnostic IDs. `location` is optional and contains `file` plus one-based `line` / `column` and a function/method `symbol` when known. FTA and coverage findings include numeric `observed` and `threshold`. Duplicate findings expose the second location in `related`; dependency symbols disambiguate package identity. `remediation` is optional; this contract does not invent a source fix when the analyzer provides none.
 
-Rules preserve TypeScript codes, Biome categories/rule names and Opengrep `check_id` values. Tsguard-owned rules include `tsguard.fta.score_exceeded`, `tsguard.criticality.ranked`, `tsguard.<gate>.failed`, and `tsguard.execution.<category>`. IDs are the rule plus a SHA-256 of gate, rule, project-relative location, line and column. They do not hash English messages, measurements, absolute project roots, timestamps or PIDs. Location changes can change an ID. No cross-revision identity or baseline comparison is promised.
+Rules preserve TypeScript codes, Biome categories/rule names and Opengrep `check_id` values. Tsguard-owned rules include `tsguard.fta.score_exceeded`, `tsguard.criticality.ranked`, `tsguard.<gate>.failed`, and `tsguard.execution.<category>`. IDs are the rule plus a SHA-256 of gate, rule, project-relative location, line, column, symbol and related locations when present. They do not hash English messages, measurements, absolute project roots, timestamps or PIDs. Location changes can change an ID. No cross-revision identity or baseline comparison is promised.
 
-Findings are sorted by execution-error/blocking/advisory priority, gate, location and ID; measurements by file and metric. Tool execution order remains lint → FTA → types → coverage → security. JSON has no raw `output` field, no elapsed-time fields and no display truncation. It describes only executed gates, not unexecuted fail-fast steps, and preserves the analyzer's available findings.
+Findings are sorted by execution-error/blocking/advisory priority, gate, location and ID; measurements by file, metric, line and symbol. Tool execution order remains lint → FTA → types → coverage → security. JSON has no raw `output` field, no elapsed-time fields and no display truncation. Finding details describe executed analyzers; ordered gate records explicitly identify unexecuted fail-fast steps.
 
 ## Semantic outcome and process code
 
@@ -69,7 +71,7 @@ Agent output shows semantic status, command, primary gate, total finding count, 
 ```text
 FAIL
 command: types
-gate: types
+gate: types; assessment: complete; not_run: 0; partial: 0
 findings: 2
 TS2322 src/order.ts:41 [quality/blocking]
 Type 'string' is not assignable to type 'number'.
@@ -91,7 +93,12 @@ Structured modes automatically save full stdout and stderr separately under `nod
 | Packaged Biome/Ultracite | Biome JSON diagnostics with all diagnostics enabled, rule/category, severity, file and position |
 | Criticality | TypeScript compiler emits resolved function/method nodes and caller → callee edges; Go deduplicates, ranks and reports |
 | Opengrep | Native JSON results/errors; preserve rule IDs and positions; `--error` continues to make every match blocking |
-| Coverage, secrets, dependency audit, Knip/jscpd, other lint backends | Stable gate-level fallback plus diagnostic references; no invented detailed normalization |
+| Coverage | Native Istanbul JSON summary from Vitest/Jest/c8/nyc; global existing thresholds and per-file measurements; Vitest/Jest JSON test failures |
+| Secretlint | Native JSON rule IDs and positions; normalized evidence excludes secret values |
+| Dependency audit | Native npm/pnpm JSON and Yarn classic event advisory IDs as informational findings; native audit-ci policy decision as a separate blocker |
+| Knip | Native JSON issue types, symbols and positions, advisory |
+| jscpd | Native JSON duplicate pairs, related positions and duplication percentage, advisory |
+| Other lint backends and unsupported details | Stable gate-level fallback with partial normalization and diagnostic references |
 
 FTA 3.0.1 exits before printing JSON when the cap is exceeded. The adapter reads its exact fixed first-failure record instead of rerunning the analyzer or changing the cap. Therefore a failed FTA invocation exposes only the first failing file, matching existing fail-fast behavior. Successful JSON supplies measured files; FTA's existing small-file exclusions still apply.
 
@@ -112,3 +119,11 @@ npx --no-install tsguard audit --output json
 This is static resolved-call parity, not a runtime dependency proof. Scope covers `.ts`, `.tsx`, `.mts` and `.cts`, excluding declarations and symlinked source paths. Imports and compiler path aliases resolve using root `tsconfig.json` options. Project-reference traversal, JavaScript sources, module-level calls, implicit getter calls and JSX component invocations are not counted. Calls to external or out-of-scope functions and unresolved dynamic calls are excluded from edges and counted together in the report. TypeScript cannot prove all runtime targets of aliases, callbacks, reflection or polymorphic calls; the graph records the implementation the compiler can resolve. A failed run does not claim an existing report as a newly generated artifact. Raw graph data is available in the stdout diagnostic file.
 
 Level 1 analyzers remain existing. The normalized contract and the first Level 2 PyGuard parity milestone are implemented by this PR. Remaining Level 2 rules, cycles, fan-out/depth/wrapper analysis and Level 3 baseline/change comparison are still missing. The skill now uses normalized results and requires JSON retrieval when the agent summary reports omitted findings.
+
+## Assessment completion
+
+`status` describes findings; `assessment` describes the requested analysis's completeness. A blocking finding can be completely normalized, while a passing unsupported adapter has a partial assessment. Each requested gate has `status` (`passed`, `advisory`, `failed`, `error` or `not_run`) and `normalization` (`complete`, `partial` or `not_run`). Gate records preserve execution order and aggregate multiple invocations without erasing earlier failures. Errors, unexecuted gates and partial normalization make the assessment incomplete. The bounded agent summary includes assessment and not-run/partial counts; use JSON to identify those gates before claiming approval.
+
+Coverage thresholds remain global; per-file measurements do not introduce per-file blocking policy. Native reports are registered as artifacts under the owned cache and refreshed before execution. Missing or unsupported report shapes produce adapter failures. Detailed test messages, source fragments, fix metadata and other upstream fields remain drill-down artifacts rather than a promise to reproduce every native field. A stale report cannot certify a new run.
+
+Package-manager vulnerability findings remain informational, including allowed advisories. audit-ci alone decides whether the existing severity/allowlist policy blocks. Its full JSON report does not identify which individual advisory policy rejected, so the normalized blocker is `tsguard.dependencies.policy_failed`, not a guessed per-advisory policy decision. Unsupported audit schemas remain partial execution failures.

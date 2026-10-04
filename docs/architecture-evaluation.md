@@ -11,10 +11,10 @@ The evaluation below remains the evidence-based assessment of `main` at the reco
 | Area | Implementation status |
 |---|---|
 | Level 1 analyzers | Existing; analyzers, thresholds, gate order and native fail-fast behavior preserved |
-| Normalized result contract | Implemented in Go by this PR: schema version 1, findings, FTA measurements, diagnostic references and artifacts |
+| Normalized result contract | Implemented in Go by this PR: schema version 1, explicit gate execution/normalization status, assessment completeness, findings, measurements, diagnostic references and artifacts |
 | Agent / JSON outputs | Implemented: `--output agent` is bounded; `--output json` contains the complete normalized run |
 | Input contract | Unknown/missing/invalid flags rejected; explicit `--root`; structured modes reject unreadable/malformed `oxguard.toml` |
-| Progressive disclosure | CLI reduction implemented for tsc, FTA, packaged Biome and Opengrep; other tools have stable gate-level fallbacks |
+| Progressive disclosure | CLI reduction implemented for tsc, FTA, packaged Biome, Opengrep, coverage, secrets, dependencies, Knip and jscpd; unsupported backends remain explicitly partial |
 | Human / npm interfaces | Human rendering retained; launcher and packaging unchanged; structured modes accept piped stdout |
 | Skill debt | Agent skill updated to use installed npm/pnpm CLI, normalized outputs, omitted-finding JSON retrieval, execution categories and advisory criticality |
 | Level 2 | PyGuard criticality parity implemented: compiler-resolved function/method caller graph, in-degree, top 30, advisory `CRITICALITY.md` in audit; remaining structural analysis still missing |
@@ -24,9 +24,9 @@ See [agent and JSON contract](guides/tsguard-result-contract.md) for schema, sem
 
 ## Python contract parity implemented by PR #5
 
-PyGuard now shares the Go schema-1 result/reporting module with Tsguard and has native Ruff/mypy/Radon adapters, structured owned helpers, bounded agent output, complete JSON, strict flags/root and explicit execution categories. The Python skill consumes that implemented contract and retrieves omitted findings through JSON. Level 1 analyzers remain existing. The advisory criticality milestone now counts distinct function callers, honors CLI scope and exposes failures truthfully; remaining Level 2 and Level 3 are still missing.
+PyGuard now shares the Go schema-1 result/reporting module with Tsguard and has native Ruff/mypy/Radon/Bandit/pip-audit/coverage/deptry adapters, Vulture native API records, structured owned helpers, bounded agent output, complete JSON, strict flags/root and explicit execution categories. The Python skill consumes that implemented contract and retrieves omitted findings through JSON. Level 1 analyzers remain existing. The advisory criticality milestone now counts distinct function callers, honors CLI scope and exposes failures truthfully; remaining Level 2 and Level 3 are still missing.
 
-The Python corpus retains 15 baseline behavior passes and gains all 14 parity cases, including five additional structured adapter checks. Both versions run against the same corpus and pinned toolchain. See [Python contract](guides/pyguard-result-contract.md), [PyGuard evidence](guides/pyguard-agent-evaluation.md) and [capability evals](guides/oxguard-evals.md). This updates implementation status only; the original evaluation and recommendations below remain unchanged.
+The Python corpus retains 15 baseline behavior passes and passes 20 parity cases, including six native coverage/security/dead-code/dependency controls. Both versions run against the same corpus and pinned toolchain. See [Python contract](guides/pyguard-result-contract.md), [PyGuard evidence](guides/pyguard-agent-evaluation.md) and [capability evals](guides/oxguard-evals.md). This updates implementation status only; the original evaluation and recommendations below remain unchanged.
 
 ## Executive assessment
 
