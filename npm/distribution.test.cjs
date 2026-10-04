@@ -53,7 +53,7 @@ test('packaged adapter preserves a declared project compiler', t => {
   assert.equal(run(process.execPath, [adapter, 'tsc', '--version'], project).stdout.trim(), 'project compiler');
 });
 
-test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: 360000 }, async t => {
+test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: process.env.OXGUARD_EVAL_REPORT_DIR ? 600000 : 360000 }, async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'tsguard-npm-'));
   t.after(() => {
     if (process.env.TSGUARD_KEEP_TEST_DIR) t.diagnostic(`Test artifacts: ${temporary}`);
@@ -143,6 +143,43 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const launcher = path.join(installed, 'tsguard/bin/tsguard.cjs');
   const nativeDirectory = path.dirname(createRequire(fs.realpathSync(launcher)).resolve(`@oxguard/tsguard-${host}/package.json`));
   const installedBinary = path.join(nativeDirectory, 'bin', binaryName);
+
+  // Evaluate through the packed, installed launcher, before fixtures replace
+  // the real binary later in this integration test. Keep scoring separate from
+  // packaging assertions and record the exact revision/corpus/toolchain.
+  if (process.env.OXGUARD_EVAL_REPORT_DIR) {
+    const { evaluate } = require('../evals/run.cjs');
+    const { compare, markdown } = require('../evals/compare.cjs');
+    const reportDirectory = path.resolve(root, process.env.OXGUARD_EVAL_REPORT_DIR, `${manager}-${host}`);
+    fs.mkdirSync(reportDirectory, { recursive: true });
+    const candidate = evaluate({ command: [process.execPath, launcher], revision: process.env.OXGUARD_EVAL_REVISION || run('git', ['rev-parse', 'HEAD'], root).stdout.trim() });
+    assert.deepEqual(candidate.toolchain, require('./toolchain.json'));
+    fs.writeFileSync(path.join(reportDirectory, 'candidate.json'), JSON.stringify(candidate, null, 2) + '\n');
+    const baselineRef = process.env.OXGUARD_EVAL_BASELINE_REF;
+    if (baselineRef) {
+      assert.match(baselineRef, /^[a-f0-9]{40}$/, 'Eval baseline must be a full commit SHA');
+      // Same launcher/toolchain isolates native CLI capability changes. The
+      // existing integration assertions independently protect package behavior.
+      run('git', ['fetch', '--no-tags', 'origin', baselineRef], root);
+      const baselineSource = path.join(temporary, 'baseline-source');
+      run('git', ['worktree', 'add', '--detach', baselineSource, baselineRef], root);
+      try {
+        const baselineBinary = path.join(temporary, binaryName);
+        run('go', ['build', '-trimpath', '-ldflags', `-X main.version=v${version}`, '-o', baselineBinary, '.'], path.join(baselineSource, 'tsguard'));
+        fs.copyFileSync(baselineBinary, installedBinary);
+        let baseline;
+        try { baseline = evaluate({ command: [process.execPath, launcher], suite: 'baseline', revision: run('git', ['rev-parse', 'HEAD'], baselineSource).stdout.trim() }); }
+        finally { fs.copyFileSync(nativeBinary, installedBinary); }
+        fs.writeFileSync(path.join(reportDirectory, 'baseline.json'), JSON.stringify(baseline, null, 2) + '\n');
+        const comparison = compare(baseline, candidate);
+        fs.writeFileSync(path.join(reportDirectory, 'comparison.json'), JSON.stringify(comparison, null, 2) + '\n');
+        fs.writeFileSync(path.join(reportDirectory, 'comparison.md'), markdown(comparison));
+        assert.equal(comparison.candidate_ready, true, JSON.stringify(comparison));
+      } finally { run('git', ['worktree', 'remove', '--force', baselineSource], root); }
+    }
+    assert.equal(candidate.totals.fail + candidate.totals.unsupported, 0, JSON.stringify(candidate.cases.filter(c => c.outcome !== 'pass' && c.outcome !== 'skipped')));
+    t.diagnostic(`Capability evals: ${JSON.stringify(candidate.totals)}; detection: ${JSON.stringify(candidate.detection)}`);
+  }
 
   // Exercise the actual gates with no analyzer listed as a consumer dependency.
   fs.mkdirSync(path.join(consumer, 'src'));

@@ -41,6 +41,19 @@ jobs:
       - name: Install pnpm test tool
         if: matrix.manager.name == 'pnpm'
         run: npm install --global pnpm@${{ matrix.manager.version }}
+      - name: Eval harness regression tests
+        if: matrix.manager.name == 'npm'
+        run: node --test evals/evals.test.cjs
       - run: node --test npm/distribution.test.cjs
         env:
           TSGUARD_PACKAGE_MANAGER: ${{ matrix.manager.name }}
+          OXGUARD_EVAL_REPORT_DIR: ${{ matrix.manager.name == 'npm' && 'eval-reports' || '' }}
+          OXGUARD_EVAL_REVISION: ${{ github.sha }}
+          OXGUARD_EVAL_BASELINE_REF: ${{ matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest' && github.event.pull_request.base.sha || '' }}
+      - name: Upload capability eval reports
+        if: always() && matrix.manager.name == 'npm'
+        uses: actions/upload-artifact@v4
+        with:
+          name: oxguard-evals-${{ matrix.os }}
+          path: eval-reports/
+          if-no-files-found: error
