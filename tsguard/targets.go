@@ -10,8 +10,8 @@ import (
 // runCheck runs the full quality gate: lint (includes Ultracite/Biome complexity) → fta → types → coverage → security.
 // Sequential, fail-fast: stops at first failure.
 func runCheck(r *Runner, dirs []string, ftaCap int) int {
-	fmt.Println("tsguard check")
-	fmt.Println("─────────")
+	r.println("tsguard check")
+	r.println("─────────")
 
 	// Remove stale coverage artifacts from previous runs before lint scans the tree.
 	// vitest --coverage writes coverage/ at the end of the run; without this cleanup
@@ -31,12 +31,12 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 
 	for _, step := range steps {
 		if code := step.fn(); code != 0 {
-			fmt.Printf("\n  FAILED: %s\n", step.name)
+			r.printf("\n  FAILED: %s\n", step.name)
 			return code
 		}
 	}
 
-	fmt.Println("\n  All checks passed.")
+	r.println("\n  All checks passed.")
 	return 0
 }
 
@@ -45,8 +45,8 @@ func runFix(r *Runner) int {
 	if packagedRuntime() != "" {
 		return r.runPackagedBiome(true)
 	}
-	fmt.Println("tsguard fix")
-	res := r.Run("ultracite fix", pkgExec(r.pkgManager, "ultracite", "fix")...)
+	r.println("tsguard fix")
+	res := r.RunTool(toolSpec{gate: "lint"}, "ultracite fix", pkgExec(r.pkgManager, "ultracite", "fix")...)
 	if !res.ok {
 		return 1
 	}
@@ -64,7 +64,7 @@ func runLint(r *Runner) int {
 	if len(r.dirs) > 0 {
 		args = append(args, r.dirs...)
 	}
-	res := r.Run("ultracite check", args...)
+	res := r.RunTool(toolSpec{gate: "lint"}, "ultracite check", args...)
 	if !res.ok {
 		return 1
 	}
@@ -76,7 +76,11 @@ func runTypes(r *Runner) int {
 	if packagedRuntime() != "" {
 		return r.runPackagedTypes()
 	}
-	res := r.Run("tsc --noEmit", pkgExec(r.pkgManager, "tsc", "--noEmit")...)
+	args := pkgExec(r.pkgManager, "tsc", "--noEmit")
+	if r.machine() {
+		args = append(args, "--pretty", "false")
+	}
+	res := r.RunTool(toolSpec{gate: "types", adapter: "tsc"}, "tsc --noEmit", args...)
 	if !res.ok {
 		return 1
 	}
@@ -85,7 +89,7 @@ func runTypes(r *Runner) int {
 
 // Compatibility alias: complexity rules are enforced by the lint gate.
 func runComplexity(r *Runner, _ []string) int {
-	fmt.Println("  complexity: delegated to ultracite check")
+	r.println("  complexity: delegated to ultracite check")
 	return runLint(r)
 }
 
@@ -98,16 +102,22 @@ func runFTA(r *Runner, dirs []string, scoreCap int) int {
 
 	configPath, err := writeFTAConfig(r.root, r.ftaExcludeTests, r.ftaExclude)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "tsguard: warning — could not write fta config (%v); running without exclusions\n", err)
+		r.errorf("tsguard: warning — could not write fta config (%v); running without exclusions\n", err)
+		if r.machine() {
+			return r.executionFailure("fta", "invalid_configuration", "Could not write FTA exclusion config.")
+		}
 	}
 
 	for _, dir := range dirs {
 		args := pkgExec(r.pkgManager, "fta", "--score-cap", scoreCapStr)
+		if r.machine() {
+			args = append(args, "--json")
+		}
 		if configPath != "" {
 			args = append(args, "--config-path", configPath)
 		}
 		args = append(args, dir)
-		if !r.Run("fta "+dir, args...).ok {
+		if !r.RunTool(toolSpec{gate: "fta", adapter: "fta", subject: dir, threshold: float64(scoreCap)}, "fta "+dir, args...).ok {
 			return 1
 		}
 	}
@@ -125,8 +135,8 @@ func runCoverage(r *Runner) int {
 	switch runner {
 	case "vitest":
 		if err := checkVitestVersionMatch(r.root); err != nil {
-			fmt.Printf("  [FAIL] coverage — %s\n", err)
-			return 1
+			r.printf("  [FAIL] coverage — %s\n", err)
+			return r.executionFailure("coverage", "invalid_configuration", err.Error())
 		}
 		args := pkgExec(r.pkgManager, "vitest", "run", "--coverage",
 			"--coverage.thresholds.lines=80",
@@ -137,21 +147,21 @@ func runCoverage(r *Runner) int {
 		if packagedRuntime() != "" && !hasProjectConfig(r.root, "vitest.config.ts", "vitest.config.js", "vitest.config.mts", "vitest.config.mjs", "vite.config.ts", "vite.config.js", "vite.config.mjs", "vite.config.mts") {
 			args = append(args, "--config", filepath.Join(packagedRuntime(), "config", "vitest.config.mjs"))
 		}
-		res := r.Run("vitest --coverage", args...)
+		res := r.RunTool(toolSpec{gate: "coverage"}, "vitest --coverage", args...)
 		if !res.ok {
 			return 1
 		}
 	case "jest":
 		const threshold = `--coverageThreshold={"global":{"lines":80,"functions":80,"branches":80,"statements":80}}`
 		args := pkgExec(r.pkgManager, "jest", "--coverage", threshold)
-		res := r.Run("jest --coverage", args...)
+		res := r.RunTool(toolSpec{gate: "coverage"}, "jest --coverage", args...)
 		if !res.ok {
 			return 1
 		}
 	case "":
-		fmt.Println("  [FAIL] coverage — no test runner found in package.json or config files")
-		fmt.Println("         Add vitest or jest to devDependencies")
-		return 1
+		r.println("  [FAIL] coverage — no test runner found in package.json or config files")
+		r.println("         Add vitest or jest to devDependencies")
+		return r.executionFailure("coverage", "tool_missing", "No test runner found; add vitest or jest.")
 	default:
 		return runCoverageWithWrapper(r, runner)
 	}
@@ -168,7 +178,7 @@ func runCoverageWithWrapper(r *Runner, runner string) int {
 			"--lines", "80", "--functions", "80", "--branches", "80", "--statements", "80",
 			runner,
 		)
-		res := r.Run(fmt.Sprintf("c8 %s --coverage", runner), args...)
+		res := r.RunTool(toolSpec{gate: "coverage"}, fmt.Sprintf("c8 %s --coverage", runner), args...)
 		if !res.ok {
 			return 1
 		}
@@ -178,14 +188,14 @@ func runCoverageWithWrapper(r *Runner, runner string) int {
 			"--lines", "80", "--functions", "80", "--branches", "80", "--statements", "80",
 			runner,
 		)
-		res := r.Run(fmt.Sprintf("nyc %s --coverage", runner), args...)
+		res := r.RunTool(toolSpec{gate: "coverage"}, fmt.Sprintf("nyc %s --coverage", runner), args...)
 		if !res.ok {
 			return 1
 		}
 	default:
-		fmt.Printf("  [FAIL] coverage — %s detected but no coverage wrapper found\n", runner)
-		fmt.Println("         Add c8 or nyc to devDependencies: npm install --save-dev c8")
-		return 1
+		r.printf("  [FAIL] coverage — %s detected but no coverage wrapper found\n", runner)
+		r.println("         Add c8 or nyc to devDependencies: npm install --save-dev c8")
+		return r.executionFailure("coverage", "tool_missing", "No coverage wrapper found; add c8 or nyc.")
 	}
 	return 0
 }
@@ -193,7 +203,7 @@ func runCoverageWithWrapper(r *Runner, runner string) int {
 // runSecurity runs secretlint → npm audit + audit-ci → opengrep SAST.
 // All are hard gates (blocking); opengrep [SKIP]s gracefully if binary is absent.
 func runSecurity(r *Runner, initFlag bool) int {
-	fmt.Println("  security:")
+	r.println("  security:")
 	if initFlag {
 		return runSecretsInit(r)
 	}
@@ -220,11 +230,11 @@ func runSecretlint(r *Runner) int {
 		var err error
 		args, err = r.packagedSecretArgs()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "tsguard: default secrets config: %v\n", err)
-			return 1
+			r.errorf("tsguard: default secrets config: %v\n", err)
+			return r.executionFailure("secrets", "invalid_configuration", err.Error())
 		}
 	}
-	res := r.Run("secretlint", args...)
+	res := r.RunTool(toolSpec{gate: "secrets"}, "secretlint", args...)
 	if !res.ok {
 		return 1
 	}
@@ -238,11 +248,11 @@ func runSecretsInit(r *Runner) int {
 	if packagedRuntime() != "" {
 		return runSecretlint(r)
 	}
-	fmt.Println("  Scanning for secrets (secretlint)...")
+	r.println("  Scanning for secrets (secretlint)...")
 	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore")
 	args = append(args, r.dirs...)
-	r.Run("secretlint scan", args...)
-	fmt.Println("  [OK]   secretlint scan complete (no baseline needed)")
+	r.RunTool(toolSpec{gate: "secrets", advisory: true}, "secretlint scan", args...)
+	r.println("  [OK]   secretlint scan complete (no baseline needed)")
 	return 0
 }
 
@@ -260,10 +270,10 @@ func runNpmAudit(r *Runner) int {
 	default:
 		infoArgs = []string{"npm", "audit", "--audit-level=moderate"}
 	}
-	r.Run("dependency audit (info)", infoArgs...)
+	r.RunTool(toolSpec{gate: "dependencies", advisory: true}, "dependency audit (info)", infoArgs...)
 
 	// audit-ci — hard gate: threshold enforcement + allowlist via .auditcirc.json.
-	res := r.Run("audit-ci", pkgExec(r.pkgManager, "audit-ci", "--moderate")...)
+	res := r.RunTool(toolSpec{gate: "dependencies"}, "audit-ci", pkgExec(r.pkgManager, "audit-ci", "--moderate")...)
 	if !res.ok {
 		return 1
 	}
@@ -277,10 +287,13 @@ func runOpengrep(r *Runner) int {
 	binaryPath := opengrepBinaryPath(r.root)
 	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
 		if packagedRuntime() != "" {
-			fmt.Fprintln(os.Stderr, "tsguard: bundled Opengrep is missing; reinstall @oxguard/tsguard with optional dependencies enabled")
-			return 1
+			r.errorf("%s\n", "tsguard: bundled Opengrep is missing; reinstall @oxguard/tsguard with optional dependencies enabled")
+			return r.executionFailure("security", "tool_missing", "Bundled Opengrep is missing; reinstall with optional dependencies.")
 		}
-		fmt.Println("  [SKIP] opengrep — binary not found. Run: tsguard setup")
+		r.println("  [SKIP] opengrep — binary not found. Run: tsguard setup")
+		if r.machine() {
+			r.result.execution("security", "tool_missing", "Opengrep is missing; standalone mode skipped SAST.")
+		}
 		return 0
 	}
 
@@ -296,23 +309,27 @@ func runOpengrep(r *Runner) int {
 	args := []string{binaryPath, "scan"}
 	args = append(args, configArgs...)
 	args = append(args, "--error", "--quiet")
+	if r.machine() {
+		args = append(args, "--json")
+	}
 	for _, dir := range r.excludeDirs {
 		args = append(args, "--exclude", dir)
 	}
 	// Scan the project's source dirs.
 	args = append(args, r.dirs...)
 
-	res := r.Run("opengrep SAST", args...)
+	res := r.RunTool(toolSpec{gate: "security", adapter: "opengrep"}, "opengrep SAST", args...)
 	if !res.ok {
 		return 1
 	}
 	return 0
 }
 
-// runAudit runs informational analysis: dead-code + duplicates.
+// runAudit runs informational analysis: criticality + dead-code + duplicates.
 // Never fails (exit 0 always) — these are advisory.
 func runAudit(r *Runner, dirs []string) int {
-	fmt.Println("tsguard audit (informational)")
+	r.println("tsguard audit (informational)")
+	runCriticality(r)
 	runDeadCode(r)
 	runDuplicates(r, dirs)
 	return 0
@@ -320,13 +337,13 @@ func runAudit(r *Runner, dirs []string) int {
 
 // runDeadCode runs knip for dead code and unused dependency detection (informational).
 func runDeadCode(r *Runner) int {
-	r.Run("knip", pkgExec(r.pkgManager, "knip")...)
+	r.RunTool(toolSpec{gate: "dead-code", advisory: true}, "knip", pkgExec(r.pkgManager, "knip")...)
 	return 0 // always informational
 }
 
 // runDuplicates runs jscpd for copy-paste code detection (informational).
 func runDuplicates(r *Runner, dirs []string) int {
 	args := append(pkgExec(r.pkgManager, "jscpd"), dirs...)
-	r.Run("jscpd", args...)
+	r.RunTool(toolSpec{gate: "duplicates", advisory: true}, "jscpd", args...)
 	return 0 // always informational
 }

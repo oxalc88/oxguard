@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,33 +52,36 @@ func (r *Runner) runPackagedBiome(fix bool) int {
 		if fix {
 			command = "fix"
 		}
-		if !r.Run("ultracite "+command, packagedCommand("ultracite", append([]string{command}, r.dirs...)...)...).ok {
+		if !r.RunTool(toolSpec{gate: "lint"}, "ultracite "+command, packagedCommand("ultracite", append([]string{command}, r.dirs...)...)...).ok {
 			return 1
 		}
 		return 0
 	}
 	args := []string{"check"}
+	if r.machine() {
+		args = append(args, "--reporter=json", "--max-diagnostics=none")
+	}
 	if fix {
 		args = append(args, "--write")
 	}
 	if !hasProjectConfig(r.root, "biome.json", "biome.jsonc", ".biome.json", ".biome.jsonc") {
 		preset, err := runtimeModule(r.root, "ultracite/biome/core")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "tsguard: resolve bundled lint preset: %v\n", err)
-			return 1
+			r.errorf("tsguard: resolve bundled lint preset: %v\n", err)
+			return r.executionFailure("lint", "tool_missing", "Bundled lint preset cannot be resolved.")
 		}
 		file, err := writeRuntimeConfig(r.root, "biome.json", map[string]any{
 			"root": true, "extends": []string{preset},
 			"vcs": map[string]any{"enabled": hasProjectConfig(r.root, ".gitignore"), "useIgnoreFile": hasProjectConfig(r.root, ".gitignore")},
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "tsguard: default lint config: %v\n", err)
-			return 1
+			r.errorf("tsguard: default lint config: %v\n", err)
+			return r.executionFailure("lint", "invalid_configuration", err.Error())
 		}
 		args = append(args, "--config-path", filepath.Dir(file))
 	}
 	args = append(args, r.dirs...)
-	if !r.Run("Biome/Ultracite", packagedCommand("biome", args...)...).ok {
+	if !r.RunTool(toolSpec{gate: "lint", adapter: "biome"}, "Biome/Ultracite", packagedCommand("biome", args...)...).ok {
 		return 1
 	}
 	return 0
@@ -91,6 +93,9 @@ func typescriptGlob(parts ...string) string {
 
 func (r *Runner) runPackagedTypes() int {
 	args := []string{"--noEmit"}
+	if r.machine() {
+		args = append(args, "--pretty", "false")
+	}
 	if !hasProjectConfig(r.root, "tsconfig.json") {
 		include := []string{}
 		for _, dir := range r.dirs {
@@ -105,12 +110,12 @@ func (r *Runner) runPackagedTypes() int {
 			"include":         include, "exclude": exclude,
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "tsguard: default TypeScript config: %v\n", err)
-			return 1
+			r.errorf("tsguard: default TypeScript config: %v\n", err)
+			return r.executionFailure("types", "invalid_configuration", err.Error())
 		}
 		args = append(args, "--project", file)
 	}
-	if !r.Run("tsc --noEmit", packagedCommand("tsc", args...)...).ok {
+	if !r.RunTool(toolSpec{gate: "types", adapter: "tsc"}, "tsc --noEmit", packagedCommand("tsc", args...)...).ok {
 		return 1
 	}
 	return 0

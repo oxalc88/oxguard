@@ -8,6 +8,12 @@ import (
 	"strings"
 )
 
+type lockHeldError struct{ pid int }
+
+func (e *lockHeldError) Error() string {
+	return fmt.Sprintf("another tsguard instance is already running (pid %d); refusing to start", e.pid)
+}
+
 // acquireLock creates .tsguard.pid at root. Returns (release, nil) on success.
 // Returns (nil, err) if another live tsguard instance is detected.
 // Stale locks (dead pid) are removed and retried once automatically.
@@ -32,7 +38,7 @@ func acquireLockAt(lockPath string) (func(), error) {
 			_ = os.Remove(lockPath)
 			continue
 		}
-		return nil, fmt.Errorf("another tsguard instance is already running (pid %d); refusing to start", pid)
+		return nil, &lockHeldError{pid: pid}
 	}
 	return nil, fmt.Errorf("cannot acquire lock at %s after retry", lockPath)
 }
@@ -43,6 +49,6 @@ func writePidAndRelease(f *os.File, lockPath string) (func(), error) {
 		os.Remove(lockPath) //nolint:errcheck
 		return nil, fmt.Errorf("cannot write lock file: %w", err)
 	}
-	f.Close() //nolint:errcheck
+	f.Close()                                  //nolint:errcheck
 	return func() { os.Remove(lockPath) }, nil //nolint:errcheck
 }

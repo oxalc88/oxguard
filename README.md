@@ -255,3 +255,14 @@ pyguard and tsguard enforce the same quality goals but reach them with different
 
 - **Dead code**: pyguard uses vulture (Python AST). tsguard uses knip (TypeScript-aware,
   also catches unused deps). tsguard additionally runs jscpd for copy-paste detection.
+
+### Tsguard machine-facing results
+
+Use `npx --no-install tsguard check --output agent` for a bounded summary, or
+`--output json` for the complete normalized result. Both support explicit
+`--root` and keep raw diagnostics for drill-down. See the
+[agent and JSON contract](docs/guides/tsguard-result-contract.md).
+
+`npx --no-install tsguard criticality --output agent` ranks TypeScript functions
+and methods by distinct callers and writes the top 30 to `CRITICALITY.md`.
+`audit` includes this advisory analysis; blocking `check` gates are unchanged.
