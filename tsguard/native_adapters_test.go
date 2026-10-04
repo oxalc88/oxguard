@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -29,7 +31,7 @@ func TestNativeAdapters(t *testing.T) {
 		adapter, report, rule string
 		advisory              bool
 	}{
-		{"secretlint", `[{"filePath":"src/a.ts","messages":[{"ruleId":"@secretlint/token","message":"must not expose secret","line":2,"column":3}]}]`, "@secretlint/token", false},
+		{"secretlint", `[{"filePath":"src/a.ts","messages":[{"ruleId":"@secretlint/token","message":"must not expose secret","loc":{"start":{"line":2,"column":2}}}]}]`, "@secretlint/token", false},
 		{"knip", `{"issues":[{"file":"src/a.ts","exports":[{"name":"unused","line":1,"col":1}]}]}`, "knip.exports", true},
 		{"jscpd", `{"statistics":{"total":{"percentage":25}},"duplicates":[{"lines":10,"firstFile":{"name":"src/a.ts","startLoc":{"line":1,"column":1}},"secondFile":{"name":"src/b.ts","startLoc":{"line":2,"column":1}}}]}`, "jscpd.duplicate", true},
 	}
@@ -66,5 +68,24 @@ func TestDependencyPolicyPreserved(t *testing.T) {
 	r.result.Finish(0)
 	if r.result.Status != "advisory" || r.result.Findings[0].Rule != "GHSA-example" || r.result.Gates[0].Status != "advisory" {
 		t.Fatal("informational audit treated as blocking")
+	}
+}
+
+func TestMissingOrMalformedCoverageReportIsExecutionFailure(t *testing.T) {
+	for _, content := range []string{"", `{}`, `{"total":{"lines":{"pct":"75"}}}`} {
+		t.Run(content, func(t *testing.T) {
+			r := &Runner{root: t.TempDir(), outputMode: "json", result: newRunResult("coverage")}
+			report := filepath.Join(r.root, "coverage.json")
+			if content != "" {
+				if err := os.WriteFile(report, []byte(content), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			r.normalize(toolSpec{gate: "coverage", adapter: "coverage-summary", reportPath: report}, Result{ok: true}, strings.NewReader(""), nil)
+			r.result.Finish(1)
+			if r.result.Status != "error" || r.result.Assessment != "incomplete" || len(r.result.Findings) != 1 || r.result.Findings[0].Category != "adapter_failure" || len(r.result.Measurements) != 0 {
+				t.Fatalf("missing/invalid report misrepresented as coverage: %+v", r.result)
+			}
+		})
 	}
 }

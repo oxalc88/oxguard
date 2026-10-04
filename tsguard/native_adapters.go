@@ -44,9 +44,11 @@ func (r *Runner) normalizeNative(spec toolSpec, res Result, reader io.Reader, re
 		var rows []struct {
 			File     string `json:"filePath"`
 			Messages []struct {
-				Rule         string `json:"ruleId"`
-				Message      string `json:"message"`
-				Line, Column int
+				Rule    string `json:"ruleId"`
+				Message string `json:"message"`
+				Loc     struct {
+					Start struct{ Line, Column int } `json:"start"`
+				} `json:"loc"`
 			} `json:"messages"`
 		}
 		if err := json.NewDecoder(reader).Decode(&rows); err != nil {
@@ -57,10 +59,10 @@ func (r *Runner) normalizeNative(spec toolSpec, res Result, reader io.Reader, re
 		}
 		for _, row := range rows {
 			for _, m := range row.Messages {
-				if m.Rule == "" || row.File == "" || m.Line < 1 {
+				if m.Rule == "" || row.File == "" || m.Loc.Start.Line < 1 {
 					return fmt.Errorf("invalid secretlint finding")
 				}
-				add(m.Rule, "Potential secret detected by "+m.Rule+".", &Location{File: relativePath(r.root, row.File), Line: m.Line, Column: m.Column})
+				add(m.Rule, "Potential secret detected by "+m.Rule+".", &Location{File: relativePath(r.root, row.File), Line: m.Loc.Start.Line, Column: m.Loc.Start.Column + 1})
 			}
 		}
 	case "knip":
@@ -215,7 +217,9 @@ func (r *Runner) coverageReport(runner string, args []string) (toolSpec, []strin
 		}
 		spec.testsPath = tests
 		if runner == "vitest" {
-			args = append(args, "--coverage.reporter=json-summary", "--coverage.reportsDirectory="+dir, "--reporter=json", "--outputFile="+tests)
+			// Preserve coverage evidence when tests fail; this changes reporting,
+			// not the test outcome or the existing thresholds.
+			args = append(args, "--coverage.reporter=json-summary", "--coverage.reportOnFailure", "--coverage.reportsDirectory="+dir, "--reporter=json", "--outputFile="+tests)
 		} else {
 			args = append(args, "--coverageReporters=json-summary", "--coverageDirectory="+dir, "--json", "--outputFile="+tests)
 		}
