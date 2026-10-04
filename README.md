@@ -266,3 +266,10 @@ Use `npx --no-install tsguard check --output agent` for a bounded summary, or
 `npx --no-install tsguard criticality --output agent` ranks TypeScript functions
 and methods by distinct callers and writes the top 30 to `CRITICALITY.md`.
 `audit` includes this advisory analysis; blocking `check` gates are unchanged.
+
+### Capability evals
+
+OxGuard has a versioned known-answer Tsguard corpus and a baseline/candidate
+comparison report alongside its regression tests. See
+[capability evals](docs/guides/oxguard-evals.md) for installation-path execution,
+metrics, historical provenance and the lanes that are not yet evaluated.
