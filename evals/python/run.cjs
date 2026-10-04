@@ -82,7 +82,9 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
         }
         if (response.status !== c.expected.exit_code) entry.errors.push(`Expected exit ${c.expected.exit_code}, got ${response.status}`);
         if (c.json) {
-          entry.errors.push(...validate(c, JSON.parse(response.stdout), response, root));
+          const normalized = JSON.parse(response.stdout);
+          entry.errors.push(...validate(c, normalized, response, root));
+          for (const expected of c.expected.measurements || []) if (!normalized.measurements.some(m => m.metric === expected.metric && m.location.file === expected.file && m.location.symbol === expected.symbol && m.value === expected.value)) entry.errors.push(`Missing known measurement: ${JSON.stringify(expected)}`);
           const again = checked(invoke(args, root, c.missing_tool ? { PATH: path.join(temporary, 'no-tools') } : {}), 'repeat JSON');
           if (again.status !== response.status || !isDeepStrictEqual(JSON.parse(again.stdout), JSON.parse(response.stdout))) entry.errors.push('Normalized result changed across identical runs');
         }
@@ -129,7 +131,7 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
       } catch (error) { entry.errors.push(error.message); }
       if (entry.outcome === 'fail') entry.failure_output = { stdout: response.stdout.slice(0, 4096), stderr: response.stderr.slice(0, 4096) };
     }
-    const base = { schema_version: '1', corpus_version: corpus.version, corpus_sha256: digest([path.join(__dirname, 'cases.json'), ...walk(path.join(__dirname, 'fixtures'))]), evaluator_sha256: digest([__filename, path.join(__dirname, '../run.cjs'), path.join(__dirname, '../compare.cjs')]), revision, toolchain, environment: { platform: process.platform, arch: process.arch, node: process.version }, cli_version: version.stdout.trim(), source_analysis_sha256: digest(walk(path.join(source, 'pyguard', 'analysis')), path.join(source, 'pyguard', 'analysis')), execution_path: 'native Go CLI + uv + pinned Python environment; scripts copied from evaluated source, as setup deploys them', detection: { precision: null, recall: null, reason: 'Legacy CLI has no normalized findings; analyzer oracles are independent checks, not a CLI accuracy score' } };
+    const base = { schema_version: '1', corpus_version: corpus.version, corpus_sha256: digest([path.join(__dirname, 'cases.json'), ...walk(path.join(__dirname, 'fixtures'))]), evaluator_sha256: digest([__filename, path.join(__dirname, '../run.cjs'), path.join(__dirname, '../compare.cjs')]), revision, toolchain, environment: { platform: process.platform, arch: process.arch, node: process.version }, cli_version: version.stdout.trim(), source_analysis_sha256: digest(walk(path.join(source, 'pyguard', 'analysis')), path.join(source, 'pyguard', 'analysis')), execution_path: 'native Go CLI + uv + pinned Python environment; scripts copied from evaluated source, as setup deploys them', detection: { precision: null, recall: null, reason: 'Analyzer oracles cover legacy behavior; contract cases assert exact findings separately. No aggregate production accuracy is claimed' } };
     const report = lane => {
       const selected = cases.filter(c => corpus.cases.find(spec => spec.id === c.id).lane === lane);
       return { ...base, suite: `pyguard.${lane}`, totals: Object.fromEntries(['pass', 'fail', 'unsupported', 'skipped'].map(outcome => [outcome, selected.filter(c => c.outcome === outcome).length])), cases: selected };
@@ -159,7 +161,7 @@ if (require.main === module) {
   }
   if (!options.binary || !options.source || !options.python || !options['report-dir']) throw new Error('Required: --binary --source --python --report-dir');
   const candidate = evaluate({ ...options, reportDirectory: path.join(options['report-dir'], 'candidate') });
-  let ready = candidate.behavior.totals.fail + candidate.behavior.totals.unsupported === 0;
+  let ready = candidate.behavior.totals.fail + candidate.behavior.totals.unsupported === 0 && candidate.parity_ready;
   if (options['baseline-binary']) {
     if (!options['baseline-source'] || !options['baseline-revision']) throw new Error('Baseline requires source and revision');
     const baseline = evaluate({ binary: options['baseline-binary'], source: options['baseline-source'], python: options.python, revision: options['baseline-revision'], reportDirectory: path.join(options['report-dir'], 'baseline') });

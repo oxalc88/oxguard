@@ -88,10 +88,16 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then EVAL_PY="$RUNNER_TEMP/python-evals/Scripts/python.exe"; fi
           uv pip install --python "$EVAL_PY" --require-hashes -r evals/python/requirements.txt
           echo "EVAL_PY=$EVAL_PY" >> "$GITHUB_ENV"
+      - name: Shared result contract tests
+        run: go test ./...
+        working-directory: contract
       - name: PyGuard regression tests
         run: go test ./...
         working-directory: pyguard
-      - name: Evaluate PyGuard and its agent gaps
+      - name: Owned helper source-location tests
+        shell: bash
+        run: '"$EVAL_PY" pyguard/tests/analysis_contract_test.py'
+      - name: Evaluate Python behavior and contract parity
         shell: bash
         env:
           EVAL_REVISION: ${{ github.sha }}

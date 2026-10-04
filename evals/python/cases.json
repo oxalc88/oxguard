@@ -336,7 +336,11 @@
         "callers": {
           "core__target": 2
         }
-      }
+      },
+      "args": [
+        "--dirs",
+        "functions"
+      ]
     },
     {
       "fixture": "complexity-boundary",
@@ -363,6 +367,124 @@
         "exit_code": 0,
         "violations": []
       }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.lint",
+      "fixture": "lint-error",
+      "command": "ruff",
+      "expected": {
+        "exit_code": 1,
+        "status": "fail",
+        "findings": [
+          {
+            "gate": "ruff",
+            "rule": "F401",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ]
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.complexity",
+      "fixture": "complexity",
+      "command": "radon",
+      "expected": {
+        "exit_code": 1,
+        "status": "fail",
+        "findings": [
+          {
+            "gate": "radon",
+            "rule": "pyguard.radon.cc_exceeded",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ]
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.complexity_boundary",
+      "fixture": "complexity-boundary",
+      "command": "radon",
+      "expected": {
+        "exit_code": 0,
+        "status": "pass",
+        "findings": []
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.annotations",
+      "fixture": "annotation-error",
+      "command": "types",
+      "expected": {
+        "exit_code": 1,
+        "status": "fail",
+        "findings": [
+          {
+            "gate": "types",
+            "rule": "pyguard.types.annotation_complexity",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ]
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.criticality",
+      "fixture": "criticality",
+      "command": "criticality",
+      "expected": {
+        "exit_code": 0,
+        "status": "advisory",
+        "findings": [
+          {
+            "gate": "criticality",
+            "rule": "pyguard.criticality.ranked",
+            "category": "quality",
+            "status": "advisory",
+            "file": "functions/core.py",
+            "line": 1
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "criticality.in_degree",
+            "file": "functions/core.py",
+            "symbol": "core.target",
+            "value": 2
+          }
+        ]
+      },
+      "args": [
+        "--dirs",
+        "functions"
+      ]
     }
   ]
 }
