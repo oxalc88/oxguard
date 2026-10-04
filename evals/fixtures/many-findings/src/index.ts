@@ -1,0 +1,12 @@
+export const value0: number = "wrong";
+export const value1: number = "wrong";
+export const value2: number = "wrong";
+export const value3: number = "wrong";
+export const value4: number = "wrong";
+export const value5: number = "wrong";
+export const value6: number = "wrong";
+export const value7: number = "wrong";
+export const value8: number = "wrong";
+export const value9: number = "wrong";
+export const value10: number = "wrong";
+export const value11: number = "wrong";
