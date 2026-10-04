@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,6 +12,12 @@ import (
 
 func main() {
 	switch os.Args[1] {
+	case "context":
+		cwd, _ := os.Getwd()
+		json.NewEncoder(os.Stdout).Encode(map[string]any{
+			"cwd": cwd, "argv": os.Args[2:], "value": os.Getenv("TSGUARD_FIXTURE_VALUE"),
+			"runtime": os.Getenv("TSGUARD_RUNTIME"), "node": os.Getenv("TSGUARD_NODE"), "opengrep": os.Getenv("TSGUARD_OPENGREP"),
+		})
 	case "exit":
 		fmt.Println(os.Args[3])
 		fmt.Fprintln(os.Stderr, "fixture stderr")

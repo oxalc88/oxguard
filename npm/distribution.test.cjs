@@ -122,7 +122,13 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '-D', ...tarballs], consumer);
     const other = platforms.find(platform => platform !== host);
     const otherPack = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary], path.join(packages, `tsguard-${other}`)).stdout)[0];
-    assert.match(run('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', path.join(temporary, otherPack.filename)], consumer, 1).stderr, /EBADPLATFORM/);
+    // Isolate this negative install from the unpublished optional versions in
+    // the real consumer. npm otherwise fails in optional-dependency deduplication
+    // before it reaches the platform check (Invalid Version / edgesOut errors).
+    const unsupportedConsumer = path.join(temporary, 'unsupported consumer');
+    fs.mkdirSync(unsupportedConsumer);
+    fs.writeFileSync(path.join(unsupportedConsumer, 'package.json'), JSON.stringify({ private: true, version: '1.0.0' }));
+    assert.match(run('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', path.join(temporary, otherPack.filename)], unsupportedConsumer, 1).stderr, /EBADPLATFORM/);
   }
   const packageBefore = fs.readFileSync(path.join(consumer, 'package.json'), 'utf8');
   const executor = manager === 'pnpm' ? 'pnpm' : 'npx';
@@ -153,8 +159,17 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const audit = execute(['audit']).stdout;
   assert.match(audit, /\[(?:OK|FAIL)\].*knip/);
   assert.match(audit, /\[OK\].*jscpd/);
-  // Use a local test rule to exercise the real SAST engine without depending on
-  // the live rule registry. Vulnerability auditing still uses the PM registry.
+  // Use local providers so live rule/advisory changes do not block real SAST.
+  // Installation above still uses the PM registry; only audit responses are fixed.
+  const auditRegistry = spawn(process.execPath, [path.join(__dirname, 'testdata/audit-registry.cjs')], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
+  t.after(() => auditRegistry.kill());
+  const [auditProvider] = await once(auditRegistry, 'message');
+  const originalRegistry = process.env.npm_config_registry;
+  process.env.npm_config_registry = auditProvider.registry;
+  t.after(() => {
+    if (originalRegistry === undefined) delete process.env.npm_config_registry;
+    else process.env.npm_config_registry = originalRegistry;
+  });
   const rules = path.join(consumer, 'node_modules/.cache/oxguard/rules');
   fs.mkdirSync(rules, { recursive: true });
   fs.writeFileSync(path.join(rules, 'test.yaml'), 'rules:\n  - id: tsguard-test-eval\n    languages: [typescript, javascript]\n    message: Avoid eval\n    severity: ERROR\n    pattern: eval($X)\n');
@@ -167,7 +182,90 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const broken: number = "not a number";\n');
   execute(['types'], 1);
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
+  // Semantic contracts are exercised through the packed, installed launcher.
+  execute(['fix']);
+  const structured = (args, expected = 0) => {
+    const value = execute([...args, '--output', 'json'], expected);
+    const result = JSON.parse(value.stdout);
+    assert.equal(result.schema_version, '1');
+    assert.equal(result.exit_code, expected);
+    for (const key of ['findings', 'measurements', 'artifacts', 'diagnostics']) assert.ok(Array.isArray(result[key]), key);
+    assert.equal(Object.hasOwn(result, 'output'), false);
+    for (const diagnostic of result.diagnostics) assert.ok(fs.existsSync(path.join(consumer, diagnostic.path)));
+    return result;
+  };
+  assert.equal(structured(['types']).status, 'pass');
+  assert.ok(['pass', 'advisory'].includes(structured(['check']).status));
+  const pipedAgent = run(executor, [...execArgs, 'tsguard', 'check', '--output', 'agent', '--dirs', 'src'], consumer);
+  assert.match(pipedAgent.stdout, /^(?:PASS|ADVISORY)\n/);
+  const ftaPass = structured(['fta']);
+  assert.equal(ftaPass.status, 'pass');
+  // FTA omits tiny files; this fixture has enough lines for a real score.
+  fs.writeFileSync(path.join(consumer, 'src/score.ts'), 'export function score(x: number) {\n  if (x === 1) return 1;\n  if (x === 2) return 2;\n  if (x === 3) return 3;\n  if (x === 4) return 4;\n  if (x === 5) return 5;\n  return 0;\n}\n');
+  assert.ok(structured(['fta']).measurements.some(m => m.metric === 'fta.score' && m.location.file === 'src/score.ts'));
+  const ftaFailed = structured(['fta', '--max-fta-score', '1'], 1);
+  const scoreFinding = ftaFailed.findings.find(f => f.rule === 'tsguard.fta.score_exceeded');
+  assert.ok(scoreFinding);
+  assert.equal(scoreFinding.location.file, 'src/score.ts');
+  assert.equal(scoreFinding.threshold, 1);
+  assert.ok(scoreFinding.observed > scoreFinding.threshold);
+  assert.ok(ftaFailed.measurements.some(m => m.metric === 'fta.score'));
+  fs.rmSync(path.join(consumer, 'src/score.ts'));
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const broken: number = "not a number";\nexport const other: boolean = 123;\n');
+  const typesFailed = structured(['types', '--tail', '1'], 1);
+  assert.equal(typesFailed.status, 'fail');
+  assert.equal(typesFailed.findings.length, 2);
+  assert.ok(typesFailed.findings.every(f => f.rule === 'TS2322' && f.category === 'quality' && f.location.file === 'src/add.ts'));
+  assert.deepEqual(structured(['types'], 1).findings.map(f => f.id), typesFailed.findings.map(f => f.id));
+  const agentTypes = execute(['types', '--output', 'agent'], 1).stdout;
+  assert.match(agentTypes, /^FAIL\n/);
+  assert.match(agentTypes, /findings: 2/);
+  assert.match(agentTypes, /TS2322 src\/add.ts:/);
+  assert.ok(Buffer.byteLength(agentTypes) <= 6144);
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const bad:number=1;\n');
+  const lintFailed = structured(['lint'], 1);
+  assert.ok(lintFailed.findings.some(f => f.gate === 'lint' && f.category === 'quality' && f.rule === 'format'));
+  const failFast = structured(['check'], 1);
+  assert.ok(failFast.findings.every(f => f.gate === 'lint'));
+  assert.ok(failFast.diagnostics.every(d => d.gate === 'lint'));
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), '// first\nexport function lintLocation() {\n  debugger;\n}\n');
+  const positionedLint = structured(['lint'], 1).findings.find(f => f.rule === 'lint/suspicious/noDebugger');
+  assert.ok(positionedLint);
+  assert.equal(positionedLint.location.line, 3);
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const unsafe = eval("1+1");\n');
+  const sastFailed = structured(['security'], 1);
+  assert.ok(sastFailed.findings.some(f => f.rule.endsWith('tsguard-test-eval') && f.category === 'quality' && f.location.file === 'src/add.ts'));
+  fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
+  for (const invalid of [['--timout', '30'], ['--timeout'], ['--output', 'xml']]) {
+    const result = structured(['types', ...invalid], 3);
+    assert.equal(result.status, 'error');
+    assert.equal(result.findings[0].category, 'invalid_configuration');
+  }
+  // Explicit root is forwarded intact from a nested cwd through Node to Go.
+  fs.mkdirSync(path.join(consumer, 'nested'));
+  const rooted = run(executor, [...execArgs, 'tsguard', 'types', '--root', consumer, '--dirs', 'src', '--output', 'json', '--log-file', 'project log.txt'], path.join(consumer, 'nested'));
+  assert.equal(JSON.parse(rooted.stdout).status, 'pass');
+  assert.equal(JSON.parse(rooted.stdout).artifacts[0].path, 'nested/project log.txt');
+  assert.ok(fs.existsSync(path.join(consumer, JSON.parse(rooted.stdout).artifacts[0].path)));
+  // Missing package-owned Node executable is an execution failure, not a TS finding.
+  // Spawn Go directly: Node is the deliberately missing analyzer dependency.
+  const missingDependency = spawnSync(installedBinary, ['types', '--output', 'json', '--dirs', 'src'], {
+    cwd: consumer, encoding: 'utf8', env: { ...process.env, TSGUARD_RUNTIME: path.dirname(path.dirname(launcher)), TSGUARD_NODE: path.join(temporary, 'absent-node') },
+  });
+  assert.ifError(missingDependency.error);
+  assert.equal(missingDependency.status, 1);
+  assert.equal(JSON.parse(missingDependency.stdout).findings[0].category, 'tool_missing');
   run('go', ['build', '-o', installedBinary, path.join(__dirname, 'testdata/cli.go')], root);
+  const contextProcess = spawnSync(process.execPath, [launcher, 'context', '--output', 'json', 'argument with spaces'], {
+    cwd: consumer, encoding: 'utf8', env: { ...process.env, TSGUARD_FIXTURE_VALUE: 'forwarded-value' },
+  });
+  assert.ifError(contextProcess.error);
+  assert.equal(contextProcess.status, 0);
+  const context = JSON.parse(contextProcess.stdout);
+  assert.equal(fs.realpathSync(context.cwd), fs.realpathSync(consumer));
+  assert.deepEqual(context.argv, ['--output', 'json', 'argument with spaces']);
+  assert.equal(context.value, 'forwarded-value');
+  assert.ok(context.runtime && context.node && context.opengrep);
   for (const code of [0, 1, 3, 4, 5]) {
     run(process.execPath, [launcher, 'exit', String(code), 'ok'], consumer, code);
   }
