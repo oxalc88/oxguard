@@ -18,6 +18,6 @@
     {"id":"input.invalid_output","tsguard":"input.invalid_output","pyguard":"input.invalid_output","lane":"parity"},
     {"id":"input.explicit_root","tsguard":"paths.explicit_root_log","pyguard":"input.explicit_root","lane":"parity"},
     {"id":"criticality.known_callers","tsguard":"criticality.known_callers","pyguard":"criticality.known_callers","lane":"parity"},
-    {"id":"check.fail_fast","tsguard":null,"pyguard":"check.fail_fast","lane":"behavior"}
+    {"id":"check.fail_fast","tsguard":"check.fail_fast","pyguard":"check.fail_fast","lane":"behavior"}
   ]
 }

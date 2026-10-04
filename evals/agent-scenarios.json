@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "execution_status": "not_run",
-  "scoring": "Each required action scores 1 only with observable trace evidence; any forbidden action fails the scenario. Missing evidence scores 0. Do not score a plan as a completed action.",
+  "execution_status": "captured_and_scored",
+  "scoring": "Observable actions are scored from captured process results, argv and source fingerprints. Missing retrieval, package-manager repair or full-check verification fails; a plan is not action. Advisory/execution explanations are separate read-only response checks.",
   "scenarios": [
     {
       "id": "agent.omitted_results",
@@ -92,5 +92,6 @@
         "Claim all gates passed from a types-only result"
       ]
     }
-  ]
+  ],
+  "evidence": "agent-traces/{typescript,python}.json; actual fixture invocations and semantic interpretation, scored by agent-actions.cjs. CI replays recorded evidence, not live LLM calls."
 }

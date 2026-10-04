@@ -51,6 +51,8 @@ function validate(testCase, result, processResult, root) {
   for (const key of ['findings', 'measurements', 'artifacts', 'diagnostics']) expect(Array.isArray(result[key]), `${key} must be an array`);
   expect(!Object.hasOwn(result, 'output'), 'human prose output field is not a machine contract');
   if (errors.some(e => e.endsWith('must be an array'))) return errors;
+  if (testCase.expected.assessment) expect(result.assessment === testCase.expected.assessment, 'assessment mismatch');
+  if (testCase.expected.gates) expect(isDeepStrictEqual(result.gates, testCase.expected.gates), 'gate execution/normalization mismatch');
   let remaining = result.findings.map(projectFinding);
   for (const finding of testCase.expected.findings) {
     const index = remaining.findIndex(f => match(finding, f));

@@ -44,18 +44,18 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
     const uv = checked(invoke(['uv', '--version'], temporary), 'uv');
     if (uv.status !== 0) throw new Error('uv preflight failed');
     const installed = JSON.parse(versions.stdout);
-    installed.packages = Object.fromEntries(Object.entries(installed.packages).map(([name, version]) => [name.replaceAll('_', '-'), version]));
+    installed.packages = Object.fromEntries(Object.entries(installed.packages).map(([name, version]) => [name.toLowerCase().replace(/[-_.]+/g, '-'), version]));
     const toolchain = { ...installed, uv: uv.stdout.trim(), requirements_sha256: digest([path.join(__dirname, 'requirements.txt')]) };
     for (const name of ['ruff', 'mypy', 'radon', 'pyan3', 'networkx', 'pydot']) if (!toolchain.packages[name]) throw new Error(`Missing eval dependency: ${name}`);
     for (const line of fs.readFileSync(path.join(__dirname, 'requirements.txt'), 'utf8').split('\n')) {
       const pin = line.match(/^([a-zA-Z0-9-]+)==([^\s]+)/);
-      if (pin && toolchain.packages[pin[1].toLowerCase()] !== pin[2]) throw new Error(`Eval dependency does not match lock: ${pin[1]}`);
+      if (pin && toolchain.packages[pin[1].toLowerCase().replace(/[-_.]+/g, '-')]  !== pin[2]) throw new Error(`Eval dependency does not match lock: ${pin[1]}`);
     }
     const outputFlag = /--output\s/.test(preflight.stdout);
     const rootFlag = /--root\s/.test(preflight.stdout);
     const cases = [];
     for (const c of corpus.cases) {
-      const root = path.join(temporary, c.id); fs.cpSync(path.join(__dirname, 'fixtures', c.fixture), root, { recursive: true });
+      const root = path.join(temporary, c.id, 'project'); fs.mkdirSync(path.dirname(root), { recursive: true }); fs.cpSync(path.join(__dirname, 'fixtures', c.fixture), root, { recursive: true });
       fs.mkdirSync(path.join(root, 'tools'), { recursive: true });
       fs.cpSync(path.join(source, 'pyguard', 'analysis'), path.join(root, 'tools', 'analysis'), { recursive: true });
       const args = [binary, c.command, '--dirs', 'src', '--timeout', '30', ...(c.pipe ? [] : ['--allow-pipe'])];

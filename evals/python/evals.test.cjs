@@ -42,7 +42,7 @@ function reports() {
 test('parity never equates missing Python contracts or untested TS behavior to passes', () => {
   const r = parity(...reports());
   assert.equal(r.pyguard_agent_ready, false); assert.equal(r.shared_capabilities_ready, false);
-  assert.equal(r.capabilities.find(c => c.id === 'check.fail_fast').tsguard, 'not_evaluated');
+  assert.equal(r.capabilities.find(c => c.id === 'check.fail_fast').tsguard, 'pass');
   assert.equal(r.capabilities.find(c => c.id === 'contract.json.clean').pyguard, 'unsupported');
 });
 test('parity rejects mixed revisions, incomplete reports and forged outcomes', () => {

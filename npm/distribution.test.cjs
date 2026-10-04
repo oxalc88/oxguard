@@ -268,7 +268,12 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   fs.rmSync(path.join(consumer, 'tsconfig.json'));
   fs.rmSync(path.join(consumer, 'calls'), { recursive: true });
   assert.equal(structured(['types']).status, 'pass');
-  assert.ok(['pass', 'advisory'].includes(structured(['check']).status));
+  const completeCheck = structured(['check']);
+  assert.ok(['pass', 'advisory'].includes(completeCheck.status));
+  assert.equal(completeCheck.assessment, 'complete');
+  assert.deepEqual(completeCheck.gates.map(g => g.name), ['lint', 'fta', 'types', 'coverage', 'secrets', 'dependencies', 'security']);
+  assert.ok(completeCheck.gates.every(g => g.normalization === 'complete' && ['passed', 'advisory'].includes(g.status)));
+  assert.equal(completeCheck.measurements.filter(m => m.metric.startsWith('coverage.') && m.location.file === '').length, 4);
   const pipedAgent = run(executor, [...execArgs, 'tsguard', 'check', '--output', 'agent', '--dirs', 'src'], consumer);
   assert.match(pipedAgent.stdout, /^(?:PASS|ADVISORY)\n/);
   const ftaPass = structured(['fta']);

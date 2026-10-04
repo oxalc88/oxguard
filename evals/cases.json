@@ -479,6 +479,67 @@
       "root_log": true,
       "symlink": true,
       "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "check.fail_fast",
+      "fixture": "lint-error",
+      "command": "check",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "lint",
+            "rule": "lint/suspicious/noExplicitAny",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          }
+        ],
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "lint",
+            "status": "failed",
+            "normalization": "complete"
+          },
+          {
+            "name": "fta",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "types",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "coverage",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "dependencies",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "security",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ]
+      },
+      "detection": true,
+      "basis": "historical_contract_or_regression",
+      "repeat": true
     }
   ]
 }

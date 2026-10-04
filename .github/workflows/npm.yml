@@ -49,7 +49,7 @@ jobs:
         run: npm install --global pnpm@${{ matrix.manager.version }}
       - name: Eval harness regression tests
         if: matrix.manager.name == 'npm'
-        run: node --test evals/evals.test.cjs evals/python/evals.test.cjs
+        run: node --test evals/evals.test.cjs evals/python/evals.test.cjs evals/agent-actions.test.cjs
       - run: node --test npm/distribution.test.cjs
         env:
           TSGUARD_PACKAGE_MANAGER: ${{ matrix.manager.name }}
@@ -147,10 +147,13 @@ jobs:
           path: eval-reports/pyguard
       - name: Produce parity matrix (gaps are not passes)
         run: node evals/parity.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/parity.json
+      - name: Require Level 1 agent contract completion
+        run: node evals/level1-ready.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/level1-ready.json
       - uses: actions/upload-artifact@v4
         with:
           name: oxguard-capability-parity
           path: |
             eval-reports/parity.json
             eval-reports/parity.md
+            eval-reports/level1-ready.json
           if-no-files-found: error

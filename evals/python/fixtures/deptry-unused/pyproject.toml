@@ -1,0 +1,14 @@
+[project]
+name = "oxguard-python-eval"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = ["requests==2.34.2"]
+[tool.uv]
+managed = false
+[tool.ruff.lint]
+select = ["F"]
+[tool.mypy]
+strict = true
+
+[tool.deptry]
+exclude = ['.*[/\\]tools[/\\].*', '.*[/\\]\.pyguard-cache[/\\].*']
