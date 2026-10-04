@@ -1,26 +1,14 @@
 # OxGuard capability evals
 
-The evals contain 17 Tsguard cases and 24 PyGuard cases (15 behavior checks and
-9 agent/criticality parity requirements). They complement unit,
-installed-distribution and release smoke tests. It does not implement Level 3
-project baselines or change analysis.
+The evals contain 17 Tsguard cases and 29 PyGuard cases (15 behavior checks and 14 agent/criticality parity requirements). They complement unit, installed-distribution and release smoke tests. This does not implement Level 3 project baselines or change analysis.
 
 ## Known answers
 
-`evals/cases.json` records stable case IDs, historical references, fixture names
-and expected semantic results. `evals/fixtures/` contains reviewed source and
-configuration. Expectations are not generated from the candidate's output.
+`evals/cases.json` records stable case IDs, historical references, fixture names and expected semantic results. `evals/fixtures/` contains reviewed source and configuration. Expectations are not generated from the candidate's output.
 
-The corpus covers clean and faulty types/lint, FTA pass/failure, known caller
-counts, recursion/repeated calls/exclusions/path aliases, malformed compiler
-configuration, missing tools, unknown/missing flags, invalid output modes,
-lock contention, omitted findings, deterministic repeat runs, explicit roots
-and symlink log paths. Finding identity is checked structurally and across
-repeated runs; English messages and huge logs are not golden snapshots.
+The corpus covers clean and faulty types/lint, FTA pass/failure, known caller counts, recursion/repeated calls/exclusions/path aliases, malformed compiler configuration, missing tools, unknown/missing flags, invalid output modes, lock contention, omitted findings, deterministic repeat runs, explicit roots and symlink log paths. Finding identity is checked structurally and across repeated runs; English messages and huge logs are not golden snapshots.
 
-The history provides evidence for regressions. Clean controls are new independent
-fixtures, clearly labelled. Passing these small fixtures does not establish
-precision/recall on arbitrary production repositories.
+The history provides evidence for regressions. Clean controls are new independent fixtures, clearly labelled. Passing these small fixtures does not establish precision/recall on arbitrary production repositories.
 
 ## Run through an installed package
 
@@ -31,11 +19,7 @@ node --test evals/evals.test.cjs
 OXGUARD_EVAL_REPORT_DIR=eval-reports node --test npm/distribution.test.cjs
 ```
 
-The harness builds, packs and installs the actual npm distribution. Evals invoke
-its Node launcher and native Go binary, with real packaged analyzers. Each case
-gets a fresh temporary project. No analysis logic or package dependency changes
-are required. Set `TSGUARD_PACKAGE_MANAGER=pnpm` to exercise that installation
-path locally; CI already protects both managers in its existing nine-job matrix.
+The harness builds, packs and installs the actual npm distribution. Evals invoke its Node launcher and native Go binary, with real packaged analyzers. Each case gets a fresh temporary project. No analysis logic or package dependency changes are required. Set `TSGUARD_PACKAGE_MANAGER=pnpm` to exercise that installation path locally; CI already protects both managers in its existing nine-job matrix.
 
 For a package already installed in your own test workspace:
 
@@ -44,16 +28,11 @@ node evals/run.cjs --launcher /absolute/path/node_modules/@oxguard/tsguard/bin/t
   --revision COMMIT_SHA --report eval-reports/candidate.json
 ```
 
-Do not use an uninstalled CLI or plain `npx` fetch as a substitute. The evaluator
-creates its own projects; it does not run analysis against your application.
+Do not use an uninstalled CLI or plain `npx` fetch as a substitute. The evaluator creates its own projects; it does not run analysis against your application.
 
 ## Compare native CLI revisions
 
-On a PR, the Linux npm job evaluates the base commit and candidate using the
-**same current corpus, evaluator, installed launcher and pinned toolchain**.
-The harness builds the baseline native binary in an isolated git worktree,
-swaps it into the temporary installed native package, evaluates it, then restores
-the candidate before the existing integration assertions continue.
+On a PR, the Linux npm job evaluates the base commit and candidate using the **same current corpus, evaluator, installed launcher and pinned toolchain**. The harness builds the baseline native binary in an isolated git worktree, swaps it into the temporary installed native package, evaluates it, then restores the candidate before the existing integration assertions continue.
 
 ```sh
 OXGUARD_EVAL_REPORT_DIR=eval-reports \
@@ -64,86 +43,42 @@ node evals/compare.cjs eval-reports/npm-linux-x64/baseline.json \
   eval-reports/npm-linux-x64/candidate.json eval-reports/comparison.json
 ```
 
-This isolates native CLI capability changes. It is not a comparison of entire
-historical npm packages or historical toolchains. The separate distribution tests
-protect launcher/package behavior. A baseline predating JSON is marked
-`unsupported`, not treated as a successful run or scored for prose it cannot
-normalize. Failed startup/preflight and malformed JSON are failures.
+This isolates native CLI capability changes. It is not a comparison of entire historical npm packages or historical toolchains. The separate distribution tests protect launcher/package behavior. A baseline predating JSON is marked `unsupported`, not treated as a successful run or scored for prose it cannot normalize. Failed startup/preflight and malformed JSON are failures.
 
-Reports with different corpus/evaluator hashes, Node/platform/architecture,
-toolchains or case sets cannot be compared. A newly added fixture is run on both
-revisions with the same oracle. Do not compare old report files against a changed
-corpus and call the difference a capability gain.
+Reports with different corpus/evaluator hashes, Node/platform/architecture, toolchains or case sets cannot be compared. A newly added fixture is run on both revisions with the same oracle. Do not compare old report files against a changed corpus and call the difference a capability gain.
 
 ## Results and merge rule
 
 Each case has `pass`, `fail`, `unsupported` or `skipped`:
 
 - `pass`: all semantic assertions match the independent expectation.
-- `fail`: wrong findings/counts/categories/status, malformed output, execution
-  failure or timeout; a failed launch never silently becomes unsupported.
+- `fail`: wrong findings/counts/categories/status, malformed output, execution failure or timeout; a failed launch never silently becomes unsupported.
 - `unsupported`: a working historical CLI does not advertise a required interface.
-- `skipped`: an explicitly conditional symlink test cannot create a symlink on
-  this environment. Other cases cannot skip themselves.
+- `skipped`: an explicitly conditional symlink test cannot create a symlink on this environment. Other cases cannot skip themselves.
 
-Comparison reports classify gained, regressed, retained and unresolved cases.
-Changes in symlink applicability are listed separately and never counted as a
-capability gain. Losing a previously passing conditional case blocks readiness.
-The candidate must pass every required case, even when the baseline also failed.
+Comparison reports classify gained, regressed, retained and unresolved cases. Changes in symlink applicability are listed separately and never counted as a capability gain. Losing a previously passing conditional case blocks readiness. The candidate must pass every required case, even when the baseline also failed.
 
-Detection metrics match rule/gate/category/status and source location one-to-one.
-They count true positives, false positives (including duplicates), and misses in
-marked detection cases. Clean controls contribute unexpected-finding counts.
-No supported observations means precision/recall is null, not 100%.
+Detection metrics match rule/gate/category/status and source location one-to-one. They count true positives, false positives (including duplicates), and misses in marked detection cases. Clean controls contribute unexpected-finding counts. No supported observations means precision/recall is null, not 100%.
 
-Case duration, output bytes and maximum agent bytes/lines are recorded. Runtime
-includes repeat/agent invocations for the applicable case. Agent limits remain
-26 lines / 6 KiB. Every child has a 60-second harness deadline; slow installation
-uses the existing separate budget. Runtime deltas are observations, not a noisy
-CI performance gate. Memory, token cost and installation latency are not measured.
+Case duration, output bytes and maximum agent bytes/lines are recorded. Runtime includes repeat/agent invocations for the applicable case. Agent limits remain 26 lines / 6 KiB. Every child has a 60-second harness deadline; slow installation uses the existing separate budget. Runtime deltas are observations, not a noisy CI performance gate. Memory, token cost and installation latency are not measured.
 
-CI runs CLI evals on the three npm platform jobs and uploads candidate JSON.
-The Linux PR job also uploads baseline JSON plus JSON/Markdown comparisons.
-All nine npm/pnpm integration jobs remain required by the workflow's tests; repo
-branch-protection policy is separate. The eval-enabled integration budget is ten
-minutes; non-eval jobs keep the existing six-minute integration budget.
+CI runs CLI evals on the three npm platform jobs and uploads candidate JSON. The Linux PR job also uploads baseline JSON plus JSON/Markdown comparisons. All nine npm/pnpm integration jobs remain required by the workflow's tests; repo branch-protection policy is separate. The eval-enabled integration budget is ten minutes; non-eval jobs keep the existing six-minute integration budget.
 
-Require existing cases to remain passing and a new capability to have positive,
-negative and boundary cases. Changes to expected answers require a documented
-behavior decision and review; never rewrite an oracle merely to get green CI.
-Corpus changes must accompany their fixtures/provenance. Store reports as CI
-artifacts rather than committing generated observations as golden answers.
+Require existing cases to remain passing and a new capability to have positive, negative and boundary cases. Changes to expected answers require a documented behavior decision and review; never rewrite an oracle merely to get green CI. Corpus changes must accompany their fixtures/provenance. Store reports as CI artifacts rather than committing generated observations as golden answers.
 
 ## Lanes still missing
 
-- PyGuard has a real known-answer corpus, but its normalized result contract is
-  absent. See the Python lanes below; this is an observed gap, not a passing eval.
-- Opengrep, coverage, secrets and dependency transport/advisories are protected
-  by existing tests but have no scored cases in this corpus yet.
-- Historical installation timeouts and registry routing remain integration checks,
-  not detection metrics. Live security-advisory feeds are outside these deterministic
-  evals; the integration harness's local provider must not imply production safety.
-- `evals/agent-scenarios.json` provides four history-based prompts and observable
-  rubrics: omitted findings, execution errors, advisory criticality and fail-fast.
-  No LLM or coding agent is run by this evaluator. These scenarios remain unscored
-  until a real agent trace is captured. A proposed plan is not proof of action.
-- Larger independent projects, unseen holdout cases, memory measurements and
-  controlled performance benchmarks remain future work.
+- PyGuard has a real known-answer corpus, but its normalized result contract is absent. See the Python lanes below; this is an observed gap, not a passing eval.
+- Opengrep, coverage, secrets and dependency transport/advisories are protected by existing tests but have no scored cases in this corpus yet.
+- Historical installation timeouts and registry routing remain integration checks, not detection metrics. Live security-advisory feeds are outside these deterministic evals; the integration harness's local provider must not imply production safety.
+- `evals/agent-scenarios.json` provides four history-based prompts and observable rubrics: omitted findings, execution errors, advisory criticality and fail-fast. No LLM or coding agent is run by this evaluator. These scenarios remain unscored until a real agent trace is captured. A proposed plan is not proof of action.
+- Larger independent projects, unseen holdout cases, memory measurements and controlled performance benchmarks remain future work.
 
 ## Python behavior and agent parity
 
-`evals/python/cases.json` contains language-specific controls with the same quality
-intent: clean/incorrect types and lint, complexity pass/threshold/boundary, annotation
-depth boundaries, fail-fast, lock/pipe refusal, missing uv and full diagnostic logs.
-Ruff/mypy JSON, Radon JSON and the owned annotation model independently verify
-known answers. Those oracle records are **not** normalized PyGuard CLI findings;
-no CLI precision/recall score is assigned while its result contract is missing.
+`evals/python/cases.json` contains language-specific controls with the same quality intent: clean/incorrect types and lint, complexity pass/threshold/boundary, annotation depth boundaries, fail-fast, lock/pipe refusal, missing uv and full diagnostic logs. Ruff/mypy JSON, Radon JSON and the owned annotation model independently verify known answers. Those oracle records are **not** normalized PyGuard CLI findings; no CLI precision/recall score is assigned while its result contract is missing.
 
-Python requirements, including transitive dependencies and hashes, are pinned in
-`evals/python/requirements.txt`. The evaluator checks the installed versions,
-runs uv offline, and copies helper scripts from the evaluated source into fresh
-projects, matching setup's deployment location. It does not test release installer
-or setup dependency installation. These remain separate smoke-test responsibilities.
+Python requirements, including transitive dependencies and hashes, are pinned in `evals/python/requirements.txt`. The evaluator checks the installed versions, runs uv offline, and copies helper scripts from the evaluated source into fresh projects, matching setup's deployment location. It does not test release installer or setup dependency installation. These remain separate smoke-test responsibilities.
 
 ```sh
 uv venv --python 3.12 /tmp/pyguard-evals
@@ -154,40 +89,17 @@ node evals/python/run.cjs --binary /tmp/pyguard-eval --source . \
   --report-dir eval-reports/pyguard
 ```
 
-On Windows the venv interpreter is `Scripts/python.exe`. Use uv 0.12.19, as CI does.
-Optional `--baseline-binary`, `--baseline-source` and `--baseline-revision` evaluate
-a rebuilt base commit with its own source helper scripts and the same pinned tools.
+On Windows the venv interpreter is `Scripts/python.exe`. Use uv 0.12.19, as CI does. Optional `--baseline-binary`, `--baseline-source` and `--baseline-revision` evaluate a rebuilt base commit with its own source helper scripts and the same pinned tools.
 
 Two reports deliberately answer different questions:
 
-- `behavior.json`: every supported behavior case must pass, including when the
-  baseline failed. This preserves the strict candidate rule.
-- `parity.json`: nine positive requirements probe full JSON, stable IDs/categories,
-  bounded agent output with omission disclosure, input validation/root and known
-  caller counts. Missing advertised interfaces are unsupported; violated
-  requirements fail. The probes actually run even when the flags are absent.
-  These cases are a visible implementation backlog. They never count as passes.
+- `behavior.json`: every supported behavior case must pass, including when the baseline failed. This preserves the strict candidate rule.
+- `parity.json`: 14 positive requirements probe full JSON, stable IDs/categories, bounded agent output with omission disclosure, input validation/root and known caller counts. Missing advertised interfaces are unsupported; violated requirements fail. The probes actually run even when the flags are absent. Requirements not met never count as passes. All are now required for candidate readiness.
 
-Current Python evidence: 15 behavior passes, five unsupported interfaces, four
-failed parity requirements (three flag validations and known caller counts).
-`agent_ready` and parity `candidate_ready` are false. A green **regression guard**
-means supported behavior passed and no passing parity capability was lost. It is
-not a claim of full Python capability readiness. Known parity failures may remain
-visible; newly broken interfaces and changing a failure into unsupported block
-the guard. Newly implemented capabilities must pass their positive requirements.
+Current Python evidence: all 15 baseline behavior cases remain passing, and all 14 parity cases are gained. The original nine parity requirements now pass; five additional structured adapter cases cover lint, complexity failure/boundary, annotations and caller measurements. `agent_ready` and parity `candidate_ready` are true on the tested candidate/toolchain. Historical baseline missing interfaces remain unsupported and historical defects remain failed; the CLI entry point requires every candidate parity case to pass, independently of baseline outcomes. The regression comparison also blocks loss of any previously passing capability.
 
-CI adds three Python platform jobs with base/candidate comparisons on PRs. A final
-report job combines Linux evidence in `parity.json` and `parity.md`. The Python
-reports include source-script provenance and toolchain versions. Reports are
-uploaded even if the eval step fails.
+CI adds three Python platform jobs with base/candidate comparisons on PRs. A final report job combines Linux evidence in `parity.json` and `parity.md`. The Python reports include source-script provenance and toolchain versions. Reports are uploaded even if the eval step fails.
 
-`evals/capabilities.json` maps shared intent across language-specific case IDs.
-FTA scores and Radon cyclomatic counts are not interchangeable numbers. The matrix
-uses `pass`, `fail`, `unsupported`, `skipped` and `not_evaluated`; it does not call
-untested behavior equivalent. The TS fail-fast path remains covered by existing
-integration tests but lacks a scored case in this corpus, so the matrix marks it
-`not_evaluated`. Reports must come from the same revision and environment.
+`evals/capabilities.json` maps shared intent across language-specific case IDs. FTA scores and Radon cyclomatic counts are not interchangeable numbers. The matrix uses `pass`, `fail`, `unsupported`, `skipped` and `not_evaluated`; it does not call untested behavior equivalent. The TS fail-fast path remains covered by existing integration tests but lacks a scored case in this corpus, so the matrix marks it `not_evaluated`. Reports must come from the same revision and environment.
 
-See [PyGuard agent evaluation](pyguard-agent-evaluation.md) for repository evidence
-and the next implementation step. No Python CLI, analyzer, threshold or skill
-behavior changes are made by this eval PR.
+See [PyGuard agent evaluation](pyguard-agent-evaluation.md) for repository evidence and implemented parity. Both CLIs share result/reporting Go code while keeping language-specific analyzers. Existing thresholds and fail-fast gate order remain protected; no unified CLI or packaging refactor is included.

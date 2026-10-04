@@ -1,163 +1,54 @@
 ---
 name: pyguard
-description: |
-  Run pyguard Python quality gate and interpret the output: prioritize findings,
-  group by check, suggest concrete fixes, and offer to auto-apply `pyguard fix`
-  for auto-fixable issues. Installs the binary if missing (with user approval).
-  Use when asked to "run pyguard", "check python quality", "review pyguard output",
-  "fix python lint", "analizar pyguard", "correr pyguard", "lint python",
-  "python quality check", "analizar calidad python".
-allowed-tools:
-  - Bash
-  - Read
-  - AskUserQuestion
+description: Run Python quality gates through PyGuard, act on normalized agent/JSON results, retrieve omitted findings, and distinguish source findings from execution failures. Use for requests to run pyguard, check Python quality, fix Python lint, inspect PyGuard results, correr pyguard, or analizar calidad python.
 ---
 
-# pyguard — quality gate complementario
+# PyGuard
 
-Eres la capa de interpretación sobre `pyguard`. Tu trabajo es ejecutar el gate, leer el output
-completo, y convertirlo en un resumen accionable con findings priorizados y fixes concretos.
-**No reimplementas ningún subcomando** — siempre delegas al binario.
+Delegate analysis to the Go CLI and its Python analyzers. Use its normalized results to explain actionable findings; do not reconstruct findings or caller counts from raw logs.
 
-## Paso 1: verificar el binario
+## Prepare
 
-```bash
-command -v pyguard >/dev/null 2>&1 && echo "ok" || echo "missing"
+Use the requested command and scope. Default to `check` for a general quality request. Use `audit` for advisory criticality, dead-code and dependency analysis. Ask only when the intended operation is ambiguous. Do not run `fix`, `setup`, installation, or source edits unless the user authorizes that operation.
+
+Verify `command -v pyguard`. If missing, explain that execution is blocked and offer installation with the official release installer. Do not claim the latest released binary already contains an unmerged feature. Verify `pyguard --help` advertises `--output` and `--root`; if absent, request an updated compatible binary rather than silently interpreting legacy output as the normalized contract.
+
+Run from the project or pass `--root /absolute/project/path` containing `pyproject.toml`. Preserve requested `--dirs`, timeout and exclusions. Targets are relative to the project root. Most commands default to that root; criticality retains `functions`/`cdk` unless `--dirs` is explicit. Project settings come from `[tool.pyguard]` in `pyproject.toml`. Conventional test-file exclusions affect the owned complexity helpers and Radon; they do not disable Ruff or coverage.
+
+If an owned helper is missing or incompatible, report the execution failure and suggest an explicitly authorized `pyguard setup` to deploy updated `tools/analysis` scripts. Do not overwrite project helpers without authorization.
+
+## Run the bounded contract
+
+```sh
+pyguard check --root /absolute/project/path --output agent
 ```
 
-Si `ok` → salta al Paso 2.
+Substitute the requested analysis command. Analysis commands accept `human`, `agent` and `json`; setup, doctor, hooks and Lambda invoke/test retain human interfaces. Structured modes accept captured/piped stdout without `--allow-pipe`. Use `--tail` and `--log-file` only when additional diagnostics are needed, never as the normal log-parsing workflow.
 
-Si `missing`: pregunta con una sola `AskUserQuestion`, tres opciones:
+Record the actual process exit code and semantic status. The agent summary shows at most ten findings, total `findings`, gate names, diagnostic availability and `omitted: N (use --output json)`. Truncation of long source names or evidence is possible. When `omitted` is positive, retrieve JSON for the same command, root, scope and configuration before assessing all findings or reporting a complete inventory:
 
-1. **Instalar ahora** — corre el one-liner oficial y espera que termine:
-   ```bash
-   curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- pyguard
-   ```
-   Tras instalar, verifica de nuevo con `command -v pyguard`. Si quedó en `~/.local/bin/` y no está en `$PATH`, informa al usuario que añada `export PATH="$HOME/.local/bin:$PATH"` a su shell rc. Menciona que el siguiente paso típico dentro del proyecto es `pyguard setup`. Continúa al Paso 2.
-
-2. **Solo mostrar el comando** — imprime el one-liner de arriba más la variante Windows PowerShell:
-   ```
-   & ([scriptblock]::Create((iwr -useb https://github.com/oxalc88/oxguard/releases/latest/download/install.ps1))) pyguard
-   ```
-   Termina sin ejecutar nada más.
-
-3. **Cancelar** — termina sin tocar nada.
-
-Restricciones al instalar: no modifiques `~/.bashrc`, `~/.zshrc`, ni ningún archivo de config automáticamente. No corras `pyguard setup`. Si el usuario está en Windows, muestra ambos comandos (sh para WSL/Git Bash, PowerShell para cmd nativo) y no auto-ejecutes.
-
-## Paso 2: detectar el modo de invocación
-
-**Interpret-existing-log**: si el usuario proporcionó una ruta a un archivo de log, pegó output directamente, o dijo "interpreta este output / este log / este resultado" → **salta directo al Paso 4** con ese contenido; no ejecutas el binario.
-
-**Run-and-interpret**: cualquier otro caso (el usuario quiere correr el gate ahora).
-
-## Paso 3: elegir subcomando
-
-Pregunta una sola vez con `AskUserQuestion`:
-
-- `check` (**recomendado**) — gate completo (ruff → mypy → radon → types → coverage → security)
-- `fix` — auto-formatea con ruff
-- `audit` — advisory: criticality, dead-code, deps (nunca falla el gate)
-- `security` — bandit + pip-audit + detect-secrets
-- `otro` — el usuario especifica el subcomando: `mypy`, `ruff`, `radon`, `types`, `coverage`, `bandit`, `pip-audit`, `secrets`, `criticality`, `dead-code`, `deps`
-
-Si el usuario ya indicó el subcomando en su mensaje ("corre pyguard mypy"), úsalo sin preguntar.
-
-Flags adicionales que el usuario puede pasar:
-- `--dirs <d1,d2,...>` — default `.` (raíz del proyecto); usa esto si quieres restringir a subdirectorios específicos
-- `--timeout <s>` — default 300; no cambies sin que el usuario lo pida
-
-Config persistente: pyguard lee `[tool.pyguard]` en `pyproject.toml` automáticamente. Claves útiles:
-
-```toml
-[tool.pyguard]
-exclude-tests = false          # re-habilita radon/complexity en archivos de test (default: true = excluidos)
-exclude = ["*/fixtures/*"]     # patrones adicionales para excluir (ej. fixtures, stubs)
+```sh
+pyguard check --root /absolute/project/path --output json
 ```
 
-Por defecto, `test_*.py`, `*_test.py`, `conftest.py` y el directorio `tests/` quedan fuera de radon cc/mi/hal y los gates de Halstead/type-complexity — son repetitivos por diseño. Ruff y coverage siguen cubriendo los tests.
+JSON is complete for executed gates, not for steps skipped by fail-fast. If rerunning is blocked or the source changed, report the incomplete inventory explicitly. Prefer JSON immediately when an exact complete inventory is requested. Do not count analyzer log lines as findings or invent findings that are absent from the normalized result.
 
-## Paso 4: ejecutar con log-file
+## Act on the result
 
-`--allow-pipe` es **obligatorio** para evitar el exit 5 (pyguard detecta que stdout es un pipe).
+Use schema `"1"`: `status`, `command`, `exit_code`, `findings`, `measurements`, `artifacts` and `diagnostics`. Preserve finding `id`, `gate`, `rule`, source `location`, `category`, `status`, evidence and available observed/threshold values. Do not compare unrelated language-specific metrics as equal scores.
 
-```bash
-LOG=$(mktemp -t pyguard-XXXXXX.log)
-pyguard <subcomando> [flags-del-usuario] --log-file "$LOG" --allow-pipe
-RC=$?
-echo "exit_code=$RC log=$LOG"
-```
+- `quality` with `blocking`: explain the rule/location and a grounded fix. Preserve Ruff codes and mypy error codes; use owned metric thresholds as reported.
+- `quality` with `advisory`: describe advisory evidence without treating it as a failed quality gate. Criticality ranks distinct static function callers; it does not prove runtime impact.
+- `tool_missing`, `dependency_failure`, `timeout`, `invalid_configuration`, `lock_contention`, `startup_failure`, `interrupted`, `diagnostics_failure`, `adapter_failure`, `artifact_failure` or `unclassified_failure`: resolve or explain execution/configuration needs. Do not interpret these as instructions to change source. For unknown failures, inspect only the referenced gate diagnostics as needed.
 
-Captura `$RC`. Significados:
-- `0` — todo OK
-- `1` — al menos un gate falló
-- `2` — error de entorno (Python/uv no encontrado)
-- `3` — comando desconocido
-- `4` — otra instancia de pyguard ya está corriendo (lock)
-- `5` — gate pesado rechazado por stdout pipe (no debería ocurrir con `--allow-pipe`)
+A run can be `pass`, `fail`, `error`, `advisory` or `skipped`. Advisory commands retain exit 0 even when `status` is `error`. Never equate code 0 with successful analysis or code 1 with a source defect. Codes 3/4 indicate invalid invocation/configuration and lock contention; human heavy commands also retain pipe refusal code 5.
 
-Si `RC=4`: informa que otra instancia está corriendo, sugiere esperar o verificar con `ps aux | grep pyguard`. No reintentas.
+`check` stops at the first failing gate: Ruff → mypy → Radon → annotations → coverage → security. After an authorized fix, rerun the same command to reach later gates. Do not claim unexecuted gates passed. Use isolated commands for requested detail, not to silently replace the full check.
 
-## Paso 5: leer el log
+## Present and drill down
 
-```python
-# Tool: Read
-file_path: "$LOG"
-```
+Lead with semantic outcome, command, actual exit code and total findings. Give concise rule/location/action entries, stating advisory or execution errors clearly. Include an omission/incomplete-inventory notice if JSON retrieval could not complete. Mention generated artifacts when relevant.
 
-Para logs grandes (>500 líneas), lee en chunks con `offset`/`limit`. Prioriza las secciones `[FAIL]`.
+Resolve finding diagnostic IDs through `diagnostics[].path`, relative to the explicit/discovered project root. Raw stdout/stderr files live in `.pyguard-cache/diagnostics`; a later run can replace them. Inspect them before rerunning when investigating an execution failure. An existing CRITICALITY.md is not evidence that a failed current run produced a report.
 
-## Paso 6: interpretar y priorizar
-
-Produce un resumen con esta estructura (omite secciones vacías):
-
-### TL;DR
-Una línea: pasó ✓ o falló ✗, subcomando, exit code, total de findings.
-
-### Errores bloqueantes (top 5)
-Formato: `[gate] archivo:línea — mensaje — fix sugerido`
-
-Prioridad de presentación: mypy > bandit HIGH > ruff E > radon CC>10 > bandit MEDIUM > ruff W > otros.
-
-### Por gate (solo si >5 findings totales)
-Tabla compacta por gate: `[OK]/[FAIL]` + conteo de errores + herramienta subyacente.
-
-### Auto-fixables
-Los errores de ruff que `ruff --fix` resuelve son auto-fixables vía `pyguard fix`. Cuenta cuántos y ofrece correrlo.
-
-### Falsos positivos comunes a mencionar
-- `bandit B101` en archivos de test → normal, es un assert en tests
-- `bandit B603/B607` en scripts que llaman herramientas de dev → evaluar si es real
-- `mypy` pidiendo anotaciones en test fixtures o `__init__.py` vacíos → suele ser config faltante
-
-### Recomendación final
-1-3 acciones concretas en orden de impacto. La primera debe ser la de mayor blast-radius reducida.
-
----
-
-## Paso 7: drill-down opcional
-
-Si el usuario pide detalle de un gate específico o de un archivo concreto, corre el subcomando aislado:
-
-```bash
-pyguard <gate-específico> [flags] --log-file "$LOG2" --allow-pipe
-```
-
-Repite Pasos 5-6 enfocado en ese output.
-
-## Paso 8: cleanup
-
-```bash
-rm -f "$LOG"
-```
-
----
-
-## Comportamientos clave
-
-- **Una sola pregunta** antes de empezar (paso 3). Después ejecuta autónomamente.
-- **No reimplementas** la lógica de ningún gate. pyguard ya sabe correr ruff/mypy/bandit/etc.
-- **No corras `pyguard setup`** a menos que el usuario lo pida explícitamente.
-- **No modifiques** archivos del proyecto (a menos que el usuario apruebe `pyguard fix`).
-- **Siempre reporta el exit code** real en el TL;DR.
-- Si el proyecto no tiene `pyproject.toml` accesible desde cwd, informa y pide que el usuario cambie de directorio.
+For supplied JSON or agent output, interpret the provided record without rerunning unless needed and authorized. If supplied legacy prose is the only evidence, label the interpretation as diagnostic evidence with unknown complete finding count; do not present it as schema-1 results. Request a compatible CLI result when exact findings or semantic categories are needed.

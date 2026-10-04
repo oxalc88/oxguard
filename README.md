@@ -269,8 +269,4 @@ and methods by distinct callers and writes the top 30 to `CRITICALITY.md`.
 
 ### Capability evals
 
-OxGuard has known-answer corpora for Tsguard and PyGuard, baseline/candidate
-comparison reports, and a shared capability matrix. PyGuard’s missing agent
-contract is reported explicitly; working legacy gates do not imply agent parity. See
-[capability evals](docs/guides/oxguard-evals.md) for installation-path execution,
-metrics, historical provenance and the lanes that are not yet evaluated.
+OxGuard has known-answer corpora for Tsguard and PyGuard, baseline/candidate comparison reports and a shared capability matrix. Both CLIs share a normalized Go result contract with bounded agent and complete JSON outputs; Python retains all 15 baseline behavior checks and gains 14 parity checks. See [capability evals](docs/guides/oxguard-evals.md), [Python outputs](docs/guides/pyguard-result-contract.md) and [TypeScript outputs](docs/guides/tsguard-result-contract.md) for execution paths, adapter limits and remaining evaluation gaps.

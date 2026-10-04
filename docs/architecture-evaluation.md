@@ -6,10 +6,7 @@
 
 ## Implementation status after PR #3
 
-The evaluation below remains the evidence-based assessment of `main` at the
-recorded SHA. Its conclusions and scorecard are preserved. This implementation
-adds the first recommended contract step and the requested PyGuard criticality
-parity milestone. It does not add blocking structural rules or change analysis.
+The evaluation below remains the evidence-based assessment of `main` at the recorded SHA. Its conclusions and scorecard are preserved. This implementation adds the first recommended contract step and the requested PyGuard criticality parity milestone. It does not add blocking structural rules or change analysis.
 
 | Area | Implementation status |
 |---|---|
@@ -23,19 +20,13 @@ parity milestone. It does not add blocking structural rules or change analysis.
 | Level 2 | PyGuard criticality parity implemented: compiler-resolved function/method caller graph, in-degree, top 30, advisory `CRITICALITY.md` in audit; remaining structural analysis still missing |
 | Level 3 | Still missing |
 
-See [agent and JSON contract](guides/tsguard-result-contract.md) for schema,
-semantic categories, diagnostic lifecycle and adapter limits. Historical claims
-of missing contracts below describe the evaluated revision, not this follow-up.
+See [agent and JSON contract](guides/tsguard-result-contract.md) for schema, semantic categories, diagnostic lifecycle and adapter limits. Historical claims of missing contracts below describe the evaluated revision, not this follow-up.
 
-## Python contract parity checked by PR #5
+## Python contract parity implemented by PR #5
 
-The normalized/agent/JSON implementation status above applies to **Tsguard**.
-PyGuard still has a prose-only runner and a log-interpreting skill. PR #5 now
-includes real Python behavior evals and explicit unmet contract/caller-count
-requirements; it does not implement Python agent parity. See
-[PyGuard agent evaluation](guides/pyguard-agent-evaluation.md) for direct execution
-evidence and [capability evals](guides/oxguard-evals.md) for the shared matrix.
-The original evaluation and its recommended architecture remain unchanged.
+PyGuard now shares the Go schema-1 result/reporting module with Tsguard and has native Ruff/mypy/Radon adapters, structured owned helpers, bounded agent output, complete JSON, strict flags/root and explicit execution categories. The Python skill consumes that implemented contract and retrieves omitted findings through JSON. Level 1 analyzers remain existing. The advisory criticality milestone now counts distinct function callers, honors CLI scope and exposes failures truthfully; remaining Level 2 and Level 3 are still missing.
+
+The Python corpus retains 15 baseline behavior passes and gains all 14 parity cases, including five additional structured adapter checks. Both versions run against the same corpus and pinned toolchain. See [Python contract](guides/pyguard-result-contract.md), [PyGuard evidence](guides/pyguard-agent-evaluation.md) and [capability evals](guides/oxguard-evals.md). This updates implementation status only; the original evaluation and recommendations below remain unchanged.
 
 ## Executive assessment
 
