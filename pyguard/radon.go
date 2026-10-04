@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -18,7 +17,10 @@ const conventionalTestIgnore = "tests,test"
 // Conventional test files are excluded by default (r.excludeTests); add project-specific
 // patterns via [tool.pyguard] exclude in pyproject.toml.
 func runRadon(r *Runner, dirs []string) int {
-	fmt.Println("  radon:")
+	if r.machine() {
+		return runRadonMachine(r, dirs)
+	}
+	r.println("  radon:")
 
 	// Export test-exclusion env vars for the Python analysis scripts (check_halstead.py,
 	// check_type_complexity.py), which use _paths.collect_paths as their single walk point.
@@ -69,14 +71,34 @@ func runRadonEnforce(r *Runner, dirs []string, subCmd, grade, failMsg, okMsg str
 	stdout, _, err := RunSilent(r.root, args...)
 	trimmed := strings.TrimSpace(stdout)
 	if err != nil || trimmed != "" {
-		fmt.Printf("  [FAIL] radon — %s:\n", failMsg)
+		r.printf("  [FAIL] radon — %s:\n", failMsg)
 		for _, line := range strings.Split(trimmed, "\n") {
 			if line != "" {
-				fmt.Printf("         %s\n", line)
+				r.printf("         %s\n", line)
 			}
 		}
 		return 1
 	}
-	fmt.Printf("  [OK]   radon — %s\n", okMsg)
+	r.printf("  [OK]   radon — %s\n", okMsg)
+	return 0
+}
+
+func runRadonMachine(r *Runner, dirs []string) int {
+	r.exportExcludeEnv()
+	for _, gate := range []struct{ command, adapter string }{{"cc", "radon_cc"}, {"mi", "radon_mi"}} {
+		res := r.RunTool(toolSpec{gate: "radon", adapter: gate.adapter}, "radon "+gate.command, append(radonExcludeArgs(r, gate.command, "--json"), dirs...)...)
+		if !res.ok {
+			return 1
+		}
+		for _, f := range r.result.Findings {
+			if f.Gate == "radon" && f.Status == "blocking" {
+				return 1
+			}
+		}
+	}
+	args := append([]string{"uv", "run", "python", "tools/analysis/check_halstead.py", "--json"}, dirs...)
+	if !r.RunTool(toolSpec{gate: "radon", adapter: "owned"}, "halstead", args...).ok {
+		return 1
+	}
 	return 0
 }

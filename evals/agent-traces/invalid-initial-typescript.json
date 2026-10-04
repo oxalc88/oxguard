@@ -1,0 +1,162 @@
+{
+  "outcome": "invalid_capture",
+  "reason": "Distribution harness intentionally left the native package renamed after its missing-package test. The agent recovered via direct Go, outside the fixture observer. This attempt is not scored; a fresh independent task was rerun after restoring the fixture.",
+  "events": [
+    {
+      "tool": "guard",
+      "argv": [
+        "--no-install",
+        "tsguard",
+        "types",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "145360200368a64d5d02ac7075e6a2328aad8ff14a58830302c2b222adc8ab82",
+      "source_after": "145360200368a64d5d02ac7075e6a2328aad8ff14a58830302c2b222adc8ab82",
+      "summary": "",
+      "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\ntsguard: missing native package @oxguard/tsguard-linux-x64@0.0.0-npm-test. Reinstall with npm install -D @oxguard/tsguard --include=optional (do not use --omit=optional).\n"
+    },
+    {
+      "tool": "guard",
+      "argv": [
+        "--no-install",
+        "tsguard",
+        "types",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "source_before": "5a180f0b4b2c09c8e540a79d32f8fc62b95508ff2310f32b7d0c23aa0b00b26b",
+      "source_after": "5a180f0b4b2c09c8e540a79d32f8fc62b95508ff2310f32b7d0c23aa0b00b26b",
+      "result": {
+        "schema_version": "1",
+        "status": "pass",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "types",
+        "exit_code": 0,
+        "findings": [],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "../tsguard-npm-RQ1ETm/consumer with spaces/node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "../tsguard-npm-RQ1ETm/consumer with spaces/node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+          }
+        ]
+      },
+      "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n"
+    },
+    {
+      "tool": "guard",
+      "argv": [
+        "--no-install",
+        "tsguard",
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "5a180f0b4b2c09c8e540a79d32f8fc62b95508ff2310f32b7d0c23aa0b00b26b",
+      "source_after": "5a180f0b4b2c09c8e540a79d32f8fc62b95508ff2310f32b7d0c23aa0b00b26b",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "lint",
+            "status": "error",
+            "normalization": "partial"
+          },
+          {
+            "name": "fta",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "types",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "coverage",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "dependencies",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "security",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ],
+        "command": "check",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "tsguard.lint.failed:e3995770260e12a083e2455a975c30215de744f9589150fd4f2b9c54bcbd905e",
+            "level": "code",
+            "gate": "lint",
+            "rule": "tsguard.lint.failed",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "unclassified_failure",
+            "evidence": "Analyzer failed; inspect diagnostics for this gate.",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          }
+        ],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "lint",
+            "channel": "stdout",
+            "path": "../tsguard-npm-RQ1ETm/consumer with spaces/node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "lint",
+            "channel": "stderr",
+            "path": "../tsguard-npm-RQ1ETm/consumer with spaces/node_modules/.cache/oxguard/diagnostics/diagnostic-002-lint-stderr.log"
+          }
+        ]
+      },
+      "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n"
+    }
+  ]
+}

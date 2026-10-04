@@ -30,6 +30,8 @@ def _scan() -> dict:  # type: ignore[type-arg]
 
 
 def main() -> int:
+    if "--json" in sys.argv:
+        return machine_main()
     if not BASELINE.exists():
         print("ERROR: .secrets.baseline not found.")
         print("Run: pkn secrets --init")
@@ -61,6 +63,29 @@ def main() -> int:
 
     print("detect-secrets: OK")
     return 0
+
+
+def machine_main() -> int:
+    data = {"schema_version": "1", "findings": [], "measurements": [], "artifacts": []}
+    try:
+        baseline = json.loads(BASELINE.read_text())
+        current = _scan()
+        if not isinstance(baseline.get("results"), dict) or not isinstance(current.get("results"), dict):
+            raise ValueError("Missing scan results")
+        for filepath, secrets in sorted(current["results"].items()):
+            known = {item["hashed_secret"] for item in baseline["results"].get(filepath, [])}
+            for item in secrets:
+                if item["hashed_secret"] not in known:
+                    kind = item["type"]
+                    data["findings"].append({"rule": "detect-secrets." + kind.lower().replace(" ", "_"), "severity": "error", "evidence": "New potential secret: " + kind, "location": {"file": filepath, "line": item["line_number"]}})
+    except FileNotFoundError:
+        data["error"] = {"category": "tool_missing" if BASELINE.exists() else "invalid_configuration", "message": "Secret scanner or baseline is missing."}
+    except subprocess.CalledProcessError:
+        data["error"] = {"category": "analyzer_failure", "message": "detect-secrets scan failed; inspect diagnostics."}
+    except (ValueError, KeyError, TypeError):
+        data["error"] = {"category": "invalid_configuration", "message": "Invalid baseline or secret scan report."}
+    print(json.dumps(data, sort_keys=True))
+    return 1 if data.get("error") or data["findings"] else 0
 
 
 if __name__ == "__main__":

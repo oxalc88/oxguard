@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 import os
 import sys
 from functools import lru_cache
@@ -38,7 +39,24 @@ def collect_paths(targets: list[str], gate: str) -> list[Path]:
     for target in targets:
         p = Path(target)
         if not p.exists():
-            print(f"  [FAIL] {gate} — path not found: {p}", file=sys.stderr)
+            if "--json" in sys.argv:
+                print(
+                    json.dumps(
+                        {
+                            "schema_version": "1",
+                            "findings": [],
+                            "measurements": [],
+                            "artifacts": [],
+                            "error": {
+                                "category": "invalid_configuration",
+                                "message": f"Source path not found: {p}",
+                            },
+                        },
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print(f"  [FAIL] {gate} — path not found: {p}", file=sys.stderr)
             sys.exit(1)
         if p.is_dir():
             paths.extend(

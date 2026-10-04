@@ -1,0 +1,10 @@
+[project]
+name = "oxguard-python-eval"
+version = "0.0.0"
+requires-python = ">=3.12"
+[tool.uv]
+managed = false
+[tool.ruff.lint]
+select = ["F"]
+[tool.mypy]
+strict = true

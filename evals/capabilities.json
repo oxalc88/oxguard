@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "capabilities": [
+    {"id":"quality.types.clean","tsguard":"types.clean","pyguard":"types.clean","lane":"behavior"},
+    {"id":"quality.types.multiple","tsguard":"types.multiple","pyguard":"types.multiple","lane":"behavior"},
+    {"id":"quality.lint.clean","tsguard":"lint.clean","pyguard":"lint.clean","lane":"behavior"},
+    {"id":"quality.lint.blocking","tsguard":"lint.explicit_any","pyguard":"lint.blocking","lane":"behavior"},
+    {"id":"quality.complexity.clean","tsguard":"fta.clean","pyguard":"complexity.clean","lane":"behavior"},
+    {"id":"quality.complexity.threshold","tsguard":"fta.score_cap","pyguard":"complexity.threshold","lane":"behavior"},
+    {"id":"execution.lock","tsguard":"execution.lock","pyguard":"execution.lock","lane":"behavior"},
+    {"id":"diagnostics.raw_log","tsguard":"paths.explicit_root_log","pyguard":"diagnostics.log","lane":"behavior"},
+    {"id":"contract.json.clean","tsguard":"types.clean","pyguard":"contract.json.clean","lane":"parity"},
+    {"id":"contract.json.multiple","tsguard":"types.multiple","pyguard":"contract.json.multiple","lane":"parity"},
+    {"id":"contract.execution_category","tsguard":"execution.missing_compiler","pyguard":"contract.execution_category","lane":"parity"},
+    {"id":"contract.agent.omitted","tsguard":"agent.omitted_findings","pyguard":"contract.agent.omitted","lane":"parity"},
+    {"id":"input.unknown_flag","tsguard":"input.unknown_flag","pyguard":"input.unknown_flag","lane":"parity"},
+    {"id":"input.missing_value","tsguard":"input.missing_value","pyguard":"input.missing_value","lane":"parity"},
+    {"id":"input.invalid_output","tsguard":"input.invalid_output","pyguard":"input.invalid_output","lane":"parity"},
+    {"id":"input.explicit_root","tsguard":"paths.explicit_root_log","pyguard":"input.explicit_root","lane":"parity"},
+    {"id":"criticality.known_callers","tsguard":"criticality.known_callers","pyguard":"criticality.known_callers","lane":"parity"},
+    {"id":"check.fail_fast","tsguard":"check.fail_fast","pyguard":"check.fail_fast","lane":"behavior"}
+  ]
+}

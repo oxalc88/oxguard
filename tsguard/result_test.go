@@ -48,7 +48,7 @@ func TestProcessNormalizationIgnoresTailAndKeepsCompleteDiagnostics(t *testing.T
 	if res.ok {
 		t.Fatal("blocking compiler result passed")
 	}
-	r.result.finish(1)
+	r.result.Finish(1)
 	if r.result.Status != "fail" || len(r.result.Findings) != 2 {
 		t.Fatalf("result: %+v", r.result)
 	}
@@ -117,14 +117,14 @@ func TestSuccessfulResultAndAdvisoryExit(t *testing.T) {
 	if !r.RunTool(toolSpec{gate: "types", adapter: "tsc"}, "compiler", os.Args[0], "-test.run=^TestAnalyzerProcess$").ok {
 		t.Fatal("success failed")
 	}
-	r.result.finish(0)
+	r.result.Finish(0)
 	if r.result.Status != "pass" || len(r.result.Findings) != 0 {
 		t.Fatal(r.result)
 	}
 	t.Setenv("TSGUARD_CONTRACT_HELPER", "unknown")
 	r.RunTool(toolSpec{gate: "dead-code", advisory: true}, "knip", os.Args[0], "-test.run=^TestAnalyzerProcess$")
-	r.result.finish(0)
-	if r.result.Status != "advisory" || r.result.ExitCode != 0 {
+	r.result.Finish(0)
+	if r.result.Status != "error" || r.result.ExitCode != 0 || r.result.Assessment != "incomplete" || r.result.Findings[0].Category != "unclassified_failure" {
 		t.Fatal(r.result)
 	}
 }
@@ -134,12 +134,12 @@ func TestAgentReporterBoundAndStableIDs(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		f := Finding{Gate: "types", Rule: "TS2322", Severity: "error", Status: "blocking", Category: "quality",
 			Location: &Location{File: strings.Repeat("file", 200), Line: i + 1}, Evidence: strings.Repeat("é\n\x1b", 1000)}
-		a.addFinding(f)
+		a.AddFinding(f)
 		f.Evidence = "Message changed by an analyzer update"
-		b.addFinding(f)
+		b.AddFinding(f)
 	}
-	a.finish(1)
-	b.finish(1)
+	a.Finish(1)
+	b.Finish(1)
 	for i := range a.Findings {
 		if a.Findings[i].ID != b.Findings[i].ID {
 			t.Fatal("ID depends on prose")

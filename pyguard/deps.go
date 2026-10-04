@@ -13,8 +13,7 @@ import (
 
 // requiredUvDevDeps is the manifest of uv dev-group packages pyguard invokes.
 // semgrep has been removed: pyguard's baseline SAST is bandit (blocking, local).
-// An optional Opengrep deep pass is available via `pyguard security --deep` using
-// the same project-local self-contained binary as tsguard (no pip required).
+// Python security also runs pip-audit and detect-secrets; --deep is not implemented.
 var requiredUvDevDeps = []string{
 	"ruff",
 	"mypy",
@@ -229,15 +228,15 @@ func detectPythonTestRunner(root string) string {
 // pyguardFileConfig holds values read from [tool.pyguard] in pyproject.toml.
 type pyguardFileConfig struct {
 	ExcludeTests *bool    `toml:"exclude-tests"` // nil = use default (true)
-	Exclude      []string `toml:"exclude"`        // extra globs for radon/complexity gates
+	Exclude      []string `toml:"exclude"`       // extra globs for radon/complexity gates
 }
 
 // loadPyguardConfig reads [tool.pyguard] from pyproject.toml.
-// Missing or unparseable sections return zero values without error.
-func loadPyguardConfig(root string) pyguardFileConfig {
+// Invalid files/configuration return an explicit invocation error.
+func loadPyguardConfig(root string) (pyguardFileConfig, error) {
 	data, err := os.ReadFile(filepath.Join(root, "pyproject.toml"))
 	if err != nil {
-		return pyguardFileConfig{}
+		return pyguardFileConfig{}, err
 	}
 	var raw struct {
 		Tool struct {
@@ -245,7 +244,7 @@ func loadPyguardConfig(root string) pyguardFileConfig {
 		} `toml:"tool"`
 	}
 	if err := toml.Unmarshal(data, &raw); err != nil {
-		return pyguardFileConfig{}
+		return pyguardFileConfig{}, err
 	}
-	return raw.Tool.Pyguard
+	return raw.Tool.Pyguard, nil
 }

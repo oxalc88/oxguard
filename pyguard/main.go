@@ -3,9 +3,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -39,6 +41,8 @@ Testing (replaces jq):
   pyguard test <fn> <client>      invoke test harness + parse summary
 
 Flags:
+  --output <mode>  human (default), agent (bounded), json (complete)
+  --root <path>    explicit project root containing pyproject.toml
   --dirs <d1,d2>    override target directories (default: . — project root)
   --timeout <s>     per-tool timeout in seconds (default: 300)
   --tail <n>        print only the last N lines of each tool's output to stdout
@@ -72,59 +76,115 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Parse global flags
-	cfg := parseFlags(args)
-
-	// Find project root
-	root, err := findProjectRoot()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Run pyguard from inside a Python project directory.\n")
-		os.Exit(exitUnknown)
-	}
-
-	// Merge [tool.pyguard] from pyproject.toml — file config > built-in defaults.
-	pgCfg := loadPyguardConfig(root)
-	if pgCfg.ExcludeTests != nil {
-		cfg.excludeTests = *pgCfg.ExcludeTests
-	} else {
-		cfg.excludeTests = true // default: skip conventional test files from complexity gates
-	}
-	cfg.exclude = append(cfg.exclude, pgCfg.Exclude...)
-
-	// --if-python: exit 0 if the edited file (from stdin JSON) is not .py
-	if cfg.ifPython {
-		if !editedFileIsPython() {
-			os.Exit(0)
-		}
-	}
-
-	// doctor is read-only — exempt from the instance lock.
-	if cmd == "doctor" {
-		os.Exit(runDoctor(root))
-	}
-
-	// Instance lock — prevents concurrent pyguard runs from stacking up.
-	// Retries from Claude Code or other tools see exit 4 and stop spawning new wrappers.
-	release, lockErr := acquireLock(root)
-	if lockErr != nil {
-		fmt.Fprintf(os.Stderr, "pyguard: %v\n", lockErr)
-		os.Exit(exitLocked)
-	}
-
-	code := dispatch(cmd, args, cfg, root)
-	release()
-	os.Exit(code)
+	os.Exit(runCLI(cmd, args))
 }
 
-func dispatch(cmd string, args []string, cfg config, root string) int {
-	if !cfg.allowPipe {
+var analysisCommands = map[string]bool{
+	"check": true, "fix": true, "audit": true, "security": true, "ruff": true, "mypy": true, "radon": true, "types": true, "coverage": true, "bandit": true, "pip-audit": true, "secrets": true, "criticality": true, "dead-code": true, "deps": true,
+}
+
+func runCLI(cmd string, args []string) int {
+	flagArgs := args
+	if cmd == "invoke" || cmd == "test" {
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "Two positional arguments are required")
+			return exitUnknown
+		}
+		flagArgs = args[2:]
+	}
+	cfg, err := parseFlags(flagArgs)
+	result := newRunResult(cmd)
+	finish := func(code int) int {
+		result.Finish(code)
+		if cfg.output != "human" {
+			if err := reportResult(os.Stdout, cfg.output, result); err != nil {
+				return 1
+			}
+		}
+		return code
+	}
+	fail := func(code int, category, message string) int {
+		result.Execution("invocation", category, message)
+		if cfg.output == "human" {
+			fmt.Fprintln(os.Stderr, "error: "+message)
+		}
+		return finish(code)
+	}
+	if err != nil {
+		return fail(exitUnknown, "invalid_configuration", err.Error())
+	}
+	if !analysisCommands[cmd] && cmd != "setup" && cmd != "doctor" && cmd != "hooks" && cmd != "invoke" && cmd != "test" {
+		return fail(exitUnknown, "invalid_configuration", "unknown command: "+cmd)
+	}
+	if cfg.output != "human" && !analysisCommands[cmd] {
+		return fail(exitUnknown, "invalid_configuration", "--output agent/json is supported only for analysis commands")
+	}
+	if cfg.output != "human" && cfg.initFlag {
+		return fail(exitUnknown, "invalid_configuration", "--init requires human output")
+	}
+	root := cfg.root
+	if root == "" {
+		root, err = findProjectRoot()
+	} else {
+		root, err = filepath.Abs(root)
+		if err == nil {
+			var info os.FileInfo
+			info, err = os.Stat(filepath.Join(root, "pyproject.toml"))
+			if err == nil && info.IsDir() {
+				err = fmt.Errorf("pyproject.toml must be a file")
+			}
+		}
+	}
+	if err != nil {
+		return fail(exitUnknown, "invalid_configuration", err.Error())
+	}
+	if physical, e := filepath.EvalSymlinks(root); e == nil {
+		root = physical
+	}
+	if cfg.logFile != "" {
+		cfg.logFile, err = filepath.Abs(cfg.logFile)
+		if err != nil {
+			return fail(exitUnknown, "invalid_configuration", err.Error())
+		}
+	}
+	pgCfg, err := loadPyguardConfig(root)
+	if err != nil {
+		return fail(exitUnknown, "invalid_configuration", err.Error())
+	}
+	cfg.excludeTests = true
+	if pgCfg.ExcludeTests != nil {
+		cfg.excludeTests = *pgCfg.ExcludeTests
+	}
+	cfg.exclude = append(cfg.exclude, pgCfg.Exclude...)
+	if cfg.ifPython && !editedFileIsPython() {
+		result.Status = "skipped"
+		return finish(0)
+	}
+	if cmd == "doctor" {
+		return runDoctor(root)
+	}
+	release, err := acquireLock(root)
+	if err != nil {
+		category := "lock_failure"
+		var held *lockHeldError
+		if errors.As(err, &held) {
+			category = "lock_contention"
+		}
+		return fail(exitLocked, category, err.Error())
+	}
+	defer release()
+	return finish(dispatch(cmd, args, cfg, root, result))
+}
+
+func dispatch(cmd string, args []string, cfg config, root string, result *RunResult) int {
+	if cfg.output == "human" && !cfg.allowPipe {
 		if info, err := os.Stdout.Stat(); err == nil && info.Mode()&os.ModeNamedPipe != 0 {
 			if heavyGates[cmd] {
 				fmt.Fprintln(os.Stderr,
 					"pyguard: stdout is a pipe for a long-running gate. Piping through\n"+
 						"     tail/head can wedge the PTY (see project CLAUDE.md).\n"+
 						"     Use --tail N or --log-file, or pass --allow-pipe to override.")
+				result.Execution("invocation", "pipe_refused", "Heavy gate refused piped stdout; use --allow-pipe.")
 				return exitPipeRefused
 			}
 			fmt.Fprintln(os.Stderr,
@@ -133,7 +193,21 @@ func dispatch(cmd string, args []string, cfg config, root string) int {
 		}
 	}
 
-	r := &Runner{root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, excludeTests: cfg.excludeTests, exclude: cfg.exclude}
+	if cfg.output != "human" {
+		switch cmd {
+		case "check":
+			result.Plan("ruff", "mypy", "radon", "types", "coverage", "bandit", "pip-audit", "secrets")
+		case "security":
+			result.Plan("bandit", "pip-audit", "secrets")
+		case "audit":
+			result.Plan("criticality", "dead-code", "deps")
+		case "fix":
+			result.Plan("ruff")
+		default:
+			result.Plan(cmd)
+		}
+	}
+	r := &Runner{outputMode: cfg.output, result: result, dirs: cfg.dirs, dirsExplicit: cfg.dirsExplicit, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, excludeTests: cfg.excludeTests, exclude: cfg.exclude}
 
 	switch cmd {
 	// Quality gates
@@ -201,9 +275,12 @@ var heavyGates = map[string]bool{
 // config holds parsed flags.
 type config struct {
 	dirs         []string
+	dirsExplicit bool
 	timeout      int
 	ifPython     bool
-	initFlag     bool     // --init for pyguard secrets
+	initFlag     bool // --init for pyguard secrets
+	output       string
+	root         string
 	logFile      string   // --log-file path
 	tailLines    int      // --tail N
 	allowPipe    bool     // --allow-pipe
@@ -212,32 +289,51 @@ type config struct {
 	exclude      []string // additional exclude globs from [tool.pyguard]
 }
 
-func parseFlags(args []string) config {
-	cfg := config{
-		dirs:    []string{"."},
-		timeout: 300,
+func parseFlags(args []string) (config, error) {
+	cfg := config{dirs: []string{"."}, timeout: 300, output: "human"}
+	// Select a recognized requested reporter even when another argument is invalid.
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--output" && (args[i+1] == "json" || args[i+1] == "agent") {
+			cfg.output = args[i+1]
+		}
 	}
 	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--dirs":
-			if i+1 < len(args) {
-				i++
-				cfg.dirs = strings.Split(args[i], ",")
+		flag := args[i]
+		switch flag {
+		case "--dirs", "--timeout", "--tail", "--log-file", "--output", "--root":
+			if i+1 == len(args) || strings.HasPrefix(args[i+1], "--") || args[i+1] == "" {
+				return cfg, fmt.Errorf("missing value for %s", flag)
 			}
-		case "--timeout":
-			if i+1 < len(args) {
-				i++
-				fmt.Sscanf(args[i], "%d", &cfg.timeout)
-			}
-		case "--tail":
-			if i+1 < len(args) {
-				i++
-				fmt.Sscanf(args[i], "%d", &cfg.tailLines)
-			}
-		case "--log-file":
-			if i+1 < len(args) {
-				i++
-				cfg.logFile = args[i]
+			i++
+			value := args[i]
+			switch flag {
+			case "--dirs":
+				cfg.dirsExplicit = true
+				cfg.dirs = strings.Split(value, ",")
+				for _, d := range cfg.dirs {
+					if strings.TrimSpace(d) == "" {
+						return cfg, fmt.Errorf("empty directory in --dirs")
+					}
+				}
+			case "--root":
+				cfg.root = value
+			case "--log-file":
+				cfg.logFile = value
+			case "--output":
+				if value != "human" && value != "json" && value != "agent" {
+					return cfg, fmt.Errorf("invalid output mode: %s", value)
+				}
+				cfg.output = value
+			case "--timeout", "--tail":
+				n, e := strconv.Atoi(value)
+				if e != nil || n < 0 || (flag == "--timeout" && n == 0) {
+					return cfg, fmt.Errorf("invalid value for %s", flag)
+				}
+				if flag == "--timeout" {
+					cfg.timeout = n
+				} else {
+					cfg.tailLines = n
+				}
 			}
 		case "--if-python":
 			cfg.ifPython = true
@@ -247,9 +343,11 @@ func parseFlags(args []string) config {
 			cfg.allowPipe = true
 		case "--yes", "-y":
 			cfg.assumeYes = true
+		default:
+			return cfg, fmt.Errorf("unknown argument: %s", flag)
 		}
 	}
-	return cfg
+	return cfg, nil
 }
 
 // findProjectRoot walks up from cwd looking for pyproject.toml.

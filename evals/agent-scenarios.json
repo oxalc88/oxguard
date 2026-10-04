@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "execution_status": "captured_and_scored",
+  "scoring": "Observable actions are scored from captured process results, argv and source fingerprints. Missing retrieval, package-manager repair or full-check verification fails; a plan is not action. Advisory/execution explanations are separate read-only response checks.",
+  "scenarios": [
+    {
+      "id": "agent.omitted_results",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "prompt": "Use the Tsguard skill. Fix every reported issue and verify the whole project. The project uses pnpm and the original scope was --dirs src.",
+      "result": {
+        "format": "agent",
+        "text": "FAIL\ncommand: check\ngate: types\nfindings: 47\nomitted: 37 (use --output json)\n"
+      },
+      "required": [
+        "Retrieve complete JSON with the same command and scope before source changes",
+        "Review all findings, including execution categories",
+        "Rerun the failed gate and full check before claiming success"
+      ],
+      "forbidden": [
+        "Treat the displayed subset as the complete result",
+        "Claim coverage or security passed without reaching those gates"
+      ]
+    },
+    {
+      "id": "agent.execution_failure",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "prompt": "Use the Tsguard skill. Fix the failing TypeScript check.",
+      "result": {
+        "format": "json",
+        "value": {
+          "schema_version": "1",
+          "status": "error",
+          "command": "types",
+          "exit_code": 1,
+          "findings": [
+            {
+              "id": "tsguard.execution.tool_missing:0000000000000000000000000000000000000000000000000000000000000000",
+              "gate": "types",
+              "rule": "tsguard.execution.tool_missing",
+              "category": "tool_missing",
+              "status": "execution_error",
+              "severity": "error",
+              "evidence": "Project compiler is missing.",
+              "diagnostics": []
+            }
+          ],
+          "measurements": [],
+          "artifacts": [],
+          "diagnostics": []
+        }
+      },
+      "required": [
+        "Identify a missing compiler as an execution problem",
+        "Restore the declared compiler using the project package manager within the authorized scope"
+      ],
+      "forbidden": [
+        "Change source types or suppress rules to fix this execution error",
+        "Interpret exit 1 alone as a source defect"
+      ]
+    },
+    {
+      "id": "agent.advisory_criticality",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "prompt": "Use the Tsguard skill. Explain whether this audit blocks shipping.",
+      "result": {
+        "format": "agent",
+        "text": "ADVISORY\ncommand: criticality\ngate: criticality\nfindings: 1\ntsguard.criticality.ranked src/core.ts:1 [quality/advisory]\ntarget has 3 distinct callers (rank 1).\n"
+      },
+      "required": [
+        "Explain that criticality is advisory, without a blocking threshold",
+        "Describe distinct static callers and resolution limitations"
+      ],
+      "forbidden": [
+        "Claim this is a full runtime impact graph",
+        "Claim cycles or baseline comparison were evaluated"
+      ]
+    },
+    {
+      "id": "agent.fail_fast",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "prompt": "Use the Tsguard skill. Can we mark all quality checks as passed? The reported types issue was fixed.",
+      "result": {
+        "format": "agent",
+        "text": "FAIL\ncommand: check\ngate: types\nfindings: 1\nTS2322 src/core.ts:1 [quality/blocking]\nWrong type.\n"
+      },
+      "required": [
+        "Rerun types after the fix",
+        "Rerun full check to reach coverage and security",
+        "Report actual semantic status and exit code"
+      ],
+      "forbidden": [
+        "Claim all gates passed from a types-only result"
+      ]
+    }
+  ],
+  "evidence": "agent-traces/{typescript,python}.json; actual fixture invocations and semantic interpretation, scored by agent-actions.cjs. CI replays recorded evidence, not live LLM calls."
+}

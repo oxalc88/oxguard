@@ -42,7 +42,7 @@ func TestCriticalityReportTop30AndCompleteMeasurements(t *testing.T) {
 	if err := r.normalizeCriticality(bytes.NewReader(data), []string{"diagnostic-001"}); err != nil {
 		t.Fatal(err)
 	}
-	result.finish(0)
+	result.Finish(0)
 	if len(result.Findings) != 30 || len(result.Measurements) != 35 || result.Status != "advisory" || result.ExitCode != 0 {
 		t.Fatalf("unexpected result: %+v", result)
 	}
@@ -74,7 +74,7 @@ func TestCriticalityReportTop30AndCompleteMeasurements(t *testing.T) {
 	if err := r.normalizeCriticality(bytes.NewReader(data), nil); err != nil {
 		t.Fatal(err)
 	}
-	second.finish(0)
+	second.Finish(0)
 	for i, f := range second.Findings {
 		if firstIDs[i] != f.ID {
 			t.Fatal("unstable finding ID")
@@ -87,7 +87,7 @@ func TestCriticalityExecutionErrorRemainsAdvisoryExit(t *testing.T) {
 	if err := r.normalizeCriticality(strings.NewReader(`{"error":{"category":"tool_missing","message":"TypeScript missing"}}`), []string{"diagnostic-001"}); err != nil {
 		t.Fatal(err)
 	}
-	r.result.finish(0)
+	r.result.Finish(0)
 	if r.result.Status != "error" || r.result.ExitCode != 0 || r.result.Findings[0].Category != "tool_missing" || len(r.result.Artifacts) != 0 {
 		t.Fatalf("unexpected result: %+v", r.result)
 	}

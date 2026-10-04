@@ -115,7 +115,7 @@ func (r *Runner) RunTool(spec toolSpec, name string, args ...string) Result {
 		if r.machine() {
 			r.normalize(spec, res, strings.NewReader(""), refs)
 		} else if r.result != nil {
-			r.result.execution(spec.gate, res.category, res.message)
+			r.result.Execution(spec.gate, res.category, res.message)
 		}
 		return res
 	}
@@ -170,7 +170,7 @@ func (r *Runner) RunTool(spec toolSpec, name string, args ...string) Result {
 	if !res.ok {
 		code = 1
 	}
-	normalized.finish(code)
+	normalized.Finish(code)
 	if r.result != nil {
 		r.result.Findings = append(r.result.Findings, normalized.Findings...)
 		r.result.Measurements = append(r.result.Measurements, normalized.Measurements...)

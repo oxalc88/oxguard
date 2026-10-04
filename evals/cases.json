@@ -1,0 +1,939 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "types.clean",
+      "fixture": "types-clean",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": []
+      },
+      "detection": true,
+      "basis": "new_clean_control"
+    },
+    {
+      "id": "types.multiple",
+      "fixture": "types-errors",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 2
+          }
+        ]
+      },
+      "detection": true,
+      "repeat": true,
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "types.missing_import_is_quality",
+      "fixture": "types-clean",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "types",
+            "rule": "TS2307",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          }
+        ]
+      },
+      "detection": true,
+      "files": {
+        "src/index.ts": "import { missing } from \"./not-present\";\nexport const count = missing;\n"
+      },
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "lint.clean",
+      "fixture": "lint-clean",
+      "command": "lint",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": []
+      },
+      "detection": true,
+      "basis": "new_clean_control"
+    },
+    {
+      "id": "lint.explicit_any",
+      "fixture": "lint-error",
+      "command": "lint",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "lint",
+            "rule": "lint/suspicious/noExplicitAny",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          }
+        ]
+      },
+      "detection": true,
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "fta.clean",
+      "fixture": "fta",
+      "command": "fta",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": []
+      },
+      "args": [
+        "--max-fta-score",
+        "1000"
+      ],
+      "fta_measurement": true,
+      "detection": true,
+      "basis": "new_clean_control"
+    },
+    {
+      "id": "fta.score_cap",
+      "fixture": "fta",
+      "command": "fta",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "fta",
+            "rule": "tsguard.fta.score_exceeded",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts"
+          }
+        ]
+      },
+      "args": [
+        "--max-fta-score",
+        "1"
+      ],
+      "fta_measurement": true,
+      "detection": true,
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "criticality.known_callers",
+      "fixture": "criticality",
+      "command": "criticality",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "advisory",
+        "exit_code": 0,
+        "findings": [
+          {
+            "gate": "criticality",
+            "rule": "tsguard.criticality.ranked",
+            "category": "quality",
+            "status": "advisory",
+            "file": "src/core.ts",
+            "line": 1
+          },
+          {
+            "gate": "criticality",
+            "rule": "tsguard.criticality.ranked",
+            "category": "quality",
+            "status": "advisory",
+            "file": "src/core.ts",
+            "line": 3
+          }
+        ],
+        "measurements": [
+          {
+            "file": "src/core.ts",
+            "symbol": "target",
+            "value": 3
+          },
+          {
+            "file": "src/core.ts",
+            "symbol": "unused",
+            "value": 0
+          },
+          {
+            "file": "src/core.ts",
+            "symbol": "recursive",
+            "value": 1
+          },
+          {
+            "file": "src/use.ts",
+            "symbol": "first",
+            "value": 0
+          },
+          {
+            "file": "src/use.ts",
+            "symbol": "Box.run",
+            "value": 0
+          },
+          {
+            "file": "src/use.ts",
+            "symbol": "second",
+            "value": 0
+          }
+        ]
+      },
+      "args": [
+        "--exclude",
+        "src/excluded"
+      ],
+      "criticality": true,
+      "repeat": true,
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "criticality.invalid_config",
+      "fixture": "invalid-config",
+      "command": "criticality",
+      "origin": "https://github.com/oxalc88/oxguard/commit/14d7be70f37628c11aa73992a518f5d7e611a92a",
+      "expected": {
+        "status": "error",
+        "exit_code": 0,
+        "findings": [
+          {
+            "gate": "criticality",
+            "rule": "tsguard.execution.invalid_configuration",
+            "category": "invalid_configuration",
+            "status": "execution_error"
+          }
+        ]
+      },
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "execution.missing_compiler",
+      "fixture": "missing-compiler",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "error",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "types",
+            "rule": "tsguard.execution.tool_missing",
+            "category": "tool_missing",
+            "status": "execution_error"
+          }
+        ]
+      },
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "input.unknown_flag",
+      "fixture": "types-clean",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "error",
+        "exit_code": 3,
+        "findings": [
+          {
+            "gate": "invocation",
+            "rule": "tsguard.execution.invalid_configuration",
+            "category": "invalid_configuration",
+            "status": "execution_error"
+          }
+        ]
+      },
+      "args": [
+        "--timout",
+        "30"
+      ],
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "input.missing_value",
+      "fixture": "types-clean",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "error",
+        "exit_code": 3,
+        "findings": [
+          {
+            "gate": "invocation",
+            "rule": "tsguard.execution.invalid_configuration",
+            "category": "invalid_configuration",
+            "status": "execution_error"
+          }
+        ]
+      },
+      "args": [
+        "--timeout"
+      ],
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "input.invalid_output",
+      "fixture": "types-clean",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "error",
+        "exit_code": 3,
+        "findings": [
+          {
+            "gate": "invocation",
+            "rule": "tsguard.execution.invalid_configuration",
+            "category": "invalid_configuration",
+            "status": "execution_error"
+          }
+        ]
+      },
+      "args": [
+        "--output",
+        "xml"
+      ],
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "execution.lock",
+      "fixture": "types-clean",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "error",
+        "exit_code": 4,
+        "findings": [
+          {
+            "gate": "invocation",
+            "rule": "tsguard.execution.lock_contention",
+            "category": "lock_contention",
+            "status": "execution_error"
+          }
+        ]
+      },
+      "lock": true,
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "agent.omitted_findings",
+      "fixture": "many-findings",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 2
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 3
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 4
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 5
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 6
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 7
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 8
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 9
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 10
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 11
+          },
+          {
+            "gate": "types",
+            "rule": "TS2322",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 12
+          }
+        ]
+      },
+      "agent": true,
+      "detection": true,
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "paths.explicit_root_log",
+      "fixture": "types-clean",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": []
+      },
+      "root_log": true,
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "paths.symlink_root_log",
+      "fixture": "types-clean",
+      "command": "types",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": []
+      },
+      "root_log": true,
+      "symlink": true,
+      "basis": "historical_contract_or_regression"
+    },
+    {
+      "id": "check.fail_fast",
+      "fixture": "lint-error",
+      "command": "check",
+      "origin": "https://github.com/oxalc88/oxguard/pull/4",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "lint",
+            "rule": "lint/suspicious/noExplicitAny",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          }
+        ],
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "lint",
+            "status": "failed",
+            "normalization": "complete"
+          },
+          {
+            "name": "fta",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "types",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "coverage",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "dependencies",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "security",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ]
+      },
+      "detection": true,
+      "basis": "historical_contract_or_regression",
+      "repeat": true
+    },
+    {
+      "id": "coverage.functions.60",
+      "fixture": "coverage-contract",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.functions_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 60,
+            "threshold": 80
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.lines_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 60,
+            "threshold": 80
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.statements_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 60,
+            "threshold": 80
+          }
+        ],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 60,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.functions",
+            "file": "",
+            "value": 60,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.statements",
+            "file": "",
+            "value": 60,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.branches",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      },
+      "files": {
+        "src/functions.test.ts": "import { test, expect } from \"vitest\";\nimport { fn1, fn2, fn3, fn4, fn5 } from \"./functions\";\ntest(\"known functions\", () => {\n  expect(fn1()).toBe(1);\n  expect(fn2()).toBe(2);\n  expect(fn3()).toBe(3);\n});\n"
+      },
+      "agent": true
+    },
+    {
+      "id": "coverage.functions.80",
+      "fixture": "coverage-contract",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 80,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.functions",
+            "file": "",
+            "value": 80,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.statements",
+            "file": "",
+            "value": 80,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.branches",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      },
+      "files": {
+        "src/functions.test.ts": "import { test, expect } from \"vitest\";\nimport { fn1, fn2, fn3, fn4, fn5 } from \"./functions\";\ntest(\"known functions\", () => {\n  expect(fn1()).toBe(1);\n  expect(fn2()).toBe(2);\n  expect(fn3()).toBe(3);\n  expect(fn4()).toBe(4);\n});\n"
+      },
+      "agent": false,
+      "repeat": true
+    },
+    {
+      "id": "coverage.functions.100",
+      "fixture": "coverage-contract",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.functions",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.statements",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.branches",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      },
+      "files": {
+        "src/functions.test.ts": "import { test, expect } from \"vitest\";\nimport { fn1, fn2, fn3, fn4, fn5 } from \"./functions\";\ntest(\"known functions\", () => {\n  expect(fn1()).toBe(1);\n  expect(fn2()).toBe(2);\n  expect(fn3()).toBe(3);\n  expect(fn4()).toBe(4);\n  expect(fn5()).toBe(5);\n});\n"
+      },
+      "agent": false
+    },
+    {
+      "id": "coverage.test_failure",
+      "fixture": "coverage-contract",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "tsguard.tests.failed",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/functions.test.ts"
+          }
+        ],
+        "assessment": "complete"
+      },
+      "files": {
+        "src/functions.test.ts": "import { test, expect } from \"vitest\";\nimport { fn1, fn2, fn3, fn4, fn5 } from \"./functions\";\ntest(\"known functions\", () => {\n  expect(fn1()).toBe(1);\n  expect(fn2()).toBe(2);\n  expect(fn3()).toBe(3);\n  expect(fn4()).toBe(4);\n  expect(fn5()).toBe(999);\n});\n"
+      }
+    },
+    {
+      "id": "coverage.no_tests",
+      "fixture": "types-clean",
+      "command": "coverage",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "error",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "tsguard.execution.invalid_configuration",
+            "category": "invalid_configuration",
+            "status": "execution_error"
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.functions_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 0,
+            "threshold": 80
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.lines_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 0,
+            "threshold": 80
+          },
+          {
+            "gate": "coverage",
+            "rule": "tsguard.coverage.statements_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 0,
+            "threshold": 80
+          }
+        ],
+        "assessment": "incomplete"
+      },
+      "agent": true
+    },
+    {
+      "id": "security.clean",
+      "fixture": "security-contract",
+      "command": "security",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete"
+      },
+      "local_rules": true,
+      "audit_registry": "clean",
+      "files": {}
+    },
+    {
+      "id": "security.multiple",
+      "fixture": "security-contract",
+      "command": "security",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "security",
+            "rule": "node_modules..cache.oxguard.rules.oxguard-eval-no-eval",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          },
+          {
+            "gate": "security",
+            "rule": "node_modules..cache.oxguard.rules.oxguard-eval-no-eval",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 2
+          }
+        ],
+        "assessment": "complete"
+      },
+      "local_rules": true,
+      "audit_registry": "clean",
+      "files": {
+        "src/index.ts": "export const unsafe = eval(\"1+1\");\nexport const alsoUnsafe = eval(\"2+2\");\n"
+      },
+      "repeat": true
+    },
+    {
+      "id": "secrets.clean",
+      "fixture": "security-contract",
+      "command": "secrets",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete"
+      },
+      "files": {}
+    },
+    {
+      "id": "secrets.blocking",
+      "fixture": "security-contract",
+      "command": "secrets",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "secrets",
+            "rule": "@secretlint/secretlint-rule-privatekey",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/key.txt",
+            "line": 1,
+            "column": 1
+          }
+        ],
+        "assessment": "complete",
+        "absent_text": [
+          "found private key:"
+        ]
+      },
+      "files": {},
+      "repeat": true,
+      "generated_files": {
+        "src/key.txt": "synthetic_private_key"
+      }
+    },
+    {
+      "id": "dependencies.clean",
+      "fixture": "security-contract",
+      "command": "npm-audit",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete"
+      },
+      "audit_registry": "clean",
+      "files": {}
+    },
+    {
+      "id": "dependencies.vulnerable",
+      "fixture": "security-contract",
+      "command": "npm-audit",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "dependencies",
+            "rule": "tsguard.dependencies.policy_failed",
+            "category": "quality",
+            "status": "blocking"
+          },
+          {
+            "gate": "dependencies",
+            "rule": "GHSA-xxxx-yyyy-zzzz",
+            "category": "quality",
+            "status": "advisory",
+            "file": "package.json"
+          }
+        ],
+        "assessment": "complete"
+      },
+      "audit_registry": "vulnerable",
+      "files": {
+        "package.json": "{\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}\n",
+        "package-lock.json": "{\"name\": \"oxguard-eval-fixture\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}, \"node_modules/oxguard-eval-dependency\": {\"version\": \"1.0.0\"}}}\n"
+      }
+    },
+    {
+      "id": "dependencies.low_advisory",
+      "fixture": "security-contract",
+      "command": "npm-audit",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "advisory",
+        "exit_code": 0,
+        "findings": [
+          {
+            "gate": "dependencies",
+            "rule": "GHSA-xxxx-yyyy-zzzz",
+            "category": "quality",
+            "status": "advisory",
+            "file": "package.json"
+          }
+        ],
+        "assessment": "complete"
+      },
+      "audit_registry": "low",
+      "files": {
+        "package.json": "{\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}\n",
+        "package-lock.json": "{\"name\": \"oxguard-eval-fixture\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}, \"node_modules/oxguard-eval-dependency\": {\"version\": \"1.0.0\"}}}\n"
+      }
+    }
+  ]
+}

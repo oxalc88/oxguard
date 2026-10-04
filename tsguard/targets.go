@@ -147,14 +147,22 @@ func runCoverage(r *Runner) int {
 		if packagedRuntime() != "" && !hasProjectConfig(r.root, "vitest.config.ts", "vitest.config.js", "vitest.config.mts", "vitest.config.mjs", "vite.config.ts", "vite.config.js", "vite.config.mjs", "vite.config.mts") {
 			args = append(args, "--config", filepath.Join(packagedRuntime(), "config", "vitest.config.mjs"))
 		}
-		res := r.RunTool(toolSpec{gate: "coverage"}, "vitest --coverage", args...)
+		spec, args, err := r.coverageReport("vitest", args)
+		if err != nil {
+			return r.executionFailure("coverage", "diagnostics_failure", err.Error())
+		}
+		res := r.RunTool(spec, "vitest --coverage", args...)
 		if !res.ok {
 			return 1
 		}
 	case "jest":
 		const threshold = `--coverageThreshold={"global":{"lines":80,"functions":80,"branches":80,"statements":80}}`
 		args := pkgExec(r.pkgManager, "jest", "--coverage", threshold)
-		res := r.RunTool(toolSpec{gate: "coverage"}, "jest --coverage", args...)
+		spec, args, err := r.coverageReport("jest", args)
+		if err != nil {
+			return r.executionFailure("coverage", "diagnostics_failure", err.Error())
+		}
+		res := r.RunTool(spec, "jest --coverage", args...)
 		if !res.ok {
 			return 1
 		}
@@ -178,7 +186,12 @@ func runCoverageWithWrapper(r *Runner, runner string) int {
 			"--lines", "80", "--functions", "80", "--branches", "80", "--statements", "80",
 			runner,
 		)
-		res := r.RunTool(toolSpec{gate: "coverage"}, fmt.Sprintf("c8 %s --coverage", runner), args...)
+		spec, reportArgs, err := r.coverageReport("c8", nil)
+		if err != nil {
+			return r.executionFailure("coverage", "diagnostics_failure", err.Error())
+		}
+		args = append(append(args[:len(args)-1:len(args)-1], reportArgs...), runner)
+		res := r.RunTool(spec, fmt.Sprintf("c8 %s --coverage", runner), args...)
 		if !res.ok {
 			return 1
 		}
@@ -188,7 +201,12 @@ func runCoverageWithWrapper(r *Runner, runner string) int {
 			"--lines", "80", "--functions", "80", "--branches", "80", "--statements", "80",
 			runner,
 		)
-		res := r.RunTool(toolSpec{gate: "coverage"}, fmt.Sprintf("nyc %s --coverage", runner), args...)
+		spec, reportArgs, err := r.coverageReport("nyc", nil)
+		if err != nil {
+			return r.executionFailure("coverage", "diagnostics_failure", err.Error())
+		}
+		args = append(append(args[:len(args)-1:len(args)-1], reportArgs...), runner)
+		res := r.RunTool(spec, fmt.Sprintf("nyc %s --coverage", runner), args...)
 		if !res.ok {
 			return 1
 		}
@@ -234,7 +252,10 @@ func runSecretlint(r *Runner) int {
 			return r.executionFailure("secrets", "invalid_configuration", err.Error())
 		}
 	}
-	res := r.RunTool(toolSpec{gate: "secrets"}, "secretlint", args...)
+	if r.machine() {
+		args = append(args, "--format", "json")
+	}
+	res := r.RunTool(toolSpec{gate: "secrets", adapter: "secretlint"}, "secretlint", args...)
 	if !res.ok {
 		return 1
 	}
@@ -270,10 +291,17 @@ func runNpmAudit(r *Runner) int {
 	default:
 		infoArgs = []string{"npm", "audit", "--audit-level=moderate"}
 	}
-	r.RunTool(toolSpec{gate: "dependencies", advisory: true}, "dependency audit (info)", infoArgs...)
+	if r.machine() {
+		infoArgs = append(infoArgs, "--json")
+	}
+	r.RunTool(toolSpec{gate: "dependencies", adapter: "dependency-audit", advisory: true}, "dependency audit (info)", infoArgs...)
 
 	// audit-ci — hard gate: threshold enforcement + allowlist via .auditcirc.json.
-	res := r.RunTool(toolSpec{gate: "dependencies"}, "audit-ci", pkgExec(r.pkgManager, "audit-ci", "--moderate")...)
+	args := pkgExec(r.pkgManager, "audit-ci", "--moderate")
+	if r.machine() {
+		args = append(args, "--output-format", "json", "--report-type", "full")
+	}
+	res := r.RunTool(toolSpec{gate: "dependencies", adapter: "audit-ci"}, "audit-ci", args...)
 	if !res.ok {
 		return 1
 	}
@@ -292,7 +320,7 @@ func runOpengrep(r *Runner) int {
 		}
 		r.println("  [SKIP] opengrep — binary not found. Run: tsguard setup")
 		if r.machine() {
-			r.result.execution("security", "tool_missing", "Opengrep is missing; standalone mode skipped SAST.")
+			r.result.Execution("security", "tool_missing", "Opengrep is missing; standalone mode skipped SAST.")
 		}
 		return 0
 	}
@@ -337,13 +365,27 @@ func runAudit(r *Runner, dirs []string) int {
 
 // runDeadCode runs knip for dead code and unused dependency detection (informational).
 func runDeadCode(r *Runner) int {
-	r.RunTool(toolSpec{gate: "dead-code", advisory: true}, "knip", pkgExec(r.pkgManager, "knip")...)
+	args := pkgExec(r.pkgManager, "knip")
+	if r.machine() {
+		args = append(args, "--reporter", "json")
+	}
+	r.RunTool(toolSpec{gate: "dead-code", adapter: "knip", advisory: true}, "knip", args...)
 	return 0 // always informational
 }
 
 // runDuplicates runs jscpd for copy-paste code detection (informational).
 func runDuplicates(r *Runner, dirs []string) int {
 	args := append(pkgExec(r.pkgManager, "jscpd"), dirs...)
-	r.RunTool(toolSpec{gate: "duplicates", advisory: true}, "jscpd", args...)
+	spec := toolSpec{gate: "duplicates", advisory: true}
+	if r.machine() {
+		report, err := r.reportFile("jscpd", "jscpd-report.json")
+		if err != nil {
+			r.executionFailure("duplicates", "diagnostics_failure", err.Error())
+			return 0
+		}
+		args = append(args, "--reporters", "json", "--output", filepath.Dir(report))
+		spec.adapter, spec.reportPath = "jscpd", report
+	}
+	r.RunTool(spec, "jscpd", args...)
 	return 0 // always informational
 }

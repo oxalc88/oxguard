@@ -1,0 +1,734 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "types.clean",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "findings": []
+      },
+      "oracle": "mypy"
+    },
+    {
+      "id": "types.multiple",
+      "fixture": "types-errors",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "findings": [
+          {
+            "rule": "assignment",
+            "file": "src/main.py",
+            "line": 1
+          },
+          {
+            "rule": "assignment",
+            "file": "src/main.py",
+            "line": 2
+          }
+        ]
+      },
+      "oracle": "mypy"
+    },
+    {
+      "id": "lint.clean",
+      "fixture": "clean",
+      "command": "ruff",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "findings": []
+      },
+      "oracle": "ruff"
+    },
+    {
+      "id": "lint.blocking",
+      "fixture": "lint-error",
+      "command": "ruff",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "findings": [
+          {
+            "rule": "F401",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ]
+      },
+      "oracle": "ruff"
+    },
+    {
+      "id": "complexity.clean",
+      "fixture": "clean",
+      "command": "radon",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "complexity": 1
+      },
+      "oracle": "radon"
+    },
+    {
+      "id": "complexity.threshold",
+      "fixture": "complexity",
+      "command": "radon",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "complexity": 12
+      },
+      "oracle": "radon"
+    },
+    {
+      "id": "annotations.clean",
+      "fixture": "clean",
+      "command": "types",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "violations": []
+      },
+      "oracle": "annotations"
+    },
+    {
+      "id": "annotations.threshold",
+      "fixture": "annotation-error",
+      "command": "types",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "violations": [
+          {
+            "line": 1,
+            "depth": 3,
+            "length": 21
+          }
+        ]
+      },
+      "oracle": "annotations"
+    },
+    {
+      "id": "execution.lock",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 4
+      },
+      "lock": true
+    },
+    {
+      "id": "execution.pipe_refusal",
+      "fixture": "clean",
+      "command": "check",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 5
+      },
+      "pipe": true
+    },
+    {
+      "id": "execution.missing_tool",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1
+      },
+      "missing_tool": true
+    },
+    {
+      "id": "diagnostics.log",
+      "fixture": "types-errors",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "log_contains": "[assignment]"
+      },
+      "log": true
+    },
+    {
+      "id": "check.fail_fast",
+      "fixture": "lint-error",
+      "command": "check",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "stops_at": "ruff"
+      }
+    },
+    {
+      "id": "contract.json.clean",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "status": "pass",
+        "findings": []
+      },
+      "json": true
+    },
+    {
+      "id": "contract.json.multiple",
+      "fixture": "types-errors",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "status": "fail",
+        "findings": [
+          {
+            "gate": "mypy",
+            "rule": "assignment",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 1
+          },
+          {
+            "gate": "mypy",
+            "rule": "assignment",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 2
+          }
+        ]
+      },
+      "json": true
+    },
+    {
+      "id": "contract.execution_category",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "status": "error",
+        "findings": [
+          {
+            "gate": "mypy",
+            "rule": "pyguard.execution.tool_missing",
+            "category": "tool_missing",
+            "status": "execution_error"
+          }
+        ]
+      },
+      "json": true,
+      "missing_tool": true
+    },
+    {
+      "id": "contract.agent.omitted",
+      "fixture": "many-findings",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1
+      },
+      "agent": true
+    },
+    {
+      "id": "input.unknown_flag",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 3
+      },
+      "args": [
+        "--timout",
+        "30"
+      ]
+    },
+    {
+      "id": "input.missing_value",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 3
+      },
+      "args": [
+        "--timeout"
+      ]
+    },
+    {
+      "id": "input.invalid_output",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 3
+      },
+      "args": [
+        "--output",
+        "xml"
+      ]
+    },
+    {
+      "id": "input.explicit_root",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0
+      },
+      "root": true
+    },
+    {
+      "id": "criticality.known_callers",
+      "fixture": "criticality",
+      "command": "criticality",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "callers": {
+          "core__target": 2
+        }
+      },
+      "args": [
+        "--dirs",
+        "functions"
+      ]
+    },
+    {
+      "fixture": "complexity-boundary",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_boundary",
+      "id": "complexity.boundary",
+      "command": "radon",
+      "oracle": "radon",
+      "expected": {
+        "exit_code": 0,
+        "complexity": 10
+      }
+    },
+    {
+      "fixture": "annotation-boundary",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_boundary",
+      "id": "annotations.boundary",
+      "command": "types",
+      "oracle": "annotations",
+      "expected": {
+        "exit_code": 0,
+        "violations": []
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.lint",
+      "fixture": "lint-error",
+      "command": "ruff",
+      "expected": {
+        "exit_code": 1,
+        "status": "fail",
+        "findings": [
+          {
+            "gate": "ruff",
+            "rule": "F401",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ]
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.complexity",
+      "fixture": "complexity",
+      "command": "radon",
+      "expected": {
+        "exit_code": 1,
+        "status": "fail",
+        "findings": [
+          {
+            "gate": "radon",
+            "rule": "pyguard.radon.cc_exceeded",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ]
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.complexity_boundary",
+      "fixture": "complexity-boundary",
+      "command": "radon",
+      "expected": {
+        "exit_code": 0,
+        "status": "pass",
+        "findings": []
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.annotations",
+      "fixture": "annotation-error",
+      "command": "types",
+      "expected": {
+        "exit_code": 1,
+        "status": "fail",
+        "findings": [
+          {
+            "gate": "types",
+            "rule": "pyguard.types.annotation_complexity",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ]
+      }
+    },
+    {
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "json": true,
+      "id": "contract.json.criticality",
+      "fixture": "criticality",
+      "command": "criticality",
+      "expected": {
+        "exit_code": 0,
+        "status": "advisory",
+        "findings": [
+          {
+            "gate": "criticality",
+            "rule": "pyguard.criticality.ranked",
+            "category": "quality",
+            "status": "advisory",
+            "file": "functions/core.py",
+            "line": 1
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "criticality.in_degree",
+            "file": "functions/core.py",
+            "symbol": "core.target",
+            "value": 2
+          }
+        ]
+      },
+      "args": [
+        "--dirs",
+        "functions"
+      ]
+    },
+    {
+      "id": "security.bandit.clean",
+      "fixture": "bandit-clean",
+      "command": "bandit",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "repeat": true,
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "bandit",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ]
+      }
+    },
+    {
+      "id": "security.bandit.blocking",
+      "fixture": "bandit-error",
+      "command": "bandit",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "repeat": true,
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "bandit",
+            "rule": "B324",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 2
+          }
+        ],
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "bandit",
+            "status": "failed",
+            "normalization": "complete"
+          }
+        ]
+      }
+    },
+    {
+      "id": "dead_code.advisory",
+      "fixture": "vulture-unused",
+      "command": "dead-code",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "repeat": true,
+      "expected": {
+        "status": "advisory",
+        "exit_code": 0,
+        "findings": [
+          {
+            "gate": "dead-code",
+            "rule": "vulture.unused.function",
+            "category": "quality",
+            "status": "advisory",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ],
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "dead-code",
+            "status": "advisory",
+            "normalization": "complete"
+          }
+        ]
+      }
+    },
+    {
+      "id": "coverage.complete",
+      "fixture": "coverage-full",
+      "command": "coverage",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "repeat": true,
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "coverage",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      }
+    },
+    {
+      "id": "coverage.threshold",
+      "fixture": "coverage-low",
+      "command": "coverage",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "repeat": true,
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "pyguard.coverage.lines_threshold_failed",
+            "category": "quality",
+            "status": "blocking",
+            "observed": 75,
+            "threshold": 80
+          }
+        ],
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "coverage",
+            "status": "failed",
+            "normalization": "complete"
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 75,
+            "threshold": 80
+          }
+        ]
+      }
+    },
+    {
+      "id": "dependencies.advisory",
+      "fixture": "deptry-unused",
+      "command": "deps",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "repeat": true,
+      "expected": {
+        "status": "advisory",
+        "exit_code": 0,
+        "findings": [
+          {
+            "gate": "deps",
+            "rule": "DEP002",
+            "category": "quality",
+            "status": "advisory",
+            "file": "pyproject.toml"
+          }
+        ],
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "deps",
+            "status": "advisory",
+            "normalization": "complete"
+          }
+        ]
+      }
+    },
+    {
+      "id": "coverage.boundary",
+      "fixture": "coverage-boundary",
+      "command": "coverage",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 80,
+            "threshold": 80
+          }
+        ]
+      }
+    },
+    {
+      "id": "coverage.test_failure",
+      "fixture": "coverage-failed-test",
+      "command": "coverage",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "coverage",
+            "rule": "pyguard.tests.failed",
+            "category": "quality",
+            "status": "blocking",
+            "file": "tests/test_main.py",
+            "line": 6
+          }
+        ],
+        "assessment": "complete",
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      }
+    }
+  ]
+}

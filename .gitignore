@@ -22,3 +22,6 @@ __pycache__/
 
 # Generated npm/release artifacts
 /dist/
+
+# Generated capability eval reports
+/eval-reports/

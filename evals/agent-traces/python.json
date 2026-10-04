@@ -1,0 +1,824 @@
+{
+  "schema_version": "1",
+  "language": "python",
+  "skill_sha256": "c8c9b1a161b2909ee80fdabe0c6a1decf9168b3fd9087a0acdb63a6d1b23b1b2",
+  "capture_date": "2026-10-04",
+  "provenance": "Independent fresh Codex tasks using repository skill; real guard/PM processes recorded by a fixture-only observer. Recorded CLI runs occurred during implementation. CI replays action scoring, not live model execution.",
+  "omitted_events": [
+    {
+      "tool": "guard",
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "source_before": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
+      "source_after": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
+      "tool_output": "pyguard — Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . — project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, s"
+    },
+    {
+      "tool": "guard",
+      "argv": [
+        "mypy",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
+      "source_after": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
+      "summary": "FAIL\ncommand: mypy\ngate: mypy; assessment: complete; not_run: 0; partial: 0\nfindings: 12\nassignment src/main.py:1 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:2 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:3 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:4 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:5 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:6 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:7 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:8 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:9 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:10 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nomitted: 2 (use --output json)\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "guard",
+      "argv": [
+        "mypy",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
+      "source_after": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
+      "result": {
+        "schema_version": "1",
+        "status": "fail",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "mypy",
+            "status": "failed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "mypy",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "assignment:cbccb23d2d7ead6184cf9e178cb9d7032636569845747ebe9fe2e2ca06048b57",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 1,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:6c54255a0a3f7e215e704c3bf0ed4fce1919bb8612c51948603c4150151fec47",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 2,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:43536f7c14f136a3843a8f6b89271ffd84a172218e5499edafd0628cbf955bce",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 3,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:807d565c7f40a6d0b10cae5ac40e8054099d974baab94fd704faeb5dfd0a3f73",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 4,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:9f82bb87bf1e84f26e7bd937c9ece252c6904cc78388a6fb75f3019dbb5e9415",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 5,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:c0a014a9c2523cf5734c152510e065063787a53069a8c1c52aa64311ca58c0a2",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 6,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:cd6898f32ea447ebb294571d6eb519895add22e03fa9f37f23cf753893647cb0",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 7,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:fd62f3f063faf997f35cc129a7bac068445730f39291f9654f3b1a3b049decec",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 8,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:b93f3cbad8f30f62a21eee40cd13972230508a7f180f6a0e53f241adbf3530f6",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 9,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:40c7d0e5fee84521ac440076773b59b9c8ce0279fbe7f1e9b1ff19521ee38000",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 10,
+              "column": 15
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:465b661eef8294c01439274fdf8f07b5c719a60b8134020c64392c0308c6965f",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 11,
+              "column": 16
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          },
+          {
+            "id": "assignment:e8e6a888f368d9fba146ee430d6564e4fb9122768ea7fd4c29cb0101b6b06ee7",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "assignment",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/main.py",
+              "line": 12,
+              "column": 16
+            },
+            "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          }
+        ],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "mypy",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "mypy",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-002-mypy-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "guard",
+      "argv": [
+        "mypy",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 0,
+      "source_before": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "source_after": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "summary": "PASS\ncommand: mypy\ngate: none; assessment: complete; not_run: 0; partial: 0\nfindings: 0\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "guard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "source_after": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "summary": "ERROR\ncommand: check\ngate: coverage; assessment: incomplete; not_run: 3; partial: 0\nfindings: 1\npyguard.execution.tool_missing [tool_missing/execution_error]\nNo test runner or test files found.\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-ruff-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "guard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "source_after": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "ruff",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "mypy",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "radon",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "coverage",
+            "status": "error",
+            "normalization": "complete"
+          },
+          {
+            "name": "bandit",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "pip-audit",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ],
+        "command": "check",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "pyguard.execution.tool_missing:57c6e3310719e9ea7fbf30dc7399548ddce843fd759b6911a6115f2a5d105313",
+            "level": "code",
+            "gate": "coverage",
+            "rule": "pyguard.execution.tool_missing",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "tool_missing",
+            "evidence": "No test runner or test files found.",
+            "diagnostics": []
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "radon.mi",
+            "level": "code",
+            "location": {
+              "file": "src/main.py"
+            },
+            "value": 100,
+            "unit": "score",
+            "threshold": 19
+          }
+        ],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "ruff",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-001-ruff-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "ruff",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-002-ruff-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "ruff",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-003-ruff-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "ruff",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-004-ruff-stderr.log"
+          },
+          {
+            "id": "diagnostic-005",
+            "gate": "mypy",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-005-mypy-stdout.log"
+          },
+          {
+            "id": "diagnostic-006",
+            "gate": "mypy",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-006-mypy-stderr.log"
+          },
+          {
+            "id": "diagnostic-007",
+            "gate": "radon",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-007-radon-stdout.log"
+          },
+          {
+            "id": "diagnostic-008",
+            "gate": "radon",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-008-radon-stderr.log"
+          },
+          {
+            "id": "diagnostic-009",
+            "gate": "radon",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-009-radon-stdout.log"
+          },
+          {
+            "id": "diagnostic-010",
+            "gate": "radon",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-010-radon-stderr.log"
+          },
+          {
+            "id": "diagnostic-011",
+            "gate": "radon",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-011-radon-stdout.log"
+          },
+          {
+            "id": "diagnostic-012",
+            "gate": "radon",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-012-radon-stderr.log"
+          },
+          {
+            "id": "diagnostic-013",
+            "gate": "types",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-013-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-014",
+            "gate": "types",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-014-types-stderr.log"
+          }
+        ]
+      }
+    }
+  ],
+  "repair_events": [
+    {
+      "tool": "pyguard",
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "tool_output": "pyguard — Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . — project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, s"
+    },
+    {
+      "tool": "pyguard",
+      "argv": [
+        "mypy",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "summary": "ERROR\ncommand: mypy\ngate: mypy; assessment: incomplete; not_run: 0; partial: 0\nfindings: 1\npyguard.execution.tool_missing [tool_missing/execution_error]\nProject analyzer or module is missing.\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "pyguard",
+      "argv": [
+        "mypy",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "mypy",
+            "status": "error",
+            "normalization": "complete"
+          }
+        ],
+        "command": "mypy",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "pyguard.execution.tool_missing:cfaf374fa8e9bb0b51de3e3cbfd3d4e80b56bc77500b47d6729f035238c9d5b6",
+            "level": "code",
+            "gate": "mypy",
+            "rule": "pyguard.execution.tool_missing",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "tool_missing",
+            "evidence": "Project analyzer or module is missing.",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          }
+        ],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "mypy",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "mypy",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-002-mypy-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "tool_output": "An extremely fast Python package manager.\n\nUsage: uv [OPTIONS] <COMMAND>\n\nCommands:\n  auth       Manage authentication\n  run        Run a command or script\n  init       Create a new project\n  add        Add dependencies to the project\n  remove     Remove dependencies from the project\n  version    Read or update the project's version\n  sync       Update the project's environment\n  lock       Update the project's lockfile\n  export     Export the project's lockfile to an alternate format\n  tree       Display the project's dependency tree\n  format     Format Python code in the project\n  check      Run checks on the project\n  audit      Audit the project's dependencies\n  tool       Run and install commands provided by Python packages\n  python     Manage Python versions and installations\n  pip        Manage Python packages with a pip-compatible interface\n  venv       Create a virtual environment\n  build      Build Python packages into source distributions and wheels\n  publish    Upload distributions to an index\n  workspace  Inspect uv workspaces\n  cache      Manage uv's cache\n  self       Manage the uv executable\n  help       Display documentation for a command\n\nCache options:\n  -n, --no-cache               Avoid reading from or writing to the cache, instead using a temporary\n                               directory for the duration of the operation [env: UV_NO_CACHE=]\n      --cache-dir <CACHE_DIR>  Path to the cache directory [env: UV_CACHE_DIR=]\n\nPython options:\n      --managed-python       Require use of uv-managed Python versions [env: UV_MANAGED_PYTHON=]\n      --no-managed-python    Disable use of uv-managed Python versions [env: UV_NO_MANAGED_PYTHON=]\n      --no-python-downloads  Disable automatic downloads of Python. [env:\n                             \"UV_PYTHON_DOWNLOADS=never\"]\n\nGlobal options:\n  -q, --quiet...\n          Use quiet output\n  -v, --verbose...\n          Use verbose output\n      --color <COLOR_CHOICE>\n          Control the use of color in output [possible values: auto, always, never]\n      --system"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "pip",
+        "install",
+        "--offline",
+        "--python",
+        ".venv/bin/python",
+        "mypy==1.18.2"
+      ],
+      "exit_code": 0,
+      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "tool_output": "",
+      "stderr": "Resolved 4 packages in 4ms\nInstalled 4 packages in 20ms\n + mypy==1.18.2\n + mypy-extensions==1.1.0\n + pathspec==1.1.1\n + typing-extensions==4.16.0\n"
+    },
+    {
+      "tool": "pyguard",
+      "argv": [
+        "mypy",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "result": {
+        "schema_version": "1",
+        "status": "pass",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "mypy",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "mypy",
+        "exit_code": 0,
+        "findings": [],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "mypy",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "mypy",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-002-mypy-stderr.log"
+          }
+        ]
+      }
+    }
+  ],
+  "interpretation": {
+    "execution": {
+      "schema_version": "1",
+      "status": "error",
+      "assessment": "incomplete",
+      "gates": [
+        {
+          "name": "mypy",
+          "status": "error",
+          "normalization": "complete"
+        }
+      ],
+      "command": "mypy",
+      "exit_code": 1,
+      "findings": [
+        {
+          "id": "pyguard.execution.tool_missing:cfaf374fa8e9bb0b51de3e3cbfd3d4e80b56bc77500b47d6729f035238c9d5b6",
+          "level": "code",
+          "gate": "mypy",
+          "rule": "pyguard.execution.tool_missing",
+          "severity": "error",
+          "status": "execution_error",
+          "category": "tool_missing",
+          "evidence": "Analyzer executable is missing.",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [],
+      "artifacts": [],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "mypy",
+          "channel": "stdout",
+          "path": ".pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "mypy",
+          "channel": "stderr",
+          "path": ".pyguard-cache/diagnostics/diagnostic-002-mypy-stderr.log"
+        }
+      ]
+    },
+    "advisory": {
+      "schema_version": "1",
+      "status": "advisory",
+      "assessment": "complete",
+      "gates": [
+        {
+          "name": "criticality",
+          "status": "advisory",
+          "normalization": "complete"
+        }
+      ],
+      "command": "criticality",
+      "exit_code": 0,
+      "findings": [
+        {
+          "id": "pyguard.criticality.ranked:7b4f8d8adb8aabaf37c8319fa471110044934cac995fb53e1f57770d2732e41d",
+          "level": "structure",
+          "gate": "criticality",
+          "rule": "pyguard.criticality.ranked",
+          "severity": "info",
+          "status": "advisory",
+          "category": "quality",
+          "location": {
+            "file": "functions/core.py",
+            "line": 1,
+            "symbol": "core.target"
+          },
+          "observed": 2,
+          "evidence": "core.target has 2 distinct callers (rank 1).",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "functions/core.py",
+            "line": 1,
+            "symbol": "core.target"
+          },
+          "value": 2,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "functions/core.py",
+            "line": 4,
+            "symbol": "core.first"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "functions/core.py",
+            "line": 8,
+            "symbol": "core.second"
+          },
+          "value": 0,
+          "unit": "callers"
+        }
+      ],
+      "artifacts": [
+        {
+          "kind": "criticality",
+          "path": "CRITICALITY.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "criticality",
+          "channel": "stdout",
+          "path": ".pyguard-cache/diagnostics/diagnostic-001-criticality-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "criticality",
+          "channel": "stderr",
+          "path": ".pyguard-cache/diagnostics/diagnostic-002-criticality-stderr.log"
+        }
+      ]
+    },
+    "response": {
+      "execution": {
+        "semantic_status": "error",
+        "exit_code": 1,
+        "source_edit_needed": false,
+        "explanation": "The mypy command reports one execution_error finding, pyguard.execution.tool_missing: the analyzer executable is missing. The assessment is incomplete, although normalization of this execution error is complete. This blocks approval that requires a completed mypy check; exit 1 does not establish a source defect or a failed type-check finding.",
+        "next_action": "Make the mypy analyzer available in the intended project environment through an authorized dependency/environment repair, then rerun the same mypy invocation and scope to obtain an actual analysis. Do not edit source in response to this tool_missing finding. The referenced diagnostics can be inspected if environment troubleshooting needs more detail."
+      },
+      "advisory": {
+        "semantic_status": "advisory",
+        "exit_code": 0,
+        "source_edit_needed": false,
+        "explanation": "The criticality command completed its requested assessment with one informational quality advisory and complete normalization. functions/core.py:1, core.target, ranks first with 2 distinct static function callers. This is not a failed quality gate and does not block approval on its own. The result lists CRITICALITY.md as its report artifact.",
+        "next_action": "Use the ranking and CRITICALITY.md to prioritize review or testing of core.target if useful. No source change is required by this advisory. Obtain any separately required quality checks before granting approval for a broader scope.",
+        "limitations": [
+          "Static distinct-caller counts do not prove runtime impact, execution frequency, or business criticality.",
+          "Assessment completeness applies only to the requested criticality command and its scope; it does not establish that other quality gates passed.",
+          "Exit 0 alone is not proof of successful analysis for advisory commands; this record's advisory status and complete assessment establish the outcome here.",
+          "Existing analyzers remain Level 1 with advisory criticality parity; remaining Level 2 and all Level 3 checks are absent."
+        ]
+      }
+    }
+  }
+}

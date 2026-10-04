@@ -249,9 +249,7 @@ pyguard and tsguard enforce the same quality goals but reach them with different
   Halstead per-function, maintainability index per-file). tsguard combines all three into a
   single FTA score per file. See [docs/metrics.md](docs/metrics.md) for what each measures.
 
-- **Security**: pyguard uses bandit (Python AST, blocking) + optional Opengrep deep pass.
-  tsguard uses Opengrep (semgrep-compatible engine, project-local binary, blocking) — same
-  class of problems caught, same depth, zero Python required on the dev machine.
+- **Security**: pyguard runs Bandit, pip-audit and detect-secrets. Python has no implemented Opengrep `--deep` command; strict flag validation rejects it. tsguard uses Opengrep as its blocking SAST engine through a project-local binary.
 
 - **Dead code**: pyguard uses vulture (Python AST). tsguard uses knip (TypeScript-aware,
   also catches unused deps). tsguard additionally runs jscpd for copy-paste detection.
@@ -266,3 +264,7 @@ Use `npx --no-install tsguard check --output agent` for a bounded summary, or
 `npx --no-install tsguard criticality --output agent` ranks TypeScript functions
 and methods by distinct callers and writes the top 30 to `CRITICALITY.md`.
 `audit` includes this advisory analysis; blocking `check` gates are unchanged.
+
+### Capability evals
+
+OxGuard has known-answer corpora for Tsguard and PyGuard, baseline/candidate comparison reports and a shared capability matrix. Both CLIs share a normalized Go result contract with bounded agent and complete JSON outputs; Python retains all 15 baseline behavior checks and passes all 22 current parity checks. See [capability evals](docs/guides/oxguard-evals.md), [Python outputs](docs/guides/pyguard-result-contract.md) and [TypeScript outputs](docs/guides/tsguard-result-contract.md) for execution paths, adapter limits and remaining evaluation gaps.

@@ -1,0 +1,6 @@
+rules:
+  - id: oxguard-eval-no-eval
+    languages: [typescript, javascript]
+    message: Avoid eval
+    severity: ERROR
+    pattern: eval($X)

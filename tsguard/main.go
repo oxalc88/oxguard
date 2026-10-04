@@ -81,7 +81,7 @@ func runCLI(cmd string, args []string) int {
 	cliCfg, err := parseFlags(args)
 	result := newRunResult(cmd)
 	finish := func(code int) int {
-		result.finish(code)
+		result.Finish(code)
 		if cliCfg.output == "agent" || cliCfg.output == "json" {
 			if err := reportResult(os.Stdout, cliCfg.output, result); err != nil {
 				return 1
@@ -90,7 +90,7 @@ func runCLI(cmd string, args []string) int {
 		return code
 	}
 	fail := func(code int, category, message string) int {
-		result.execution("invocation", category, message)
+		result.Execution("invocation", category, message)
 		if cliCfg.output != "agent" && cliCfg.output != "json" {
 			fmt.Fprintf(os.Stderr, "error: %s\n", message)
 		}
@@ -161,7 +161,7 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 					"tsguard: stdout is a pipe for a long-running gate. Piping through\n"+
 						"     tail/head can wedge the PTY (see project CLAUDE.md).\n"+
 						"     Use --tail N or --log-file, or pass --allow-pipe to override.")
-				result.execution("invocation", "pipe_refused", "Heavy gate refused piped stdout; use --allow-pipe.")
+				result.Execution("invocation", "pipe_refused", "Heavy gate refused piped stdout; use --allow-pipe.")
 				return exitPipeRefused
 			}
 			fmt.Fprintln(os.Stderr,
@@ -170,6 +170,24 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		}
 	}
 
+	if cfg.output != "human" {
+		switch cmd {
+		case "check":
+			result.Plan("lint", "fta", "types", "coverage", "secrets", "dependencies", "security")
+		case "security":
+			result.Plan("secrets", "dependencies", "security")
+		case "audit":
+			result.Plan("criticality", "dead-code", "duplicates")
+		case "complexity":
+			result.Plan("lint")
+		case "fix":
+			result.Plan("lint")
+		case "npm-audit":
+			result.Plan("dependencies")
+		default:
+			result.Plan(cmd)
+		}
+	}
 	r := &Runner{outputMode: cfg.output, result: result, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs, ftaExcludeTests: cfg.ftaExcludeTests, ftaExclude: cfg.ftaExclude}
 
 	switch cmd {
