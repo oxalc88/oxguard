@@ -15,6 +15,7 @@ Exit 0 on success, 1 on any violation or missing path.
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,7 @@ MAX_TYPE_LENGTH: int = 40
 class Violation:
     file: Path
     line: int
+    column: int
     context: str
     annotation: str
     depth: int
@@ -68,6 +70,7 @@ def check_annotation(
         return Violation(
             file=file,
             line=node.lineno,
+            column=node.col_offset + 1,
             context=context,
             annotation=text,
             depth=depth,
@@ -123,12 +126,50 @@ def check_file(path: Path) -> list[Violation]:
 
 
 def main() -> None:
-    targets = sys.argv[1:] or ["."]
+    machine = "--json" in sys.argv[1:]
+    targets = [arg for arg in sys.argv[1:] if arg != "--json"] or ["."]
     paths = collect_paths(targets, gate="types")
 
     all_violations: list[Violation] = []
     for path in paths:
         all_violations.extend(check_file(path))
+
+    if machine:
+        findings = []
+        for v in all_violations:
+            observed, threshold = (
+                (v.depth, MAX_NESTING_DEPTH)
+                if v.depth > MAX_NESTING_DEPTH
+                else (v.length, MAX_TYPE_LENGTH)
+            )
+            findings.append(
+                {
+                    "rule": "pyguard.types.annotation_complexity",
+                    "severity": "error",
+                    "location": {
+                        "file": v.file.as_posix(),
+                        "line": v.line,
+                        "column": v.column,
+                        "symbol": v.context,
+                    },
+                    "observed": observed,
+                    "threshold": threshold,
+                    "evidence": f"Annotation depth {v.depth}, length {v.length}: {v.annotation}",
+                    "remediation": v.suggestion,
+                }
+            )
+        print(
+            json.dumps(
+                {
+                    "schema_version": "1",
+                    "findings": findings,
+                    "measurements": [],
+                    "artifacts": [],
+                },
+                sort_keys=True,
+            )
+        )
+        sys.exit(1 if findings else 0)
 
     if not all_violations:
         print(f"  [OK]   types — annotations within thresholds ({len(paths)} file(s))")

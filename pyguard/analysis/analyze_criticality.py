@@ -1,85 +1,120 @@
-"""Analyze function criticality via call graph.
+"""Rank defined Python functions by distinct callers using pyan3's use edges."""
 
-Ranks functions by in-degree (how many callers they have).
-High in-degree = high criticality = high risk to change.
-
-Output: CRITICALITY.md in the project root.
-
-Usage:
-    uv run python tools/analysis/analyze_criticality.py
-
-Dependencies: pyan3, networkx (install via: uv add --group dev pyan3 networkx)
-"""
-
+import ast
+import json
 import sys
-import tempfile
 from pathlib import Path
+from _paths import collect_paths
 
-try:
-    import networkx as nx  # type: ignore[import-untyped]
-    import pyan  # type: ignore[import-untyped]
-
-    HAS_DEPS = True
-except ImportError:
-    HAS_DEPS = False
-
-SOURCE_DIRS = ["functions", "cdk"]
-OUTPUT = Path(__file__).parent.parent.parent / "CRITICALITY.md"
-
-
-def find_python_files(dirs: list[str]) -> list[str]:
-    files: list[str] = []
-    for d in dirs:
-        files.extend(str(p) for p in Path(d).rglob("*.py") if "__pycache__" not in str(p))
-    return files
+OUTPUT = Path(__file__).resolve().parent.parent.parent / "CRITICALITY.md"
 
 
 def main() -> int:
-    if not HAS_DEPS:
-        msg = "pyan3/networkx not installed. Run: uv add --group dev pyan3 networkx"
-        print(f"WARNING: {msg}")
-        OUTPUT.write_text(f"# Criticality Analysis\n\n{msg}\n")
-        return 0
+    machine = "--json" in sys.argv[1:]
+    targets = [arg for arg in sys.argv[1:] if arg != "--json"] or ["functions", "cdk"]
+    result = {
+        "schema_version": "1",
+        "findings": [],
+        "measurements": [],
+        "artifacts": [],
+    }
 
-    files = find_python_files(SOURCE_DIRS)
-    if not files:
-        print("No Python files found.")
+    def failure(category: str, message: str) -> int:
+        if machine:
+            result["error"] = {"category": category, "message": message}
+            print(json.dumps(result, sort_keys=True))
+        else:
+            print(f"WARNING: {message}")
         return 1
 
     try:
-        callgraph = pyan.create_callgraph(files, format="dot")
-    except Exception as e:
-        print(f"WARNING: pyan3 failed: {e}")
-        OUTPUT.write_text(f"# Criticality Analysis\n\npyan3 failed: {e}\n")
-        return 0
-
+        from pyan.analyzer import CallGraphVisitor
+    except ImportError:
+        return failure(
+            "tool_missing", "pyan3 is not installed. Run: uv add --group dev pyan3"
+        )
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".dot", delete=False) as f:
-            f.write(callgraph)
-            dot_path = f.name
-        graph = nx.DiGraph(nx.drawing.nx_pydot.read_dot(dot_path))
-    except Exception as e:
-        print(f"WARNING: Could not parse call graph: {e}")
-        OUTPUT.write_text(f"# Criticality Analysis\n\nGraph parse failed: {e}\n")
-        return 0
-
-    # Rank by in-degree (number of callers)
-    ranked = sorted(graph.in_degree(), key=lambda x: x[1], reverse=True)
-
-    lines = [
-        "# Criticality Analysis",
-        "",
-        "Functions ranked by in-degree (number of callers). High = high risk to change.",
-        "",
-        "| Rank | Function | Callers |",
-        "|------|----------|---------|",
-    ]
-    for i, (node, degree) in enumerate(ranked[:30], 1):
-        if degree > 0:
-            lines.append(f"| {i} | `{node}` | {degree} |")
-
-    OUTPUT.write_text("\n".join(lines) + "\n")
-    print(f"Criticality analysis written to {OUTPUT}")
+        files = sorted(
+            {str(p.resolve()) for p in collect_paths(targets, "criticality")}
+        )
+        if not files:
+            return failure(
+                "invalid_configuration",
+                "No Python source files found in the requested scope.",
+            )
+        visitor = CallGraphVisitor(files)
+        functions = {
+            n
+            for group in visitor.nodes.values()
+            for n in group
+            if n.defined
+            and n.filename in files
+            and isinstance(n.ast_node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        callers = {n: set() for n in functions}
+        for caller, callees in visitor.uses_edges.items():
+            if caller in functions:
+                for callee in callees:
+                    if callee in functions:
+                        callers[callee].add(caller)
+        ranked = sorted(
+            functions,
+            key=lambda n: (
+                -len(callers[n]),
+                n.filename,
+                n.ast_node.lineno,
+                n.get_name(),
+            ),
+        )
+        lines = [
+            "# Criticality Analysis",
+            "",
+            "Functions ranked by distinct defined function callers. Repeated calls count once; namespace containment and external functions are excluded.",
+            "",
+            "| Rank | Function | Callers |",
+            "|------|----------|---------|",
+        ]
+        for rank, node in enumerate(ranked, 1):
+            count = len(callers[node])
+            location = {
+                "file": str(Path(node.filename).relative_to(Path.cwd())),
+                "line": node.ast_node.lineno,
+                "symbol": node.get_name(),
+            }
+            result["measurements"].append(
+                {
+                    "metric": "criticality.in_degree",
+                    "level": "structure",
+                    "location": location,
+                    "value": count,
+                    "unit": "callers",
+                }
+            )
+            if rank <= 30 and count:
+                lines.append(f"| {rank} | `{node.get_label()}` | {count} |")
+                result["findings"].append(
+                    {
+                        "rule": "pyguard.criticality.ranked",
+                        "level": "structure",
+                        "severity": "info",
+                        "location": location,
+                        "observed": count,
+                        "evidence": f"{node.get_name()} has {count} distinct callers (rank {rank}).",
+                    }
+                )
+        try:
+            OUTPUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        except OSError as error:
+            return failure("artifact_failure", f"Cannot write CRITICALITY.md: {error}")
+        result["artifacts"].append({"kind": "criticality", "path": str(OUTPUT)})
+    except SystemExit as error:
+        return int(error.code or 1)
+    except Exception as error:
+        return failure("adapter_failure", f"Criticality analysis failed: {error}")
+    if machine:
+        print(json.dumps(result, sort_keys=True))
+    else:
+        print(f"Criticality analysis written to {OUTPUT}")
     return 0
 
 
