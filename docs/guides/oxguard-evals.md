@@ -1,6 +1,7 @@
 # OxGuard capability evals
 
-The first eval corpus contains 17 Tsguard CLI cases. It complements unit,
+The evals contain 17 Tsguard cases and 24 PyGuard cases (15 behavior checks and
+9 agent/criticality parity requirements). They complement unit,
 installed-distribution and release smoke tests. It does not implement Level 3
 project baselines or change analysis.
 
@@ -115,8 +116,8 @@ artifacts rather than committing generated observations as golden answers.
 
 ## Lanes still missing
 
-- PyGuard analysis has no known-answer corpus in this first slice; its existing
-  hook/setup/doctor tests remain separate.
+- PyGuard has a real known-answer corpus, but its normalized result contract is
+  absent. See the Python lanes below; this is an observed gap, not a passing eval.
 - Opengrep, coverage, secrets and dependency transport/advisories are protected
   by existing tests but have no scored cases in this corpus yet.
 - Historical installation timeouts and registry routing remain integration checks,
@@ -128,3 +129,65 @@ artifacts rather than committing generated observations as golden answers.
   until a real agent trace is captured. A proposed plan is not proof of action.
 - Larger independent projects, unseen holdout cases, memory measurements and
   controlled performance benchmarks remain future work.
+
+## Python behavior and agent parity
+
+`evals/python/cases.json` contains language-specific controls with the same quality
+intent: clean/incorrect types and lint, complexity pass/threshold/boundary, annotation
+depth boundaries, fail-fast, lock/pipe refusal, missing uv and full diagnostic logs.
+Ruff/mypy JSON, Radon JSON and the owned annotation model independently verify
+known answers. Those oracle records are **not** normalized PyGuard CLI findings;
+no CLI precision/recall score is assigned while its result contract is missing.
+
+Python requirements, including transitive dependencies and hashes, are pinned in
+`evals/python/requirements.txt`. The evaluator checks the installed versions,
+runs uv offline, and copies helper scripts from the evaluated source into fresh
+projects, matching setup's deployment location. It does not test release installer
+or setup dependency installation. These remain separate smoke-test responsibilities.
+
+```sh
+uv venv --python 3.12 /tmp/pyguard-evals
+uv pip install --python /tmp/pyguard-evals/bin/python --require-hashes -r evals/python/requirements.txt
+(cd pyguard && go build -o /tmp/pyguard-eval .)
+node evals/python/run.cjs --binary /tmp/pyguard-eval --source . \
+  --python /tmp/pyguard-evals/bin/python --revision COMMIT_SHA \
+  --report-dir eval-reports/pyguard
+```
+
+On Windows the venv interpreter is `Scripts/python.exe`. Use uv 0.12.19, as CI does.
+Optional `--baseline-binary`, `--baseline-source` and `--baseline-revision` evaluate
+a rebuilt base commit with its own source helper scripts and the same pinned tools.
+
+Two reports deliberately answer different questions:
+
+- `behavior.json`: every supported behavior case must pass, including when the
+  baseline failed. This preserves the strict candidate rule.
+- `parity.json`: nine positive requirements probe full JSON, stable IDs/categories,
+  bounded agent output with omission disclosure, input validation/root and known
+  caller counts. Missing advertised interfaces are unsupported; violated
+  requirements fail. The probes actually run even when the flags are absent.
+  These cases are a visible implementation backlog. They never count as passes.
+
+Current Python evidence: 15 behavior passes, five unsupported interfaces, four
+failed parity requirements (three flag validations and known caller counts).
+`agent_ready` and parity `candidate_ready` are false. A green **regression guard**
+means supported behavior passed and no passing parity capability was lost. It is
+not a claim of full Python capability readiness. Known parity failures may remain
+visible; newly broken interfaces and changing a failure into unsupported block
+the guard. Newly implemented capabilities must pass their positive requirements.
+
+CI adds three Python platform jobs with base/candidate comparisons on PRs. A final
+report job combines Linux evidence in `parity.json` and `parity.md`. The Python
+reports include source-script provenance and toolchain versions. Reports are
+uploaded even if the eval step fails.
+
+`evals/capabilities.json` maps shared intent across language-specific case IDs.
+FTA scores and Radon cyclomatic counts are not interchangeable numbers. The matrix
+uses `pass`, `fail`, `unsupported`, `skipped` and `not_evaluated`; it does not call
+untested behavior equivalent. The TS fail-fast path remains covered by existing
+integration tests but lacks a scored case in this corpus, so the matrix marks it
+`not_evaluated`. Reports must come from the same revision and environment.
+
+See [PyGuard agent evaluation](pyguard-agent-evaluation.md) for repository evidence
+and the next implementation step. No Python CLI, analyzer, threshold or skill
+behavior changes are made by this eval PR.

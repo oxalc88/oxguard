@@ -269,7 +269,8 @@ and methods by distinct callers and writes the top 30 to `CRITICALITY.md`.
 
 ### Capability evals
 
-OxGuard has a versioned known-answer Tsguard corpus and a baseline/candidate
-comparison report alongside its regression tests. See
+OxGuard has known-answer corpora for Tsguard and PyGuard, baseline/candidate
+comparison reports, and a shared capability matrix. PyGuard’s missing agent
+contract is reported explicitly; working legacy gates do not imply agent parity. See
 [capability evals](docs/guides/oxguard-evals.md) for installation-path execution,
 metrics, historical provenance and the lanes that are not yet evaluated.

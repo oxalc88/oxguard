@@ -27,6 +27,16 @@ See [agent and JSON contract](guides/tsguard-result-contract.md) for schema,
 semantic categories, diagnostic lifecycle and adapter limits. Historical claims
 of missing contracts below describe the evaluated revision, not this follow-up.
 
+## Python contract parity checked by PR #5
+
+The normalized/agent/JSON implementation status above applies to **Tsguard**.
+PyGuard still has a prose-only runner and a log-interpreting skill. PR #5 now
+includes real Python behavior evals and explicit unmet contract/caller-count
+requirements; it does not implement Python agent parity. See
+[PyGuard agent evaluation](guides/pyguard-agent-evaluation.md) for direct execution
+evidence and [capability evals](guides/oxguard-evals.md) for the shared matrix.
+The original evaluation and its recommended architecture remain unchanged.
+
 ## Executive assessment
 
 Tsguard is a useful **Level 1 code-quality gate** with a strong npm delivery path, but it is not yet an agent-native analysis engine. The Go CLI orchestrates deterministic analyzers well, but its public result contract is still human CLI text. There is no common finding model, no machine-readable output, no Level 2 graph model, and no Level 3 baseline/change model.
