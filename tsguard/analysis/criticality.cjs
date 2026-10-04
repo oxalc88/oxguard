@@ -34,9 +34,10 @@ for (const dir of input.dirs) {
 let options = { target: ts.ScriptTarget.Latest, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext, noEmit: true, jsx: ts.JsxEmit.Preserve };
 const configFile = path.join(root, 'tsconfig.json');
 if (fs.existsSync(configFile)) {
-  const config = ts.readConfigFile(configFile, ts.sys.readFile);
+  // Compiler config diagnostics compare normalized filenames on Windows.
+  const config = ts.readConfigFile(configFile.replaceAll('\\', '/'), ts.sys.readFile);
   if (config.error) throw Object.assign(new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n')), { category: 'invalid_configuration' });
-  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
+  const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root.replaceAll('\\', '/'));
   const errors = parsed.errors.filter(e => e.code !== 18003); // scope is explicit dirs
   if (errors.length) throw Object.assign(new Error(errors.map(e => ts.flattenDiagnosticMessageText(e.messageText, '\n')).join('\n')), { category: 'invalid_configuration' });
   options = { ...parsed.options, noEmit: true };

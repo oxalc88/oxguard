@@ -18,11 +18,11 @@ const version = '0.0.0-npm-test';
 const manager = process.env.TSGUARD_PACKAGE_MANAGER || 'npm';
 assert.ok(['npm', 'pnpm'].includes(manager), `Unsupported test package manager: ${manager}`);
 
-function run(command, args, cwd, expected = 0) {
+function run(command, args, cwd, expected = 0, timeout = 120000) {
   // Windows package managers are .cmd scripts; quote paths when going through cmd.exe.
   const shell = process.platform === 'win32' && ['npm', 'npx', 'pnpm'].includes(command);
   const result = spawnSync(command, shell ? args.map(a => `"${a}"`) : args, {
-    cwd, encoding: 'utf8', shell, timeout: 120000,
+    cwd, encoding: 'utf8', shell, timeout,
   });
   assert.ifError(result.error);
   assert.equal(result.status, expected, `${command}: ${result.stdout}\n${result.stderr}`);
@@ -53,7 +53,7 @@ test('packaged adapter preserves a declared project compiler', t => {
   assert.equal(run(process.execPath, [adapter, 'tsc', '--version'], project).stdout.trim(), 'project compiler');
 });
 
-test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: 240000 }, async t => {
+test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: 360000 }, async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'tsguard-npm-'));
   t.after(() => {
     if (process.env.TSGUARD_KEEP_TEST_DIR) t.diagnostic(`Test artifacts: ${temporary}`);
@@ -119,7 +119,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     assert.deepEqual(Object.keys(consumerManifest.devDependencies), ['@oxguard/tsguard']);
   } else {
   // Both tarballs are supplied locally; owned tools still resolve from the registry.
-    run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '-D', ...tarballs], consumer);
+    run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '-D', ...tarballs], consumer, 0, 240000);
     const other = platforms.find(platform => platform !== host);
     const otherPack = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', temporary], path.join(packages, `tsguard-${other}`)).stdout)[0];
     // Isolate this negative install from the unpublished optional versions in
@@ -204,6 +204,8 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   fs.writeFileSync(path.join(consumer, 'calls/use.ts'), 'import { target as alias, Service } from "./core";\nexport function first() { alias(); alias(); new Service().method(); }\nexport const second = () => alias();\nexport function outer() { function nested() { alias(); } return nested(); }\nalias();\n');
   fs.writeFileSync(path.join(consumer, 'calls/ignored/skip.ts'), 'import { target } from "../core"; export function excluded() { target(); }\n');
   const criticalArgs = ['criticality', '--dirs', 'calls', '--exclude', 'calls/ignored'];
+  fs.writeFileSync(path.join(consumer, 'tsconfig.json'), JSON.stringify({ compilerOptions: { module: 'NodeNext', moduleResolution: 'NodeNext', paths: { '@core': ['./calls/core.ts'] } }, include: ['calls/**/*.ts'] }));
+  fs.writeFileSync(path.join(consumer, 'calls/use.ts'), fs.readFileSync(path.join(consumer, 'calls/use.ts'), 'utf8').replace('"./core"', '"@core"'));
   const critical = structured(criticalArgs);
   assert.equal(critical.status, 'advisory');
   const inDegree = (symbol) => critical.measurements.find(m => m.metric === 'criticality.in_degree' && m.location.symbol === symbol)?.value;
