@@ -1,6 +1,7 @@
 name: npm distribution checks
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_call:
     inputs:
@@ -10,6 +11,11 @@ on:
 
 permissions:
   contents: read
+
+# New PR commits supersede earlier checks; release invocations keep running.
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   npm:

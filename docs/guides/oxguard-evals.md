@@ -62,6 +62,8 @@ Detection metrics match rule/gate/category/status and source location one-to-one
 
 Case duration, output bytes and maximum agent bytes/lines are recorded. Runtime includes repeat/agent invocations for the applicable case. Agent limits remain 26 lines / 6 KiB. Every child has a 60-second harness deadline; slow installation uses the existing separate budget. Runtime deltas are observations, not a noisy CI performance gate. Memory, token cost and installation latency are not measured.
 
+CI triggers once per PR update and on pushes to `main`; branch pushes do not start a duplicate run. A newer PR commit cancels its older in-progress checks. Release workflow calls retain their full validation and are not cancelled by this policy. The matrix remains 13 jobs: nine npm/pnpm platform combinations, three Python platform jobs and one shared report.
+
 CI runs CLI evals on the three npm platform jobs and uploads candidate JSON. The Linux PR job also uploads baseline JSON plus JSON/Markdown comparisons. All nine npm/pnpm integration jobs remain required by the workflow's tests; repo branch-protection policy is separate. The eval-enabled integration budget is ten minutes; non-eval jobs keep the existing six-minute integration budget.
 
 Require existing cases to remain passing and a new capability to have positive, negative and boundary cases. Changes to expected answers require a documented behavior decision and review; never rewrite an oracle merely to get green CI. Corpus changes must accompany their fixtures/provenance. Store reports as CI artifacts rather than committing generated observations as golden answers.
