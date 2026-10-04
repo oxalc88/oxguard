@@ -225,7 +225,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   fs.writeFileSync(path.join(consumer, 'tsconfig.json'), '{broken');
   const invalidCritical = structured(criticalArgs);
   assert.equal(invalidCritical.status, 'error');
-  assert.equal(invalidCritical.findings[0].category, 'invalid_configuration');
+  assert.equal(invalidCritical.findings[0].category, 'invalid_configuration', JSON.stringify(invalidCritical));
   fs.rmSync(path.join(consumer, 'tsconfig.json'));
   fs.rmSync(path.join(consumer, 'calls'), { recursive: true });
   assert.equal(structured(['types']).status, 'pass');
