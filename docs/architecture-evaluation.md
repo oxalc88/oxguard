@@ -8,7 +8,8 @@
 
 The evaluation below remains the evidence-based assessment of `main` at the
 recorded SHA. Its conclusions and scorecard are preserved. This implementation
-adds the first recommended contract step; it does not add quality layers.
+adds the first recommended contract step and the requested PyGuard criticality
+parity milestone. It does not add blocking structural rules or change analysis.
 
 | Area | Implementation status |
 |---|---|
@@ -18,8 +19,8 @@ adds the first recommended contract step; it does not add quality layers.
 | Input contract | Unknown/missing/invalid flags rejected; explicit `--root`; structured modes reject unreadable/malformed `oxguard.toml` |
 | Progressive disclosure | CLI reduction implemented for tsc, FTA, packaged Biome and Opengrep; other tools have stable gate-level fallbacks |
 | Human / npm interfaces | Human rendering retained; launcher and packaging unchanged; structured modes accept piped stdout |
-| Skill debt | Still pending; `tsguard/skill/SKILL.md` is unchanged |
-| Level 2 | Still missing |
+| Skill debt | Agent skill updated to use installed npm/pnpm CLI, normalized outputs, omitted-finding JSON retrieval, execution categories and advisory criticality |
+| Level 2 | PyGuard criticality parity implemented: compiler-resolved function/method caller graph, in-degree, top 30, advisory `CRITICALITY.md` in audit; remaining structural analysis still missing |
 | Level 3 | Still missing |
 
 See [agent and JSON contract](guides/tsguard-result-contract.md) for schema,

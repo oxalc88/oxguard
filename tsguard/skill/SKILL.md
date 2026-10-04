@@ -1,183 +1,115 @@
 ---
 name: tsguard
-description: |
-  Run tsguard TypeScript quality gate and interpret the output: prioritize findings,
-  group by check, suggest concrete fixes, and offer to auto-apply `tsguard fix`
-  for auto-fixable issues. Installs the binary if missing (with user approval).
-  Use when asked to "run tsguard", "check typescript quality", "review tsguard output",
-  "fix typescript lint", "analizar tsguard", "correr tsguard", "lint typescript",
-  "typescript quality check", "analizar calidad typescript", "fta score".
-allowed-tools:
-  - Bash
-  - Read
-  - AskUserQuestion
+description: >-
+  Run Tsguard quality checks for TypeScript projects and act on its normalized
+  agent or JSON results. Use for type errors, lint, FTA scores, coverage,
+  security, advisory criticality, or requests to run or interpret Tsguard.
 ---
 
-# tsguard — quality gate complementario
+# Tsguard
 
-Eres la capa de interpretación sobre `tsguard`. Tu trabajo es ejecutar el gate, leer el output
-completo, y convertirlo en un resumen accionable con findings priorizados y fixes concretos.
-**No reimplementas ningún subcomando** — siempre delegas al binario.
+Delegate analysis to Tsguard. Use normalized findings to select work; use raw
+analyzer diagnostics only when a finding needs more evidence.
 
-## Paso 1: verificar el binario
+## Invoke the installed CLI
 
-```bash
-command -v tsguard >/dev/null 2>&1 && echo "ok" || echo "missing"
+Work from the project containing `package.json`, or supply `--root <project>`.
+Prefer the project-local npm distribution:
+
+```sh
+npx --no-install tsguard check --output agent
 ```
 
-Si `ok` → salta al Paso 2.
+For a pnpm project, use `pnpm exec tsguard check --output agent`.
+Verify local installation with the same executor and `tsguard --version`.
+If the package is missing, use the project's package manager to install
+`@oxguard/tsguard` as a dev dependency when installation is authorized. Do not
+silently fetch a CLI with plain `npx`. Do not run `setup` or install a global
+binary as part of routine analysis.
 
-Si `missing`: pregunta con una sola `AskUserQuestion`, tres opciones:
+Use the command the user requested. Otherwise default to `check`:
 
-1. **Instalar ahora** — corre el one-liner oficial y espera que termine:
-   ```bash
-   curl -fsSL https://github.com/oxalc88/oxguard/releases/latest/download/install.sh | sh -s -- tsguard
-   ```
-   Tras instalar, verifica de nuevo con `command -v tsguard`. Si quedó en `~/.local/bin/` y no está en `$PATH`, informa que añada `export PATH="$HOME/.local/bin:$PATH"` al shell rc. El siguiente paso típico dentro del proyecto es `tsguard setup`. Continúa al Paso 2.
+- `check`: blocking, fail-fast lint → FTA → types → coverage → security.
+- `lint`, `types`, `fta`, `coverage`, `security`, `npm-audit`, `secrets`: individual gates.
+- `criticality`: advisory function/method caller ranking and `CRITICALITY.md`.
+- `audit`: advisory criticality → dead-code → duplicates; exit 0 even on findings.
+- `fix`: source formatting/lint mutation; run when source changes are authorized.
 
-2. **Solo mostrar el comando** — imprime el one-liner de arriba más la variante Windows PowerShell:
-   ```
-   & ([scriptblock]::Create((iwr -useb https://github.com/oxalc88/oxguard/releases/latest/download/install.ps1))) tsguard
-   ```
-   Termina sin ejecutar nada más.
+Keep requested scope and thresholds. Supported flags include `--root`,
+`--dirs <d1,d2>`, `--exclude <d1,d2>`, `--timeout <seconds>` and
+`--max-fta-score <n>`. CLI overrides root `oxguard.toml`, then defaults apply.
+Unknown flags, missing values and invalid output modes are errors. Agent/JSON
+modes accept captured stdout without `--allow-pipe`. Help, version, doctor,
+setup and hooks retain human output; do not give them `--output agent/json`.
 
-3. **Cancelar** — termina sin tocar nada.
+## Consume findings completely
 
-Restricciones al instalar: no modifiques `~/.bashrc`, `~/.zshrc`, ni ningún archivo de config automáticamente. No corras `tsguard setup`. En Windows muestra ambos comandos y no auto-ejecutes.
+Use `--output agent` for the first bounded view. It shows the total count and
+at most ten findings. **If `omitted: N (use --output json)` appears, retrieve
+JSON with the same command, root, scope and thresholds before claiming that
+all findings have been reviewed or addressed.** The summary cannot describe
+omitted findings. A rerun produces a new result, so keep source/configuration
+unchanged during retrieval.
 
-## Paso 2: detectar el modo de invocación
-
-**Interpret-existing-log**: si el usuario proporcionó una ruta a un archivo de log, pegó output directamente, o dijo "interpreta este output / este log / este resultado" → **salta directo al Paso 4** con ese contenido; no ejecutas el binario.
-
-**Run-and-interpret**: cualquier otro caso.
-
-## Paso 3: elegir subcomando
-
-Pregunta una sola vez con `AskUserQuestion`:
-
-- `check` (**recomendado**) — gate completo: lint → fta → types → coverage → security
-- `fix` — auto-formatea con `ultracite fix`
-- `audit` — advisory: dead-code (knip) + duplicates (jscpd) — nunca falla el gate
-- `security` — secretlint + npm/pnpm/yarn audit + audit-ci + opengrep SAST
-- `otro` — el usuario especifica: `lint`, `types`, `fta`, `coverage`, `npm-audit`, `secrets`, `dead-code`, `duplicates`
-
-Si el usuario ya indicó el subcomando en su mensaje, úsalo sin preguntar.
-
-Flags adicionales:
-- `--dirs <d1,d2,...>` — default `.` (raíz del proyecto); usa esto si quieres restringir a subdirectorios específicos. También configurable en `oxguard.toml`.
-- `--exclude <d1,d2,...>` — excluir directorios adicionales. Aditivo; los defaults (`node_modules`, `dist`, `.agents`, `.claude`, etc.) siempre aplican.
-- `--max-fta-score <n>` — default `60`
-- `--timeout <s>` — default 300
-
-Config persistente: si el proyecto tiene `oxguard.toml` en la raíz, tsguard lo lee automáticamente. CLI siempre gana sobre el archivo. Claves útiles:
-
-```toml
-dirs            = ["src", "lib"]   # directorios a escanear (default: .)
-exclude         = ["generated"]    # directorios adicionales a excluir
-fta-score-cap   = 50               # cap FTA más estricto (default: 60)
-fta-exclude-tests = false          # re-habilita FTA en archivos de test (default: true = excluidos)
-fta-exclude     = ["*.pbt.ts"]     # patrones adicionales excluidos del FTA (ej. property-based tests)
+```sh
+npx --no-install tsguard check --output json
 ```
 
-Por defecto, `*.test.*` y `*.spec.*` quedan fuera del gate FTA — los tests son repetitivos por diseño y la métrica de mantenibilidad no aplica a ellos. Lint y coverage siguen cubriendo los tests.
+Parse JSON as data. Require `schema_version: "1"`. Use `status`, `exit_code`,
+`findings`, `measurements`, `artifacts` and `diagnostics`. Process the complete
+`findings` array, grouping work by rule and location; summarize groups without
+pasting the full JSON into context. Preserve the total count and any unresolved
+groups. Finding fields include stable `id`, `rule`, `gate`, `level`, `severity`,
+`status`, `category`, optional `location`, numeric `observed` / `threshold`,
+`evidence`, and diagnostic IDs. Do not reconstruct these fields from prose.
 
-## Paso 4: ejecutar con log-file
+Distinguish `blocking`, `advisory`, and `execution_error` findings. Read the
+semantic run status as well as the real process code:
 
-`--allow-pipe` es **obligatorio** para evitar el exit 5.
+- `quality`: inspect the reported rule/location; use evidence to guide fixes.
+- `tool_missing`, `startup_failure`, `dependency_failure`, `timeout`: resolve
+  execution or dependencies; do not treat them as source defects.
+- `invalid_configuration`: correct flags, project root or configuration.
+- `lock_contention`: report the active lock; do not delete it or retry blindly.
+- `adapter_failure`, `analyzer_failure`, `diagnostics_failure`, `artifact_failure`,
+  `lock_failure`, `interrupted`, `unclassified_failure`: use the referenced
+  diagnostics to identify the cause before making changes.
 
-```bash
-LOG=$(mktemp -t tsguard-XXXXXX.log)
-tsguard <subcomando> [flags-del-usuario] --log-file "$LOG" --allow-pipe
-RC=$?
-echo "exit_code=$RC log=$LOG"
-```
+Exit 1 alone does not mean “fix source.” `audit` and `criticality` can have
+`status: error` with exit 0. A passed gate does not prove that later gates ran:
+`check` stops at the first blocking failure. Fix authorized issues, rerun the
+failed gate, then rerun `check` to reach the remaining gates.
 
-Significados de `$RC`:
-- `0` — todo OK
-- `1` — al menos un gate falló
-- `2` — error de entorno (Node <22 o no encontrado)
-- `3` — comando desconocido
-- `4` — otra instancia de tsguard ya está corriendo (lock)
-- `5` — gate pesado rechazado por stdout pipe (no debería ocurrir con `--allow-pipe`)
+FTA reports file scores and the configured cap; do not invent per-function
+scores or unreported component measurements. Biome and Opengrep preserve native
+rule IDs; TypeScript preserves TS codes. Unsupported tool details produce a
+stable gate-level fallback, whose cause must be checked in diagnostics.
 
-Si `RC=4`: informa que otra instancia está corriendo, sugiere `ps aux | grep tsguard`. No reintentas.
+## Use criticality as advisory context
 
-## Paso 5: leer el log
+Read `criticality.in_degree` measurements and `CRITICALITY.md`. The report ranks
+up to 30 functions/methods by distinct callers; JSON has all measured functions,
+including zero-caller functions. Repeated calls from one caller count once.
+Use the rank to identify functions that need careful tests before changes,
+not as a blocking threshold or proof of runtime impact. Static unresolved and
+external calls are disclosed in the report. No cycle, depth, wrapper,
+architecture-rule or baseline/change comparison analysis exists yet.
 
-```python
-# Tool: Read
-file_path: "$LOG"
-```
+## Drill down and report
 
-Para logs grandes (>500 líneas), lee en chunks con `offset`/`limit`. Prioriza las secciones `[FAIL]`.
+Resolve finding diagnostic IDs through the JSON `diagnostics` array. Read only
+the relevant stdout/stderr file when evidence is insufficient. Structured modes
+save complete streams under `node_modules/.cache/oxguard/diagnostics/`; a later
+run can overwrite them. `--log-file` is optional additional logging; `--tail`
+limits human display only. Do not create a temp log and read every analyzer log
+for the normal path.
 
-## Paso 6: interpretar y priorizar
+If the user supplied an existing JSON result or log, interpret that artifact
+without rerunning unless asked. Label legacy prose as unnormalized and do not
+invent stable IDs or counts that it does not establish. Launcher errors before
+Go starts retain stderr/exit output; do not expect JSON for those failures.
 
-Produce un resumen con esta estructura (omite secciones vacías):
-
-### TL;DR
-Una línea: pasó ✓ o falló ✗, subcomando, exit code, total de findings.
-
-### Errores bloqueantes (top 5)
-Formato: `[gate] archivo:línea — mensaje — fix sugerido`
-
-Prioridad: tsc (errores de tipo) > opengrep HIGH > fta >60 > biome/lint E > opengrep MEDIUM > npm-audit CRITICAL/HIGH > otros.
-
-### FTA scores — interpretación (si el gate `fta` aparece)
-El FTA score combina Halstead effort, complejidad ciclomática y LOC en un índice de mantenibilidad inverso (mayor = peor):
-- **<40**: excelente
-- **40–60**: aceptable (default cap)
-- **60–75**: refactor recomendado — extraer funciones, reducir branches
-- **>75**: refactor urgente — el archivo está haciendo demasiado
-
-Para cada archivo que supera el cap: indica el score, qué contribuye más (LOC alto, CC alto, o Halstead alto), y la estrategia de refactor preferida.
-
-### Por gate (solo si >5 findings totales)
-Tabla compacta: `[OK]/[FAIL]` + conteo + herramienta.
-
-Gates en `check` (en orden): `lint (ultracite/biome)` → `fta (fta-cli)` → `types (tsc)` → `coverage (vitest/jest)` → `security (secretlint + audit-ci + opengrep)`
-
-### Auto-fixables
-Los errores de lint/format que `ultracite fix` resuelve son auto-fixables vía `tsguard fix`. Cuenta cuántos y ofrece correrlo.
-
-Los errores de tipo de `tsc` no son auto-fixables — lista los primeros 3.
-
-### Falsos positivos comunes
-- `knip` con exports usados en runtime dynamic imports → `@knip-ignore`
-- `jscpd` en test fixtures o seed data → mover a helpers compartidos o ignorar
-- `audit-ci` en devDependencies con exploits no explotables en producción → usar allowlist en `.auditcirc.json`
-- `opengrep` en código generado o vendored → agregar al `oxguard.toml` exclude
-
-### Recomendación final
-1-3 acciones concretas en orden de impacto.
-
----
-
-## Paso 7: drill-down opcional
-
-Si el usuario pide detalle de un gate específico:
-
-```bash
-tsguard <gate-específico> [flags] --log-file "$LOG2" --allow-pipe
-```
-
-Repite Pasos 5-6 enfocado en ese output.
-
-## Paso 8: cleanup
-
-```bash
-rm -f "$LOG"
-```
-
----
-
-## Comportamientos clave
-
-- **Una sola pregunta** antes de empezar (paso 3). Después ejecuta autónomamente.
-- **No reimplementas** la lógica de ningún gate.
-- **No corras `tsguard setup`** a menos que el usuario lo pida explícitamente.
-- **No modifiques** archivos del proyecto (a menos que el usuario apruebe `tsguard fix`).
-- **Siempre reporta el exit code** real en el TL;DR.
-- Si el proyecto no tiene `package.json` accesible desde cwd, informa y pide que cambie de directorio.
-- El gate `opengrep` muestra `[SKIP]` si el binario no fue descargado — dirigir al usuario a `tsguard setup`. No requiere Python ni cuenta en ninguna plataforma.
-- El gate `security` no usa Python. Secretlint detecta credenciales vía npm; audit-ci valida CVEs con allowlist; opengrep es un binario local autocontenido.
+Report command/scope, semantic status, real exit code, total findings, blocking
+versus advisory work, execution problems and the next concrete action. State
+any omitted or unreviewed findings and gates that have not run. After fixes,
+verify the complete result before claiming success.

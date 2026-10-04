@@ -34,19 +34,19 @@ Schema version `1` has these fields, including empty arrays on success:
 | `command` | Requested analysis command |
 | `exit_code` | Compatible process exit code |
 | `findings` | First-class normalized quality or execution records |
-| `measurements` | Native FTA scores available from this run |
-| `artifacts` | Optional full log-file reference |
+| `measurements` | Native FTA scores and complete function/method `criticality.in_degree` values |
+| `artifacts` | Generated `CRITICALITY.md` and optional full log-file reference |
 | `diagnostics` | Gate, channel, ID and project-relative path for each raw analyzer stream |
 
 Each finding has `id`, `level`, `gate`, `rule`, `severity`, `status`, `category`,
 `evidence` and a `diagnostics` array of diagnostic IDs. `location` is optional
-and contains `file` plus one-based `line` / `column` when known. FTA findings
+and contains `file` plus one-based `line` / `column` and a function/method `symbol` when known. FTA findings
 include numeric `observed` and `threshold`. `remediation` is optional; this
 contract does not invent a source fix when the analyzer provides none.
 
 Rules preserve TypeScript codes, Biome categories/rule names and Opengrep
 `check_id` values. Tsguard-owned rules include
-`tsguard.fta.score_exceeded`, `tsguard.<gate>.failed`, and
+`tsguard.fta.score_exceeded`, `tsguard.criticality.ranked`, `tsguard.<gate>.failed`, and
 `tsguard.execution.<category>`. IDs are the rule plus a SHA-256 of gate, rule,
 project-relative location, line and column. They do not hash English messages,
 measurements, absolute project roots, timestamps or PIDs. Location changes can
@@ -71,6 +71,7 @@ not unexecuted fail-fast steps, and preserves the analyzer's available findings.
 | `startup_failure`, `interrupted`, `diagnostics_failure`, `lock_failure` | Resolve the execution environment |
 | `adapter_failure` | Inspect the tool's structured-output compatibility |
 | `analyzer_failure` | Inspect explicit analyzer error records |
+| `artifact_failure` | Restore permission to write the generated report |
 | `unclassified_failure` | Inspect this gate's diagnostics; cause is not yet known |
 
 Finding `status` is `blocking`, `advisory`, or `execution_error`. A run with
@@ -137,6 +138,7 @@ artifact. Relative log paths retain their invocation-cwd meaning even with
 | TypeScript / tsc | `--pretty false`, TS code, project-relative file, line, column, primary message; global compiler errors are configuration failures |
 | FTA | Native JSON on success; native first score-cap stderr record on failure; score/threshold finding and measurement |
 | Packaged Biome/Ultracite | Biome JSON diagnostics with all diagnostics enabled, rule/category, severity, file and position |
+| Criticality | TypeScript compiler emits resolved function/method nodes and caller → callee edges; Go deduplicates, ranks and reports |
 | Opengrep | Native JSON results/errors; preserve rule IDs and positions; `--error` continues to make every match blocking |
 | Coverage, secrets, dependency audit, Knip/jscpd, other lint backends | Stable gate-level fallback plus diagnostic references; no invented detailed normalization |
 
@@ -152,7 +154,48 @@ Standalone Ultracite and packaged ESLint/Oxlint paths retain their existing back
 and use the stable gate-level fallback. Native tsc primary messages are extracted;
 additional indented explanation remains in diagnostics.
 
-Level 1 analyzers remain existing. This PR implements the normalized result
-contract. Level 2 graphs/criticality and Level 3 baseline/change comparison remain
-missing. The skill is intentionally unchanged; simplifying it is the next small
-integration step after the CLI contract is proven.
+## PyGuard criticality parity
+
+```sh
+npx --no-install tsguard criticality --output agent
+npx --no-install tsguard criticality --output json
+npx --no-install tsguard audit --output json
+```
+
+`criticality` uses the selected `--dirs` and `--exclude` scope. It builds a static
+function/method caller → callee graph with the TypeScript compiler, counts
+**distinct callers** (in-degree), sorts descending with stable location ties,
+and overwrites `CRITICALITY.md` with up to 30 functions having callers. Repeated
+calls from one function count once; a resolved recursive self-call counts once.
+Every discovered function, including zero-caller functions, has a JSON
+measurement. The top 30 have `tsguard.criticality.ranked` advisory findings.
+Agent output uses the existing ten-finding bound; the full ranked table is in
+the report. Generic JSON ordering follows the contract above; rank is in each
+criticality finding's evidence and the Markdown table.
+
+`audit` now runs criticality before the existing dead-code and duplicate checks.
+All three remain advisory, with exit 0; execution failures remain explicit
+`status: error` records. `check` and its blocking gate order are unchanged.
+The compiler analyzer is embedded in the native binary. It emits graph data;
+Go owns ranking, reporting and artifacts. The npm launcher is unchanged and
+no package dependency is added. Standalone use requires Node and project-local
+TypeScript; npm use resolves the package-owned compiler unless the project
+explicitly declares its own compiler, matching the existing type-check path.
+
+This is static resolved-call parity, not a runtime dependency proof. Scope
+covers `.ts`, `.tsx`, `.mts` and `.cts`, excluding declarations and symlinked
+source paths. Imports and compiler path aliases resolve using root
+`tsconfig.json` options. Project-reference traversal, JavaScript sources,
+module-level calls, implicit getter calls and JSX component invocations are
+not counted. Calls to external or out-of-scope functions and unresolved dynamic
+calls are excluded from edges and counted together in the report. TypeScript
+cannot prove all runtime targets of aliases, callbacks, reflection or polymorphic
+calls; the graph records the implementation the compiler can resolve.
+A failed run does not claim an existing report as a newly generated artifact.
+Raw graph data is available in the stdout diagnostic file.
+
+Level 1 analyzers remain existing. The normalized contract and the first Level 2
+PyGuard parity milestone are implemented by this PR. Remaining Level 2 rules,
+cycles, fan-out/depth/wrapper analysis and Level 3 baseline/change comparison
+are still missing. The skill now uses normalized results and requires JSON
+retrieval when the agent summary reports omitted findings.
