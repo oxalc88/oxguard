@@ -249,9 +249,7 @@ pyguard and tsguard enforce the same quality goals but reach them with different
   Halstead per-function, maintainability index per-file). tsguard combines all three into a
   single FTA score per file. See [docs/metrics.md](docs/metrics.md) for what each measures.
 
-- **Security**: pyguard uses bandit (Python AST, blocking) + optional Opengrep deep pass.
-  tsguard uses Opengrep (semgrep-compatible engine, project-local binary, blocking) — same
-  class of problems caught, same depth, zero Python required on the dev machine.
+- **Security**: pyguard runs Bandit, pip-audit and detect-secrets. Python has no implemented Opengrep `--deep` command; strict flag validation rejects it. tsguard uses Opengrep as its blocking SAST engine through a project-local binary.
 
 - **Dead code**: pyguard uses vulture (Python AST). tsguard uses knip (TypeScript-aware,
   also catches unused deps). tsguard additionally runs jscpd for copy-paste detection.

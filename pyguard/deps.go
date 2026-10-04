@@ -13,8 +13,7 @@ import (
 
 // requiredUvDevDeps is the manifest of uv dev-group packages pyguard invokes.
 // semgrep has been removed: pyguard's baseline SAST is bandit (blocking, local).
-// An optional Opengrep deep pass is available via `pyguard security --deep` using
-// the same project-local self-contained binary as tsguard (no pip required).
+// Python security also runs pip-audit and detect-secrets; --deep is not implemented.
 var requiredUvDevDeps = []string{
 	"ruff",
 	"mypy",
