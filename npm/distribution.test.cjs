@@ -237,16 +237,17 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const ftaPass = structured(['fta']);
   assert.equal(ftaPass.status, 'pass');
   // FTA omits tiny files; this fixture has enough lines for a real score.
-  fs.writeFileSync(path.join(consumer, 'src/score.ts'), 'export function score(x: number) {\n  if (x === 1) return 1;\n  if (x === 2) return 2;\n  if (x === 3) return 3;\n  if (x === 4) return 4;\n  if (x === 5) return 5;\n  return 0;\n}\n');
-  assert.ok(structured(['fta']).measurements.some(m => m.metric === 'fta.score' && m.location.file === 'src/score.ts'));
-  const ftaFailed = structured(['fta', '--max-fta-score', '1'], 1);
+  fs.mkdirSync(path.join(consumer, 'src/score'));
+  fs.writeFileSync(path.join(consumer, 'src/score/score.ts'), 'export function score(x: number) {\n  if (x === 1) return 1;\n  if (x === 2) return 2;\n  if (x === 3) return 3;\n  if (x === 4) return 4;\n  if (x === 5) return 5;\n  return 0;\n}\n');
+  assert.ok(structured(['fta']).measurements.some(m => m.metric === 'fta.score' && m.location.file === 'src/score/score.ts'));
+  const ftaFailed = structured(['fta', '--dirs', 'src/score', '--max-fta-score', '1'], 1);
   const scoreFinding = ftaFailed.findings.find(f => f.rule === 'tsguard.fta.score_exceeded');
   assert.ok(scoreFinding);
-  assert.equal(scoreFinding.location.file, 'src/score.ts');
+  assert.equal(scoreFinding.location.file, 'src/score/score.ts');
   assert.equal(scoreFinding.threshold, 1);
   assert.ok(scoreFinding.observed > scoreFinding.threshold);
   assert.ok(ftaFailed.measurements.some(m => m.metric === 'fta.score'));
-  fs.rmSync(path.join(consumer, 'src/score.ts'));
+  fs.rmSync(path.join(consumer, 'src/score'), { recursive: true });
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const broken: number = "not a number";\nexport const other: boolean = 123;\n');
   const typesFailed = structured(['types', '--tail', '1'], 1);
   assert.equal(typesFailed.status, 'fail');
