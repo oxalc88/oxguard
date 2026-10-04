@@ -1,0 +1,368 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "types.clean",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "findings": []
+      },
+      "oracle": "mypy"
+    },
+    {
+      "id": "types.multiple",
+      "fixture": "types-errors",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "findings": [
+          {
+            "rule": "assignment",
+            "file": "src/main.py",
+            "line": 1
+          },
+          {
+            "rule": "assignment",
+            "file": "src/main.py",
+            "line": 2
+          }
+        ]
+      },
+      "oracle": "mypy"
+    },
+    {
+      "id": "lint.clean",
+      "fixture": "clean",
+      "command": "ruff",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "findings": []
+      },
+      "oracle": "ruff"
+    },
+    {
+      "id": "lint.blocking",
+      "fixture": "lint-error",
+      "command": "ruff",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "findings": [
+          {
+            "rule": "F401",
+            "file": "src/main.py",
+            "line": 1
+          }
+        ]
+      },
+      "oracle": "ruff"
+    },
+    {
+      "id": "complexity.clean",
+      "fixture": "clean",
+      "command": "radon",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "complexity": 1
+      },
+      "oracle": "radon"
+    },
+    {
+      "id": "complexity.threshold",
+      "fixture": "complexity",
+      "command": "radon",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "complexity": 12
+      },
+      "oracle": "radon"
+    },
+    {
+      "id": "annotations.clean",
+      "fixture": "clean",
+      "command": "types",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "violations": []
+      },
+      "oracle": "annotations"
+    },
+    {
+      "id": "annotations.threshold",
+      "fixture": "annotation-error",
+      "command": "types",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "violations": [
+          {
+            "line": 1,
+            "depth": 3,
+            "length": 21
+          }
+        ]
+      },
+      "oracle": "annotations"
+    },
+    {
+      "id": "execution.lock",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 4
+      },
+      "lock": true
+    },
+    {
+      "id": "execution.pipe_refusal",
+      "fixture": "clean",
+      "command": "check",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 5
+      },
+      "pipe": true
+    },
+    {
+      "id": "execution.missing_tool",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1
+      },
+      "missing_tool": true
+    },
+    {
+      "id": "diagnostics.log",
+      "fixture": "types-errors",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "log_contains": "[assignment]"
+      },
+      "log": true
+    },
+    {
+      "id": "check.fail_fast",
+      "fixture": "lint-error",
+      "command": "check",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "stops_at": "ruff"
+      }
+    },
+    {
+      "id": "contract.json.clean",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "status": "pass",
+        "findings": []
+      },
+      "json": true
+    },
+    {
+      "id": "contract.json.multiple",
+      "fixture": "types-errors",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "status": "fail",
+        "findings": [
+          {
+            "gate": "mypy",
+            "rule": "assignment",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 1
+          },
+          {
+            "gate": "mypy",
+            "rule": "assignment",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 2
+          }
+        ]
+      },
+      "json": true
+    },
+    {
+      "id": "contract.execution_category",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "status": "error",
+        "findings": [
+          {
+            "gate": "mypy",
+            "rule": "pyguard.execution.tool_missing",
+            "category": "tool_missing",
+            "status": "execution_error"
+          }
+        ]
+      },
+      "json": true,
+      "missing_tool": true
+    },
+    {
+      "id": "contract.agent.omitted",
+      "fixture": "many-findings",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1
+      },
+      "agent": true
+    },
+    {
+      "id": "input.unknown_flag",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 3
+      },
+      "args": [
+        "--timout",
+        "30"
+      ]
+    },
+    {
+      "id": "input.missing_value",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 3
+      },
+      "args": [
+        "--timeout"
+      ]
+    },
+    {
+      "id": "input.invalid_output",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 3
+      },
+      "args": [
+        "--output",
+        "xml"
+      ]
+    },
+    {
+      "id": "input.explicit_root",
+      "fixture": "clean",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0
+      },
+      "root": true
+    },
+    {
+      "id": "criticality.known_callers",
+      "fixture": "criticality",
+      "command": "criticality",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 0,
+        "callers": {
+          "core__target": 2
+        }
+      }
+    },
+    {
+      "fixture": "complexity-boundary",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_boundary",
+      "id": "complexity.boundary",
+      "command": "radon",
+      "oracle": "radon",
+      "expected": {
+        "exit_code": 0,
+        "complexity": 10
+      }
+    },
+    {
+      "fixture": "annotation-boundary",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "independent_python_boundary",
+      "id": "annotations.boundary",
+      "command": "types",
+      "oracle": "annotations",
+      "expected": {
+        "exit_code": 0,
+        "violations": []
+      }
+    }
+  ]
+}

@@ -167,7 +167,7 @@ function evaluate({ command, revision = 'unspecified', suite = 'candidate', repo
       costs: { total_case_duration_ms: times.reduce((sum, value) => sum + value, 0), p50_case_duration_ms: percentile(0.5), p95_case_duration_ms: percentile(0.95), max_agent_bytes: Math.max(0, ...cases.map(c => c.agent_bytes || 0)), max_agent_lines: Math.max(0, ...cases.map(c => c.agent_lines || 0)) },
       environment: { platform: process.platform, arch: process.arch, node: process.version },
       cli_version: version.stdout.trim(), execution_path: 'caller-supplied argv; installed launcher in CI',
-      lanes: { cli: 'executed', distribution: 'separate installed integration tests', agent: 'scenario/rubric corpus only', pyguard: 'not evaluated' },
+      lanes: { cli: 'executed', distribution: 'separate installed integration tests', agent: 'scenario/rubric corpus only', pyguard: 'separate behavior/parity reports; see evals/python/run.cjs' },
       totals: counts, detection: { ...detectionTotals, precision: tp + fp ? tp / (tp + fp) : null, recall: tp + fn ? tp / (tp + fn) : null }, cases };
     if (reportFile) {
       fs.mkdirSync(path.dirname(reportFile), { recursive: true });
