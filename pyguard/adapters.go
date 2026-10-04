@@ -9,8 +9,8 @@ import (
 )
 
 type toolSpec struct {
-	gate, adapter string
-	advisory      bool
+	gate, adapter, reportPath, testsPath string
+	advisory                             bool
 }
 
 func (r *Runner) machine() bool { return r.outputMode == "json" || r.outputMode == "agent" }
@@ -40,6 +40,8 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	if r.result == nil {
 		return
 	}
+	complete := spec.adapter != ""
+	defer func() { r.result.RecordGate(spec.gate, res.ok, complete) }()
 	status := "blocking"
 	if spec.advisory {
 		status = "advisory"
@@ -81,6 +83,12 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	before := len(r.result.Findings)
 	decodeFailed := false
 	switch spec.adapter {
+	case "bandit", "pip-audit", "deptry", "pytest":
+		if r.machine() {
+			if err := r.normalizeNative(spec, stdout, refs); err != nil {
+				decodeFailed = true
+			}
+		}
 	case "ruff":
 		var rows []struct {
 			Code     string                    `json:"code"`
@@ -218,10 +226,13 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 		}
 	}
 	if decodeFailed {
+		complete = false
 		execution("adapter_failure", "Analyzer structured output is invalid; inspect diagnostics.")
 		return
 	}
+
 	if !res.ok && len(r.result.Findings) == before {
+		complete = false
 		add("pyguard."+spec.gate+".failed", "error", "unclassified_failure", "Gate failed; cause is unknown. Inspect referenced diagnostics.", nil)
 	}
 }

@@ -14,6 +14,8 @@ type RunResult struct {
 	namespace     string
 	SchemaVersion string        `json:"schema_version"`
 	Status        string        `json:"status"`
+	Assessment    string        `json:"assessment"`
+	Gates         []Gate        `json:"gates"`
 	Command       string        `json:"command"`
 	ExitCode      int           `json:"exit_code"`
 	Findings      []Finding     `json:"findings"`
@@ -30,19 +32,20 @@ type Location struct {
 }
 
 type Finding struct {
-	ID          string    `json:"id"`
-	Level       string    `json:"level"`
-	Gate        string    `json:"gate"`
-	Rule        string    `json:"rule"`
-	Severity    string    `json:"severity"`
-	Status      string    `json:"status"` // blocking, advisory, or execution_error
-	Category    string    `json:"category"`
-	Location    *Location `json:"location,omitempty"`
-	Observed    *float64  `json:"observed,omitempty"`
-	Threshold   *float64  `json:"threshold,omitempty"`
-	Evidence    string    `json:"evidence"`
-	Remediation string    `json:"remediation,omitempty"`
-	Diagnostics []string  `json:"diagnostics"`
+	ID          string     `json:"id"`
+	Level       string     `json:"level"`
+	Gate        string     `json:"gate"`
+	Rule        string     `json:"rule"`
+	Severity    string     `json:"severity"`
+	Status      string     `json:"status"` // blocking, advisory, or execution_error
+	Category    string     `json:"category"`
+	Location    *Location  `json:"location,omitempty"`
+	Related     []Location `json:"related,omitempty"`
+	Observed    *float64   `json:"observed,omitempty"`
+	Threshold   *float64   `json:"threshold,omitempty"`
+	Evidence    string     `json:"evidence"`
+	Remediation string     `json:"remediation,omitempty"`
+	Diagnostics []string   `json:"diagnostics"`
 }
 
 type Measurement struct {
@@ -68,7 +71,7 @@ type Diagnostic struct {
 
 func New(namespace, command string) *RunResult {
 	return &RunResult{namespace: namespace, SchemaVersion: "1", Status: "pass", Command: command,
-		Findings: []Finding{}, Measurements: []Measurement{}, Artifacts: []Artifact{}, Diagnostics: []Diagnostic{}}
+		Gates: []Gate{}, Assessment: "incomplete", Findings: []Finding{}, Measurements: []Measurement{}, Artifacts: []Artifact{}, Diagnostics: []Diagnostic{}}
 }
 
 func (r *RunResult) AddFinding(f Finding) {
@@ -84,6 +87,12 @@ func (r *RunResult) AddFinding(f Finding) {
 	}
 	// IDs never depend on English messages, analyzer order, cwd, timestamps or PIDs.
 	identity := fmt.Sprintf("%s\x00%s\x00%s\x00%d\x00%d", f.Gate, f.Rule, file, line, column)
+	if f.Location != nil && f.Location.Symbol != "" {
+		identity += "\x00symbol:" + f.Location.Symbol
+	}
+	for _, loc := range f.Related {
+		identity += fmt.Sprintf("\x00related:%s:%d:%d:%s", loc.File, loc.Line, loc.Column, loc.Symbol)
+	}
 	f.ID = fmt.Sprintf("%s:%x", f.Rule, sha256.Sum256([]byte(identity)))
 	r.Findings = append(r.Findings, f)
 }
@@ -91,10 +100,20 @@ func (r *RunResult) AddFinding(f Finding) {
 func (r *RunResult) Execution(gate, category, evidence string) {
 	r.AddFinding(Finding{Gate: gate, Rule: r.namespace + ".execution." + category,
 		Severity: "error", Status: "execution_error", Category: category, Evidence: evidence})
+	r.RecordGate(gate, false, true)
 }
 
 func (r *RunResult) Finish(code int) {
 	r.ExitCode = code
+	r.Assessment = "complete"
+	if len(r.Gates) == 0 {
+		r.Assessment = "incomplete"
+	}
+	for _, g := range r.Gates {
+		if g.Status == "not_run" || g.Status == "error" || g.Normalization != "complete" {
+			r.Assessment = "incomplete"
+		}
+	}
 	for _, f := range r.Findings {
 		if f.Status == "execution_error" {
 			r.Status = "error"
@@ -138,7 +157,13 @@ func (r *RunResult) Finish(code int) {
 		if a.Location.File != b.Location.File {
 			return a.Location.File < b.Location.File
 		}
-		return a.Metric < b.Metric
+		if a.Metric != b.Metric {
+			return a.Metric < b.Metric
+		}
+		if a.Location.Line != b.Location.Line {
+			return a.Location.Line < b.Location.Line
+		}
+		return a.Location.Symbol < b.Location.Symbol
 	})
 }
 

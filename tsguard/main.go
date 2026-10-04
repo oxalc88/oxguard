@@ -170,6 +170,24 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		}
 	}
 
+	if cfg.output != "human" {
+		switch cmd {
+		case "check":
+			result.Plan("lint", "fta", "types", "coverage", "secrets", "dependencies", "security")
+		case "security":
+			result.Plan("secrets", "dependencies", "security")
+		case "audit":
+			result.Plan("criticality", "dead-code", "duplicates")
+		case "complexity":
+			result.Plan("lint")
+		case "fix":
+			result.Plan("lint")
+		case "npm-audit":
+			result.Plan("dependencies")
+		default:
+			result.Plan(cmd)
+		}
+	}
 	r := &Runner{outputMode: cfg.output, result: result, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs, ftaExcludeTests: cfg.ftaExcludeTests, ftaExclude: cfg.ftaExclude}
 
 	switch cmd {

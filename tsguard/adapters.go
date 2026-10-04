@@ -13,9 +13,9 @@ import (
 )
 
 type toolSpec struct {
-	gate, adapter, subject string
-	advisory               bool
-	threshold              float64
+	gate, adapter, subject, reportPath, testsPath string
+	advisory                                      bool
+	threshold                                     float64
 }
 
 var tscDiagnostic = regexp.MustCompile(`^(.+)\((\d+),(\d+)\): error (TS\d+): (.*)$`)
@@ -28,6 +28,8 @@ var networkDiagnostic = regexp.MustCompile(`(?m)(?:^npm (?:ERR!|error) code |^\s
 var missingModuleDiagnostic = regexp.MustCompile(`(?m)(?:^Error: Cannot find module |^\s*code: ['"](?:MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND)['"])`)
 
 func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []string) {
+	complete := spec.adapter != ""
+	defer func() { r.result.RecordGate(spec.gate, res.ok, complete) }()
 	start := len(r.result.Findings)
 	status := "blocking"
 	if spec.advisory {
@@ -64,6 +66,12 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	}
 	var adapterErr error
 	switch spec.adapter {
+	case "secretlint", "knip", "jscpd", "coverage-summary", "dependency-audit", "audit-ci":
+		if r.machine() {
+			if err := r.normalizeNative(spec, res, stdout, refs); err != nil {
+				adapterErr = err
+			}
+		}
 	case "criticality":
 		if res.ok {
 			adapterErr = r.normalizeCriticality(stdout, refs)
@@ -199,11 +207,14 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 		}
 	}
 	if adapterErr != nil {
+		complete = false
 		add("tsguard.execution.adapter_failure", "error", "adapter_failure", "Analyzer structured output could not be decoded; inspect diagnostics.", nil)
 	}
+
 	if !res.ok && len(r.result.Findings) == start {
+		complete = false
 		// Unknown tool details are never confidently labelled source-code defects.
-		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".failed", Severity: "error", Status: status,
+		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".failed", Severity: "error", Status: "execution_error",
 			Category: "unclassified_failure", Evidence: "Analyzer failed; inspect diagnostics for this gate.", Diagnostics: refs})
 	}
 }

@@ -124,7 +124,7 @@ func TestSuccessfulResultAndAdvisoryExit(t *testing.T) {
 	t.Setenv("TSGUARD_CONTRACT_HELPER", "unknown")
 	r.RunTool(toolSpec{gate: "dead-code", advisory: true}, "knip", os.Args[0], "-test.run=^TestAnalyzerProcess$")
 	r.result.Finish(0)
-	if r.result.Status != "advisory" || r.result.ExitCode != 0 {
+	if r.result.Status != "error" || r.result.ExitCode != 0 || r.result.Assessment != "incomplete" || r.result.Findings[0].Category != "unclassified_failure" {
 		t.Fatal(r.result)
 	}
 }

@@ -127,15 +127,22 @@ func runTypes(r *Runner, dirs []string) int {
 func runCoverage(r *Runner) int {
 	runner := detectPythonTestRunner(r.root)
 	switch runner {
-	case "pytest":
-		res := r.RunTool(toolSpec{gate: "coverage"}, "pytest --cov", "uv", "run", "pytest", "--cov", "--cov-fail-under=80")
-		if !res.ok {
-			return 1
+	case "pytest", "unittest":
+		args := []string{"uv", "run", "pytest", "--cov", "--cov-fail-under=80"}
+		spec := toolSpec{gate: "coverage"}
+		if r.machine() {
+			report, err := r.reportFile("coverage", "coverage.json")
+			if err != nil {
+				return r.executionFailure("coverage", "diagnostics_failure", err.Error())
+			}
+			tests, err := r.reportFile("coverage", "tests.xml")
+			if err != nil {
+				return r.executionFailure("coverage", "diagnostics_failure", err.Error())
+			}
+			spec.adapter, spec.reportPath, spec.testsPath = "pytest", report, tests
+			args = append(args, "--cov-report=json:"+report, "--junitxml="+tests, "-o", "junit_family=xunit1")
 		}
-	case "unittest":
-		// pytest discovers and runs unittest tests without requiring rewrites.
-		res := r.RunTool(toolSpec{gate: "coverage"}, "pytest --cov (unittest)", "uv", "run", "pytest", "--cov", "--cov-fail-under=80")
-		if !res.ok {
+		if !r.RunTool(spec, "pytest --cov", args...).ok {
 			return 1
 		}
 	case "":
@@ -148,7 +155,11 @@ func runCoverage(r *Runner) int {
 
 // runBandit runs the security scanner.
 func runBandit(r *Runner, dirs []string) int {
-	res := r.Run("bandit", append([]string{"uv", "run", "bandit", "-r", "-c", "pyproject.toml", "-q"}, dirs...)...)
+	args := []string{"uv", "run", "bandit", "-r", "-c", "pyproject.toml", "-q"}
+	if r.machine() {
+		args = append(args, "--format", "json")
+	}
+	res := r.RunTool(toolSpec{gate: "bandit", adapter: "bandit"}, "bandit", append(args, dirs...)...)
 	if !res.ok {
 		return 1
 	}
@@ -157,7 +168,11 @@ func runBandit(r *Runner, dirs []string) int {
 
 // runPipAudit runs dependency vulnerability scanning.
 func runPipAudit(r *Runner) int {
-	res := r.Run("pip-audit", "uv", "run", "pip-audit")
+	args := []string{"uv", "run", "pip-audit"}
+	if r.machine() {
+		args = append(args, "--format", "json")
+	}
+	res := r.RunTool(toolSpec{gate: "pip-audit", adapter: "pip-audit"}, "pip-audit", args...)
 	if !res.ok {
 		return 1
 	}
@@ -190,7 +205,11 @@ func runSecrets(r *Runner, cfg config) int {
 		return 1
 	}
 
-	res := r.RunTool(toolSpec{gate: "secrets"}, "detect-secrets", "uv", "run", "python", "tools/analysis/check_secrets.py")
+	args := []string{"uv", "run", "python", "tools/analysis/check_secrets.py"}
+	if r.machine() {
+		args = append(args, "--json")
+	}
+	res := r.RunTool(toolSpec{gate: "secrets", adapter: "owned"}, "detect-secrets", args...)
 	if !res.ok {
 		return 1
 	}
@@ -214,12 +233,29 @@ func runCriticality(r *Runner) int {
 
 // runDeadCode runs vulture for dead code detection (informational).
 func runDeadCode(r *Runner, dirs []string) int {
-	r.RunTool(toolSpec{gate: "dead-code", advisory: true}, "vulture", append([]string{"uv", "run", "vulture"}, dirs...)...)
+	args := append([]string{"uv", "run", "vulture"}, dirs...)
+	spec := toolSpec{gate: "dead-code", advisory: true}
+	if r.machine() {
+		args = append([]string{"uv", "run", "python", "tools/analysis/vulture_report.py"}, dirs...)
+		spec.adapter = "owned"
+	}
+	r.RunTool(spec, "vulture", args...)
 	return 0
 }
 
 // runDeps runs deptry for dependency hygiene (informational).
 func runDeps(r *Runner) int {
-	r.RunTool(toolSpec{gate: "deps", advisory: true}, "deptry", "uv", "run", "deptry", "..")
+	args := []string{"uv", "run", "deptry", ".."}
+	spec := toolSpec{gate: "deps", advisory: true}
+	if r.machine() {
+		report, err := r.reportFile("deptry", "deptry.json")
+		if err != nil {
+			r.executionFailure("deps", "diagnostics_failure", err.Error())
+			return 0
+		}
+		args = append(args, "--json-output", report)
+		spec.adapter, spec.reportPath = "deptry", report
+	}
+	r.RunTool(spec, "deptry", args...)
 	return 0
 }

@@ -27,7 +27,16 @@ func Report(w io.Writer, mode string, result *RunResult) error {
 	if len(result.Findings) > 0 {
 		gate = result.Findings[0].Gate
 	}
-	fmt.Fprintln(&b, "gate: "+Text(gate))
+	notRun, partial := 0, 0
+	for _, g := range result.Gates {
+		if g.Status == "not_run" {
+			notRun++
+		}
+		if g.Normalization == "partial" {
+			partial++
+		}
+	}
+	fmt.Fprintln(&b, Text(fmt.Sprintf("gate: %s; assessment: %s; not_run: %d; partial: %d", gate, result.Assessment, notRun, partial)))
 	fmt.Fprintf(&b, "findings: %d\n", len(result.Findings))
 	for i, f := range result.Findings {
 		if i == FindingLimit {

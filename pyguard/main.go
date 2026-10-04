@@ -193,6 +193,20 @@ func dispatch(cmd string, args []string, cfg config, root string, result *RunRes
 		}
 	}
 
+	if cfg.output != "human" {
+		switch cmd {
+		case "check":
+			result.Plan("ruff", "mypy", "radon", "types", "coverage", "bandit", "pip-audit", "secrets")
+		case "security":
+			result.Plan("bandit", "pip-audit", "secrets")
+		case "audit":
+			result.Plan("criticality", "dead-code", "deps")
+		case "fix":
+			result.Plan("ruff")
+		default:
+			result.Plan(cmd)
+		}
+	}
 	r := &Runner{outputMode: cfg.output, result: result, dirs: cfg.dirs, dirsExplicit: cfg.dirsExplicit, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, excludeTests: cfg.excludeTests, exclude: cfg.exclude}
 
 	switch cmd {
