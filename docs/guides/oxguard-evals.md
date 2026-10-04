@@ -68,10 +68,9 @@ CI runs CLI evals on the three npm platform jobs and uploads candidate JSON. The
 
 Require existing cases to remain passing and a new capability to have positive, negative and boundary cases. Changes to expected answers require a documented behavior decision and review; never rewrite an oracle merely to get green CI. Corpus changes must accompany their fixtures/provenance. Store reports as CI artifacts rather than committing generated observations as golden answers.
 
-## Lanes still missing
+## Evaluation coverage and remaining gaps
 
-- PyGuard has a real known-answer corpus, but its normalized result contract is absent. See the Python lanes below; this is an observed gap, not a passing eval.
-- Opengrep, coverage, secrets and dependency transport/advisories are protected by existing tests but have no scored cases in this corpus yet.
+- Python coverage and Bandit now have scored cases. TypeScript Opengrep/coverage, secrets and dependency transport/advisories remain integration/unit checks rather than independent scored detection cases in the current corpus.
 - Historical installation timeouts and registry routing remain integration checks, not detection metrics. Live security-advisory feeds are outside these deterministic evals; the integration harness's local provider must not imply production safety.
 - `evals/agent-scenarios.json` defines four history-based scenarios now exercised through real independent agents for both skills: omitted findings, execution repair, advisory criticality and fail-fast. `agent-traces/` records native results, argv, source fingerprints and read-only semantic answers. `agent-actions.cjs` scores observable actions; CI replays those captures rather than making live LLM calls. Skill content changes invalidate the corresponding capture until fresh forward-testing replaces it.
 - Larger independent projects, unseen holdout cases, memory measurements and controlled performance benchmarks remain future work.
