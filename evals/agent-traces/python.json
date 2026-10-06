@@ -1,46 +1,84 @@
 {
   "schema_version": "1",
   "language": "python",
-  "skill_sha256": "c8c9b1a161b2909ee80fdabe0c6a1decf9168b3fd9087a0acdb63a6d1b23b1b2",
-  "capture_date": "2026-10-04",
-  "provenance": "Independent fresh Codex tasks using repository skill; real guard/PM processes recorded by a fixture-only observer. Recorded CLI runs occurred during implementation. CI replays action scoring, not live model execution.",
+  "skill_sha256": "c8892de0e83a409160d36782760b79184ec9d0988583aac6c8088023e77dcfba",
+  "capture_date": "2026-10-06",
+  "provenance": "Fresh independent Codex agents read the updated repository skill and chose real CLI/package-manager actions in isolated fixtures. evals/record-agent-command.cjs recorded argv, process results, and before/after fingerprints of fixture src files. Python omission/interpretation and exact-JSON dependency repair used separate independent agents. Read-only interpretation inputs were real native CLI preflight records. CI replays recorded evidence; it does not call live models. No historical actions were relabelled with a new skill hash.",
+  "agent_tasks": [
+    "python_skill_forward",
+    "python_repair_forward"
+  ],
   "omitted_events": [
     {
-      "tool": "guard",
+      "tool": "pyguard",
       "argv": [
         "--help"
       ],
       "exit_code": 0,
-      "source_before": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
-      "source_after": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
-      "tool_output": "pyguard — Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . — project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, s"
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "tool_output": "pyguard \u2014 Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . \u2014 project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, security, coverage) pyguard refuses to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter commands warn on piped stdout but still run.\n"
     },
     {
-      "tool": "guard",
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 1,
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "tool_output": "{\"file\": \"src/main.py\", \"line\": 1, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 2, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 3, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 4, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 5, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 6, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 7, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 8, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 9, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 10, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 11, \"column\": 15, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 12, \"column\": 15, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "pyguard",
       "argv": [
         "mypy",
+        "--root",
+        "/tmp/oxguard-agent-refresh/python/omitted",
         "--dirs",
         "src",
         "--output",
         "agent"
       ],
       "exit_code": 1,
-      "source_before": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
-      "source_after": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
       "summary": "FAIL\ncommand: mypy\ngate: mypy; assessment: complete; not_run: 0; partial: 0\nfindings: 12\nassignment src/main.py:1 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:2 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:3 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:4 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:5 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:6 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:7 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:8 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:9 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:10 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nomitted: 2 (use --output json)\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log (paths in --output json)\n"
     },
     {
-      "tool": "guard",
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 1,
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "tool_output": "{\"file\": \"src/main.py\", \"line\": 1, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 2, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 3, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 4, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 5, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 6, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 7, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 8, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 9, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 10, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 11, \"column\": 15, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 12, \"column\": 15, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "pyguard",
       "argv": [
         "mypy",
+        "--root",
+        "/tmp/oxguard-agent-refresh/python/omitted",
         "--dirs",
         "src",
         "--output",
         "json"
       ],
       "exit_code": 1,
-      "source_before": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
-      "source_after": "83380178583ea8cb3f0bf31de5654552607ddea0cdcabd67a4554efb822eac2c",
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
       "result": {
         "schema_version": "1",
         "status": "fail",
@@ -303,45 +341,314 @@
       }
     },
     {
-      "tool": "guard",
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "pyguard",
       "argv": [
         "mypy",
+        "--root",
+        "/tmp/oxguard-agent-refresh/python/omitted",
         "--dirs",
         "src",
         "--output",
         "agent"
       ],
       "exit_code": 0,
-      "source_before": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
-      "source_after": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
       "summary": "PASS\ncommand: mypy\ngate: none; assessment: complete; not_run: 0; partial: 0\nfindings: 0\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log (paths in --output json)\n"
     },
     {
-      "tool": "guard",
+      "tool": "uv",
+      "argv": [
+        "run",
+        "ruff",
+        "check",
+        "--output-format",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "[]",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "1 file already formatted\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "radon",
+        "cc",
+        "--json",
+        "--exclude",
+        "*/test_*.py,*/*_test.py,*/conftest.py",
+        "--ignore",
+        "tests,test",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "{}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "radon",
+        "mi",
+        "--json",
+        "--exclude",
+        "*/test_*.py,*/*_test.py,*/conftest.py",
+        "--ignore",
+        "tests,test",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "{\"src/main.py\": {\"mi\": 100.0, \"rank\": \"A\"}}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "python",
+        "tools/analysis/check_halstead.py",
+        "--json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n",
+      "native_result": {
+        "artifacts": [],
+        "findings": [],
+        "measurements": [],
+        "schema_version": "1"
+      }
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "python",
+        "tools/analysis/check_type_complexity.py",
+        "src",
+        "--json"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n",
+      "native_result": {
+        "artifacts": [],
+        "findings": [],
+        "measurements": [],
+        "schema_version": "1"
+      }
+    },
+    {
+      "tool": "pyguard",
       "argv": [
         "check",
+        "--root",
+        "/tmp/oxguard-agent-refresh/python/omitted",
         "--dirs",
         "src",
         "--output",
         "agent"
       ],
       "exit_code": 1,
-      "source_before": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
-      "source_after": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
       "summary": "ERROR\ncommand: check\ngate: coverage; assessment: incomplete; not_run: 3; partial: 0\nfindings: 1\npyguard.execution.tool_missing [tool_missing/execution_error]\nNo test runner or test files found.\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-ruff-stdout.log (paths in --output json)\n"
     },
     {
-      "tool": "guard",
+      "tool": "uv",
+      "argv": [
+        "run",
+        "ruff",
+        "check",
+        "--output-format",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "[]",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "1 file already formatted\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "radon",
+        "cc",
+        "--json",
+        "--exclude",
+        "*/test_*.py,*/*_test.py,*/conftest.py",
+        "--ignore",
+        "tests,test",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "{}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "radon",
+        "mi",
+        "--json",
+        "--exclude",
+        "*/test_*.py,*/*_test.py,*/conftest.py",
+        "--ignore",
+        "tests,test",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "tool_output": "{\"src/main.py\": {\"mi\": 100.0, \"rank\": \"A\"}}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "python",
+        "tools/analysis/check_halstead.py",
+        "--json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n",
+      "native_result": {
+        "artifacts": [],
+        "findings": [],
+        "measurements": [],
+        "schema_version": "1"
+      }
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "python",
+        "tools/analysis/check_type_complexity.py",
+        "src",
+        "--json"
+      ],
+      "exit_code": 0,
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n",
+      "native_result": {
+        "artifacts": [],
+        "findings": [],
+        "measurements": [],
+        "schema_version": "1"
+      }
+    },
+    {
+      "tool": "pyguard",
       "argv": [
         "check",
+        "--root",
+        "/tmp/oxguard-agent-refresh/python/omitted",
         "--dirs",
         "src",
         "--output",
         "json"
       ],
       "exit_code": 1,
-      "source_before": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
-      "source_after": "b39834e4f80f15718cce91b6fc75ec4d3cc0836a16aa8a5490b8f010d1f72988",
+      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
       "result": {
         "schema_version": "1",
         "status": "error",
@@ -512,36 +819,39 @@
         "--help"
       ],
       "exit_code": 0,
-      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "tool_output": "pyguard — Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . — project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, s"
+      "source_before": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "source_after": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "tool_output": "pyguard \u2014 Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . \u2014 project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, security, coverage) pyguard refuses to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter commands warn on piped stdout but still run.\n"
     },
     {
-      "tool": "pyguard",
+      "tool": "uv",
       "argv": [
+        "run",
         "mypy",
-        "--dirs",
-        "src",
         "--output",
-        "agent"
+        "json",
+        "src"
       ],
-      "exit_code": 1,
-      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "summary": "ERROR\ncommand: mypy\ngate: mypy; assessment: incomplete; not_run: 0; partial: 0\nfindings: 1\npyguard.execution.tool_missing [tool_missing/execution_error]\nProject analyzer or module is missing.\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log (paths in --output json)\n"
+      "exit_code": 2,
+      "source_before": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "source_after": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "tool_output": "",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\nerror: Failed to spawn: `mypy`\n  Caused by: No such file or directory (os error 2)\n"
     },
     {
       "tool": "pyguard",
       "argv": [
         "mypy",
+        "--root",
+        "/tmp/oxguard-agent-refresh/python/repair",
         "--dirs",
         "src",
         "--output",
         "json"
       ],
       "exit_code": 1,
-      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_before": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "source_after": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
       "result": {
         "schema_version": "1",
         "status": "error",
@@ -592,41 +902,48 @@
     {
       "tool": "uv",
       "argv": [
-        "--help"
-      ],
-      "exit_code": 0,
-      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "tool_output": "An extremely fast Python package manager.\n\nUsage: uv [OPTIONS] <COMMAND>\n\nCommands:\n  auth       Manage authentication\n  run        Run a command or script\n  init       Create a new project\n  add        Add dependencies to the project\n  remove     Remove dependencies from the project\n  version    Read or update the project's version\n  sync       Update the project's environment\n  lock       Update the project's lockfile\n  export     Export the project's lockfile to an alternate format\n  tree       Display the project's dependency tree\n  format     Format Python code in the project\n  check      Run checks on the project\n  audit      Audit the project's dependencies\n  tool       Run and install commands provided by Python packages\n  python     Manage Python versions and installations\n  pip        Manage Python packages with a pip-compatible interface\n  venv       Create a virtual environment\n  build      Build Python packages into source distributions and wheels\n  publish    Upload distributions to an index\n  workspace  Inspect uv workspaces\n  cache      Manage uv's cache\n  self       Manage the uv executable\n  help       Display documentation for a command\n\nCache options:\n  -n, --no-cache               Avoid reading from or writing to the cache, instead using a temporary\n                               directory for the duration of the operation [env: UV_NO_CACHE=]\n      --cache-dir <CACHE_DIR>  Path to the cache directory [env: UV_CACHE_DIR=]\n\nPython options:\n      --managed-python       Require use of uv-managed Python versions [env: UV_MANAGED_PYTHON=]\n      --no-managed-python    Disable use of uv-managed Python versions [env: UV_NO_MANAGED_PYTHON=]\n      --no-python-downloads  Disable automatic downloads of Python. [env:\n                             \"UV_PYTHON_DOWNLOADS=never\"]\n\nGlobal options:\n  -q, --quiet...\n          Use quiet output\n  -v, --verbose...\n          Use verbose output\n      --color <COLOR_CHOICE>\n          Control the use of color in output [possible values: auto, always, never]\n      --system"
-    },
-    {
-      "tool": "uv",
-      "argv": [
         "pip",
         "install",
         "--offline",
         "--python",
-        ".venv/bin/python",
+        "/tmp/oxguard-agent-refresh/python/repair/.venv/bin/python",
         "mypy==1.18.2"
       ],
       "exit_code": 0,
-      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_before": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "source_after": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
       "tool_output": "",
-      "stderr": "Resolved 4 packages in 4ms\nInstalled 4 packages in 20ms\n + mypy==1.18.2\n + mypy-extensions==1.1.0\n + pathspec==1.1.1\n + typing-extensions==4.16.0\n"
+      "stderr": "Resolved 4 packages in 4ms\nwarning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.\n         If the cache and target directories are on different filesystems, hardlinking may not be supported.\n         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.\nInstalled 1 package in 99ms\n + mypy==1.18.2\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "source_after": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "tool_output": "\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
     {
       "tool": "pyguard",
       "argv": [
         "mypy",
+        "--root",
+        "/tmp/oxguard-agent-refresh/python/repair",
         "--dirs",
         "src",
         "--output",
         "json"
       ],
       "exit_code": 0,
-      "source_before": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
-      "source_after": "2f2b9249dea155e7b6cb38c35de4b22df33de2e6cbe38168517eff7c108c349c",
+      "source_before": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
+      "source_after": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
       "result": {
         "schema_version": "1",
         "status": "pass",
@@ -683,7 +1000,7 @@
           "severity": "error",
           "status": "execution_error",
           "category": "tool_missing",
-          "evidence": "Analyzer executable is missing.",
+          "evidence": "Project analyzer or module is missing.",
           "diagnostics": [
             "diagnostic-001",
             "diagnostic-002"
@@ -799,24 +1116,26 @@
       ]
     },
     "response": {
-      "execution": {
-        "semantic_status": "error",
-        "exit_code": 1,
-        "source_edit_needed": false,
-        "explanation": "The mypy command reports one execution_error finding, pyguard.execution.tool_missing: the analyzer executable is missing. The assessment is incomplete, although normalization of this execution error is complete. This blocks approval that requires a completed mypy check; exit 1 does not establish a source defect or a failed type-check finding.",
-        "next_action": "Make the mypy analyzer available in the intended project environment through an authorized dependency/environment repair, then rerun the same mypy invocation and scope to obtain an actual analysis. Do not edit source in response to this tool_missing finding. The referenced diagnostics can be inspected if environment troubleshooting needs more detail."
-      },
       "advisory": {
         "semantic_status": "advisory",
         "exit_code": 0,
         "source_edit_needed": false,
-        "explanation": "The criticality command completed its requested assessment with one informational quality advisory and complete normalization. functions/core.py:1, core.target, ranks first with 2 distinct static function callers. This is not a failed quality gate and does not block approval on its own. The result lists CRITICALITY.md as its report artifact.",
-        "next_action": "Use the ranking and CRITICALITY.md to prioritize review or testing of core.target if useful. No source change is required by this advisory. Obtain any separately required quality checks before granting approval for a broader scope.",
+        "explanation": "The criticality analysis completed with one advisory quality finding: core.target at functions/core.py:1 has 2 distinct static callers and rank 1. This is informational prioritization, not a blocking source defect. The supplied record lists CRITICALITY.md as an artifact.",
         "limitations": [
-          "Static distinct-caller counts do not prove runtime impact, execution frequency, or business criticality.",
-          "Assessment completeness applies only to the requested criticality command and its scope; it does not establish that other quality gates passed.",
-          "Exit 0 alone is not proof of successful analysis for advisory commands; this record's advisory status and complete assessment establish the outcome here.",
-          "Existing analyzers remain Level 1 with advisory criticality parity; remaining Level 2 and all Level 3 checks are absent."
+          "Static caller counts do not establish runtime impact.",
+          "This complete assessment covers criticality only; no other quality gates are evidenced by this result.",
+          "The artifact is listed in the supplied record; its contents were not inspected."
+        ]
+      },
+      "execution": {
+        "semantic_status": "error",
+        "exit_code": 1,
+        "source_edit_needed": false,
+        "explanation": "The supplied mypy result has one tool_missing execution error: the project analyzer or module is missing. Mypy did not complete an assessment of source quality. Repair the analyzer/environment rather than changing source based on this finding.",
+        "limitations": [
+          "Assessment is incomplete despite complete normalization of the execution error.",
+          "No completed source type-checking result is provided.",
+          "No other quality gates are evidenced by this supplied result."
         ]
       }
     }
