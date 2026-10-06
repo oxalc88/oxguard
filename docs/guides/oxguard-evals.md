@@ -109,7 +109,28 @@ See [PyGuard agent evaluation](pyguard-agent-evaluation.md) for repository evide
 
 The existing report job runs `evals/level1-ready.cjs` and publishes `level1-ready.json`; no extra workflow or runner is added. Readiness requires every case in both current corpora, all 18 shared capabilities, and the recorded action scores for both current skills. Missing cases, failed/unsupported/skipped outcomes, stale skill captures, missing complete JSON retrieval or source changes during execution repair block readiness. An initial TypeScript forward-test had an invalid fixture because the distribution harness deliberately renamed its native package; that attempt is retained as `invalid-initial-typescript.json` and earns no score. A fresh independent task supplied the scored replacement.
 
-The traces prove scoped behavior on these fixtures: both agents retrieve all 12 findings before editing, fix them, rerun the failed gate and full check, and disclose unexecuted gates. Authorized offline repair restores TypeScript with npm and mypy with uv without changing source. Read-only answers distinguish missing tools from source defects and criticality from blocking policy. Python full-check verification remains blocked by missing tests in its fixture; TypeScript's final run is blocked by an unavailable audit endpoint. Those are truthful error results, not failed skill scenarios or claims that all gates passed. Additional models, production projects, analyzer versions and long-term capability accuracy need new evaluation evidence. Passing this gate does not authorize implementing or releasing Level 2/3.
+The current traces were recaptured on 2026-10-06 with the updated skills, using fresh independent agents in isolated projects. They prove scoped behavior on these fixtures: both agents retrieve all 12 findings before editing, fix them, rerun the failed gate and full check, and disclose unexecuted gates. Authorized offline repair restores TypeScript with npm and mypy with uv without changing `src` files. Python omission/interpretation and exact-JSON dependency repair were separate independent tasks; the repair records include complete initial and final CLI results. Read-only answers distinguish missing tools from source defects and criticality from blocking policy. Python full-check verification remains blocked by missing tests in its fixture. The TypeScript agent adds tests and reaches 100% coverage; its final run is blocked by an intentionally unavailable local audit endpoint. Those are truthful error results, not failed skill scenarios or claims that all gates passed. Additional models, production projects, analyzer versions and long-term capability accuracy need new evaluation evidence. Passing this gate does not authorize implementing or releasing Level 2/3.
+
+### Refresh skill evidence
+
+Changing `SKILL.md` invalidates its recorded fingerprint. Run fresh independent agents with the current skill and realistic fixture tasks; do not replace only the old fingerprint. Give agents the requested scope and authorized operations without supplying scorer expectations or historical answers. Keep their fixture projects outside the repository. The installed-package harness can retain an npm toolchain with `TSGUARD_KEEP_TEST_DIR=1`; copy it into a separate fixture toolchain and restore the real built native binary before use, because integration tests deliberately rename native packages and replace binaries to test launcher failures. Python uses the pinned eval environment above, with a separate incomplete environment for dependency repair.
+
+`evals/record-agent-command.cjs` observes actual commands chosen by those agents. Configure absolute paths to real tools and fixture projects, then put wrapper executables on the agent's PATH. A minimal configuration has this shape:
+
+```json
+{
+  "tools": { "pyguard": "/absolute/path/pyguard", "uv": "/absolute/path/uv" },
+  "projects": [{
+    "root": "/absolute/path/fixture",
+    "events": "/absolute/path/events.jsonl",
+    "env": { "VIRTUAL_ENV": "/absolute/path/fixture/.venv", "UV_NO_SYNC": "1", "UV_OFFLINE": "1" }
+  }]
+}
+```
+
+A wrapper forwards its arguments with `node /absolute/path/evals/record-agent-command.cjs /absolute/path/config.json pyguard "$@"`; use the corresponding tool name for each wrapper. Run from the fixture directory. The observer records argv, actual exit code, complete JSON or bounded stdout, stderr, and before/after fingerprints of files under `src`. It rejects unrelated working directories and source symlinks. Configure the environment's PATH so analyzers use the intended fixture environment. It does not choose commands, retrieve JSON automatically, generate semantic answers, or infer normalized findings from summaries.
+
+Assemble `omitted_events` and `repair_events` from the resulting JSONL records, and attach the real native interpretation inputs and the agent's read-only response. Record the current skill hash, capture date and actual provenance in `agent-traces/{typescript,python}.json`. Finally run `node evals/agent-actions.cjs`, the harness regression tests and `level1-ready.cjs` against fresh CLI corpus reports. The fingerprint and behavioral checks remain unchanged.
 
 ## Contract eval design and cost
 
