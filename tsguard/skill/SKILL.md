@@ -18,7 +18,7 @@ Work from the project containing `package.json`, or supply `--root <project>`. P
 npx --no-install tsguard check --output agent
 ```
 
-For a pnpm project, use `pnpm exec tsguard check --output agent`. Verify local installation with the same executor and `tsguard --version`. If the package is missing, use the project's package manager to install `@oxguard/tsguard` as a dev dependency when installation is authorized. Do not silently fetch a CLI with plain `npx`. Do not run `setup` or install a global binary as part of routine analysis.
+For a pnpm project, use `pnpm exec tsguard check --output agent`. Verify local installation with the same executor and `tsguard --version`; check that `--help` advertises `--output` and `--root` before relying on this contract. If the package is missing, use the project's package manager to install `@oxguard/tsguard` as a dev dependency when installation is authorized. Do not silently fetch a CLI with plain `npx`. Do not run `setup` or install a global binary as part of routine analysis.
 
 Use the command the user requested. Otherwise default to `check`:
 
@@ -52,7 +52,7 @@ execution or dependencies; do not treat them as source defects.
 
 Exit 1 alone does not mean “fix source.” `audit` and `criticality` can have `status: error` with exit 0. A passed gate does not prove that later gates ran: `check` stops at the first blocking failure. Fix authorized issues, rerun the failed gate, then rerun `check` to reach the remaining gates.
 
-FTA reports file scores and the configured cap; do not invent per-function scores or unreported component measurements. Biome and Opengrep preserve native rule IDs; TypeScript preserves TS codes. Unsupported tool details produce a stable gate-level fallback, whose cause must be checked in diagnostics.
+FTA reports file scores and the configured cap; a cap failure exposes only the first failing file because the analyzer exits before producing JSON. Do not invent per-function scores, later failing files or unreported component measurements. Biome and Opengrep preserve native rule IDs; TypeScript preserves TS codes. Unsupported tool details produce a stable gate-level fallback, whose cause must be checked in diagnostics.
 
 ## Use criticality as advisory context
 
@@ -70,4 +70,6 @@ Report command/scope, semantic status, real exit code, total findings, blocking 
 
 Read `assessment` and `gates` in JSON. `assessment: complete` means every requested gate ran with supported normalization; it does not mean findings passed. Each gate has `status` (`passed`, `advisory`, `failed`, `error` or `not_run`) and `normalization` (`complete`, `partial` or `not_run`). The agent summary includes incomplete assessment, not-run and partial counts. Retrieve JSON with the same invocation when any count is nonzero to name the affected gates. Do not claim a complete assessment from a partial adapter, execution error, or fail-fast result. Use the relevant isolated gate to investigate, then rerun the full requested command after authorized fixes.
 
-Read coverage measurements and owned threshold rules directly. Native dependency advisories are informational in Tsguard; audit-ci's policy decision remains the blocker, including allowlists. Use `related` locations for duplicate pairs. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. Existing analyzers remain Level 1; advisory criticality parity is present, but remaining Level 2 and all Level 3 checks are absent.
+Read global coverage thresholds and per-file measurements directly; per-file measurements do not add per-file blocking thresholds. Native test failures are quality findings; no-test collection and missing or malformed reports are execution problems. Native analyzer reports are listed in `artifacts` and refreshed for each run; use those reports for additional upstream fields. Secretlint findings retain rules and positions while omitting secret values.
+
+Native dependency advisories are informational; `tsguard.dependencies.policy_failed` records audit-ci's blocking decision without guessing which individual advisory caused it. The CLI invokes audit-ci with `--moderate` and does not pass `--config`; do not claim a project's allowlist file was loaded automatically. Use `related` locations for duplicate pairs. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. Existing analyzers remain Level 1; advisory criticality parity is present, but remaining Level 2 and all Level 3 checks are absent.

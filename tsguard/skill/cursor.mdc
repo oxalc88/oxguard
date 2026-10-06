@@ -6,13 +6,13 @@ alwaysApply: false
 
 # tsguard — TypeScript quality gate
 
-After editing TypeScript files, run `tsguard check` to validate quality gates.
-Fix any failures before committing.
+After editing TypeScript files, run the project-local `npx --no-install tsguard check --output agent` (or `pnpm exec tsguard check --output agent`) to validate quality gates.
+When the summary reports omitted findings or incomplete assessment, retrieve JSON with the same command, root and scope before claiming completeness. Distinguish blocking quality findings from execution errors. After authorized fixes, rerun the failed gate and full check; fail-fast leaves later gates unexecuted.
 
 **Commands:**
 - `tsguard check`    — full gate: lint → fta → types → coverage → security
 - `tsguard fix`      — auto-format (ultracite fix)
 - `tsguard security` — secrets (secretlint) + CVE (audit-ci) + SAST (opengrep)
-- `tsguard setup`    — install deps + download opengrep SAST binary
+- `tsguard setup`    — npm distribution: verify bundled tools and configure hooks; standalone: install deps and download Opengrep; run when setup is authorized
 
-**Config:** `oxguard.toml` at project root sets default dirs and excludes.
+**Config:** scan the project root (`.`) by default. `oxguard.toml` sets dirs, excludes and thresholds; CLI overrides take precedence. Use `--root` for an explicit project and preserve requested scope.
