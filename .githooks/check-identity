@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+expected_name=$(git config --local --get oxguard.identityName || true)
+expected_email=$(git config --local --get oxguard.identityEmail || true)
+if [ -z "$expected_name" ] || [ -z "$expected_email" ]; then
+  echo 'Commit blocked: configure the repository identity with scripts/install-identity-hooks.sh.' >&2
+  exit 1
+fi
+
+check_identity() {
+  case "$2" in
+    "$expected_name <$expected_email> "*) ;;
+    *)
+      echo "Commit blocked: $1 must use $expected_name <$expected_email>." >&2
+      echo 'Check repository user.name/user.email, --author, and GIT_AUTHOR_*/GIT_COMMITTER_* overrides.' >&2
+      exit 1
+      ;;
+  esac
+}
+
+check_identity author "$(git var GIT_AUTHOR_IDENT)"
+check_identity committer "$(git var GIT_COMMITTER_IDENT)"

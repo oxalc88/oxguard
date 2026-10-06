@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+root=$(git rev-parse --show-toplevel)
+"$root/.githooks/check-identity"
+expected_name=$(git config --local --get oxguard.identityName)
+expected_email=$(git config --local --get oxguard.identityEmail)
+while read -r local_ref local_oid remote_ref remote_oid; do
+  case "$local_oid" in *[!0]*) ;; *) continue ;; esac
+  if [ "$(git cat-file -t "$local_oid")" = tag ]; then
+    tagger=$(git cat-file -p "$local_oid" | sed -n '/^tagger /{s/^tagger //;p;q;}')
+    case "$tagger" in
+      "$expected_name <$expected_email> "*) ;;
+      *)
+        echo "Push blocked: $local_ref tagger must use $expected_name <$expected_email>." >&2
+        exit 1
+        ;;
+    esac
+  fi
+done
