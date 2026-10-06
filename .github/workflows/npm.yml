@@ -49,7 +49,7 @@ jobs:
         run: npm install --global pnpm@${{ matrix.manager.version }}
       - name: Eval harness regression tests
         if: matrix.manager.name == 'npm'
-        run: node --test evals/evals.test.cjs evals/python/evals.test.cjs evals/agent-actions.test.cjs
+        run: node --test evals/evals.test.cjs evals/python/evals.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs
       - run: node --test npm/distribution.test.cjs
         env:
           TSGUARD_PACKAGE_MANAGER: ${{ matrix.manager.name }}
