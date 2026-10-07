@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 from _paths import collect_paths
 
-# Analyzer scripts may run from a private directory; artifacts belong to the project.\nOUTPUT = Path.cwd() / "CRITICALITY.md"
+# Analyzer scripts may run from a private directory; artifacts belong to the project.
+OUTPUT = Path.cwd() / "CRITICALITY.md"
 
 
 def main() -> int:
