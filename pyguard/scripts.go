@@ -13,7 +13,8 @@ import (
 //go:embed analysis/*.py
 var analysisScripts embed.FS
 
-// ensureAnalysisScripts deploys pyguard/analysis/*.py into <root>/tools/analysis/.
+// ensureAnalysisScripts deploys reference copies into <root>/tools/analysis/.
+// RunTool never executes these project-local files; it uses private embedded copies.
 // Behavior per file:
 //   - missing  → write
 //   - identical SHA256 → no-op
@@ -84,3 +85,45 @@ func ensureAnalysisScripts(root string, cfg config) error {
 	return nil
 }
 
+
+// materializeAnalysisHelper creates an execution-only copy of all bundled Python
+// helpers outside the untrusted project. Python can then import _paths from the
+// same private directory. All files are sourced from the Go binary, never from
+// <root>/tools/analysis, and the caller removes the directory after execution.
+func materializeAnalysisHelper(projectPath string) (string, func(), error) {
+	const prefix = "tools/analysis/"
+	if !strings.HasPrefix(projectPath, prefix) {
+		return "", nil, fmt.Errorf("not a PyGuard analysis helper: %q", projectPath)
+	}
+	name := strings.TrimPrefix(projectPath, prefix)
+	if name == "" || filepath.Base(name) != name || !strings.HasSuffix(name, ".py") {
+		return "", nil, fmt.Errorf("invalid PyGuard helper name: %q", name)
+	}
+	if _, err := analysisScripts.ReadFile("analysis/" + name); err != nil {
+		return "", nil, fmt.Errorf("unknown bundled PyGuard helper %q: %w", name, err)
+	}
+	entries, err := fs.ReadDir(analysisScripts, "analysis")
+	if err != nil {
+		return "", nil, fmt.Errorf("read bundled helpers: %w", err)
+	}
+	dir, err := os.MkdirTemp("", "pyguard-analysis-")
+	if err != nil {
+		return "", nil, fmt.Errorf("create private helper directory: %w", err)
+	}
+	cleanup := func() { _ = os.RemoveAll(dir) }
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".py") {
+			continue
+		}
+		data, err := analysisScripts.ReadFile("analysis/" + entry.Name())
+		if err != nil {
+			cleanup()
+			return "", nil, fmt.Errorf("read bundled helper %q: %w", entry.Name(), err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, entry.Name()), data, 0o600); err != nil {
+			cleanup()
+			return "", nil, fmt.Errorf("write private helper %q: %w", entry.Name(), err)
+		}
+	}
+	return filepath.Join(dir, name), cleanup, nil
+}

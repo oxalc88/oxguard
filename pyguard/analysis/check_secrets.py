@@ -15,7 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-BASELINE = Path(__file__).parent.parent.parent / ".secrets.baseline"
+# Resolve project data from the working directory, not the trusted helper path.
+BASELINE = Path.cwd() / ".secrets.baseline"
 SCAN_PATHS = ["functions", "cdk", "scripts"]
 
 

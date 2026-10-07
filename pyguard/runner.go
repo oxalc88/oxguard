@@ -57,15 +57,20 @@ type Result struct {
 // On success: prints "[OK] name". On failure: prints "[FAIL] name" + output.
 // Output is bounded to 2 MB in memory; --tail N caps the displayed lines.
 func (r *Runner) RunTool(spec toolSpec, name string, args ...string) Result {
-	if r.machine() {
-		for _, arg := range args {
-			if strings.HasPrefix(arg, "tools/analysis/") && strings.HasSuffix(arg, ".py") {
-				if _, err := os.Stat(filepath.Join(r.root, arg)); err != nil {
-					r.executionFailure(spec.gate, "tool_missing", "Project analysis helper is missing or unreadable; run pyguard setup to deploy updated helpers.")
-					return Result{name: name}
-				}
-			}
+	// Project-local tools/analysis files are untrusted inputs. Execute the
+	// embedded PyGuard implementation, including imported sibling modules,
+	// from a fresh private directory instead of the inspected checkout.
+	if len(args) >= 4 && args[0] == "uv" && args[1] == "run" &&
+		args[2] == "python" && strings.HasPrefix(args[3], "tools/analysis/") {
+		trustedPath, cleanup, err := materializeAnalysisHelper(args[3])
+		if err != nil {
+			message := fmt.Sprintf("Cannot prepare trusted PyGuard helper: %v", err)
+			r.executionFailure(spec.gate, "analyzer_failure", message)
+			return Result{name: name, category: "analyzer_failure", message: message}
 		}
+		defer cleanup()
+		args = append([]string(nil), args...)
+		args[3] = trustedPath
 	}
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 	cmd.Dir = r.root
