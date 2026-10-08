@@ -7,12 +7,10 @@ import (
 	"strings"
 )
 
+// Hooks execute a separately installed command, never a project-owned binary.
 func tsguardBinary(root string) string {
-	name := "tsguard"
-	if runtime.GOOS == "windows" {
-		name = "tsguard.exe"
-	}
-	return filepath.Join(root, "tools", "tsguard", name)
+	if runtime.GOOS == "windows" { return "tsguard.exe" }
+	return "tsguard"
 }
 
 func jsonEscapePath(p string) string {
