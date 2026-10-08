@@ -9,7 +9,7 @@ import (
 
 func GenerateCodexHook(root string, agentsTemplate []byte) error {
 	pyguardBin := pyguardBinary(root)
-	codexDir := filepath.Join(root, "..", ".codex")
+	codexDir := filepath.Join(root, ".codex")
 	if err := os.MkdirAll(codexDir, 0o755); err != nil {
 		return err
 	}
@@ -36,5 +36,5 @@ func GenerateCodexHook(root string, agentsTemplate []byte) error {
 	}
 
 	agentsContent := strings.ReplaceAll(string(agentsTemplate), "__BINARY__", pyguardBin)
-	return writeHookFile(filepath.Join(root, "..", "AGENTS.md"), agentsContent)
+	return writeHookFile(filepath.Join(root, "AGENTS.md"), agentsContent)
 }
