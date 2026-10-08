@@ -37,8 +37,8 @@ func runSetup(root string, cfg config) int {
 	}
 	fmt.Println("  [OK]   node_modules ready")
 
-	fmt.Println("  [4/4] Opengrep SAST engine (project-local)...")
-	ensureOpengrep(root, cfg)
+	fmt.Println("  [4/4] Opengrep SAST engine (verified cache)...")
+	if !ensureOpengrep(root, cfg) { return 1 }
 
 	fmt.Println()
 	runHooks(root)
