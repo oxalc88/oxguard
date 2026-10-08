@@ -14,9 +14,6 @@ var claudeSkillContent []byte
 //go:embed skill/cursor.mdc
 var cursorRuleContent []byte
 
-//go:embed skill/kiro-agent.json
-var kiroAgentContent []byte
-
 //go:embed skill/opencode.ts
 var opencodePluginContent []byte
 
