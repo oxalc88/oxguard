@@ -2,7 +2,6 @@ package hooks
 
 import (
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 )
