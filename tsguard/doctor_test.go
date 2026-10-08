@@ -16,7 +16,7 @@ func TestRunDoctorInPnpmProjectDoesNotInvokeBiomeDirectly(t *testing.T) {
 	// Provide a fake project-local opengrep binary so doctor does not fail on it.
 	writeFakeOpengrepBinary(t, r.root)
 
-	if code := runDoctor(r.root, "pnpm"); code != 0 {
+	if code := runDoctor(r.root, "pnpm"); code != 1 {
 		t.Fatalf("runDoctor returned %d", code)
 	}
 
@@ -33,7 +33,7 @@ func TestRunDoctorInPnpmProjectDoesNotInvokeBiomeDirectly(t *testing.T) {
 // writeFakeOpengrepBinary creates a fake opengrep binary in the project-local cache dir.
 func writeFakeOpengrepBinary(t *testing.T, root string) {
 	t.Helper()
-	cacheDir := filepath.Join(root, opengrepCacheDir)
+	cacheDir := filepath.Dir(opengrepBinaryPath(root))
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		t.Fatalf("mkdir opengrep cache: %v", err)
 	}
