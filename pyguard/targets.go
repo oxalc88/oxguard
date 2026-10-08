@@ -205,7 +205,7 @@ func runSecrets(r *Runner, cfg config) int {
 		return 1
 	}
 
-	args := []string{"uv", "run", "python", "tools/analysis/check_secrets.py"}
+	args := append([]string{"uv", "run", "python", "tools/analysis/check_secrets.py"}, r.dirs...)
 	if r.machine() {
 		args = append(args, "--json")
 	}
