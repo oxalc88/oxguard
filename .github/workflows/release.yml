@@ -211,7 +211,7 @@ jobs:
     needs: [build, release, validate-release]
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      TAG: ${{ needs.validate-release.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
         with:
