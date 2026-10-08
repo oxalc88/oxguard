@@ -191,6 +191,18 @@ func validateScanDirs(root string, dirs []string) error {
 		if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
 			return fmt.Errorf("scan directory escapes project: %q", dir)
 		}
+		// Reject symlinks in each existing component, including when the final
+		// requested path does not exist yet (linked-parent escapes).
+		walk := physicalRoot
+		for _, component := range strings.Split(clean, string(filepath.Separator)) {
+			walk = filepath.Join(walk, component)
+			info, err := os.Lstat(walk)
+			if os.IsNotExist(err) { break }
+			if err != nil { return fmt.Errorf("stat scan directory %q: %w", dir, err) }
+			if info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("scan directory contains symlink: %q", dir)
+			}
+		}
 		candidate := filepath.Join(physicalRoot, clean)
 		if resolved, err := filepath.EvalSymlinks(candidate); err == nil {
 			rel, err := filepath.Rel(physicalRoot, resolved)
