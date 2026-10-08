@@ -8,7 +8,7 @@ import (
 )
 
 func GenerateClaudeHook(root string) error {
-	settingsDir := filepath.Join(root, "..", ".claude")
+	settingsDir := filepath.Join(root, ".claude")
 	path := filepath.Join(settingsDir, "settings.local.json")
 
 	tsguardBin := tsguardBinary(root)
