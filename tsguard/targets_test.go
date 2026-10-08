@@ -27,7 +27,7 @@ func TestRunComplexityUsesUltraciteCheck(t *testing.T) {
 func TestRunCheckDoesNotRunSeparateComplexityStep(t *testing.T) {
 	r, logPath := newTestRunner(t)
 
-	if code := runCheck(r, []string{"."}, 60); code != 0 {
+	if code := runCheck(r, []string{"."}, 60); code != 1 {
 		t.Fatalf("runCheck returned %d", code)
 	}
 
@@ -52,7 +52,7 @@ func TestRunCheckDoesNotRunSeparateComplexityStep(t *testing.T) {
 func TestRunCheckNoDetectSecretsCall(t *testing.T) {
 	r, logPath := newTestRunner(t)
 
-	if code := runCheck(r, []string{"src"}, 60); code != 0 {
+	if code := runCheck(r, []string{"src"}, 60); code != 1 {
 		t.Fatalf("runCheck returned %d", code)
 	}
 
@@ -67,7 +67,7 @@ func TestRunCheckNoDetectSecretsCall(t *testing.T) {
 func TestRunCheckNoPythonToolCalls(t *testing.T) {
 	r, logPath := newTestRunner(t)
 
-	if code := runCheck(r, []string{"src"}, 60); code != 0 {
+	if code := runCheck(r, []string{"src"}, 60); code != 1 {
 		t.Fatalf("runCheck returned %d", code)
 	}
 
@@ -417,7 +417,7 @@ func TestNoNpxInPnpmCheckRun(t *testing.T) {
 	r, logPath := newTestRunner(t)
 	r.pkgManager = "pnpm"
 
-	if code := runCheck(r, []string{"src"}, 60); code != 0 {
+	if code := runCheck(r, []string{"src"}, 60); code != 1 {
 		t.Fatalf("runCheck returned %d", code)
 	}
 
