@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -110,6 +111,12 @@ func buildConfig(cli config, root string) (config, error) {
 		cfg.ftaScoreCap = cli.ftaScoreCap
 	}
 
+	// Repository-supplied and CLI scopes must never escape the project, even
+	// through symlinks. An analyzer must not forward untrusted option strings.
+	if err := validateScanDirs(root, cfg.dirs); err != nil {
+		return config{}, err
+	}
+
 	return cfg, nil
 }
 
@@ -169,4 +176,30 @@ func writeFTAConfig(root string, excludeTests bool, extraExclude []string) (stri
 	}
 	configPath := filepath.Join(cacheDir, "fta.json")
 	return configPath, os.WriteFile(configPath, data, 0o644)
+}
+
+// validateScanDirs rejects paths which could make mutating tools leave the
+// selected project. Missing targets are left to the analyzer to report.
+func validateScanDirs(root string, dirs []string) error {
+	physicalRoot, err := filepath.EvalSymlinks(root)
+	if err != nil { return fmt.Errorf("resolve project root: %w", err) }
+	for _, dir := range dirs {
+		if dir == "" || strings.HasPrefix(dir, "-") || filepath.IsAbs(dir) || filepath.VolumeName(dir) != "" {
+			return fmt.Errorf("unsafe scan directory %q", dir)
+		}
+		clean := filepath.Clean(dir)
+		if clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("scan directory escapes project: %q", dir)
+		}
+		candidate := filepath.Join(physicalRoot, clean)
+		if resolved, err := filepath.EvalSymlinks(candidate); err == nil {
+			rel, err := filepath.Rel(physicalRoot, resolved)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				return fmt.Errorf("scan directory leaves project through symlink: %q", dir)
+			}
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("resolve scan directory %q: %w", dir, err)
+		}
+	}
+	return nil
 }
