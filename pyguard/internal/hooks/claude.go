@@ -9,7 +9,7 @@ import (
 
 func GenerateClaudeHook(root string) error {
 	pyguardBin := pyguardBinary(root)
-	settingsDir := filepath.Join(root, "..", ".claude")
+	settingsDir := filepath.Join(root, ".claude")
 	path := filepath.Join(settingsDir, "settings.local.json")
 
 	var hookCmd string

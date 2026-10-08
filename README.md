@@ -209,7 +209,6 @@ your agent understands how to interpret gate output):
 | Cursor | `.cursor/hooks.json` | `.cursor/rules/tsguard.mdc` |
 | OpenAI Codex CLI | `.codex/hooks.json` | `AGENTS.md` |
 | OpenCode | `.opencode/plugins/tsguard/index.ts` + `opencode.json` | (plugin is the skill) |
-| Kiro | `.kiro/hooks/tsguard.kiro.hook` | `.kiro/agents/tsguard.json` |
 
 *(pyguard writes the same set with `pyguard` names in each path.)*
 
@@ -236,7 +235,7 @@ pyguard check
 
 ## Install via AI agent
 
-If you use Claude Code, Cursor, Codex, OpenCode, or Kiro, you can paste a one-shot
+If you use Claude Code, Cursor, Codex, or OpenCode, you can paste a one-shot
 prompt and let your agent handle the full install + setup flow.
 
 → See [docs/AI_INSTALL.md](docs/AI_INSTALL.md) for copy-paste prompts.

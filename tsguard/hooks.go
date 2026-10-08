@@ -21,7 +21,6 @@ var toolOptions = []toolOption{
 	{"3", "Cursor"},
 	{"4", "OpenAI Codex CLI"},
 	{"5", "OpenCode"},
-	{"6", "Kiro"},
 }
 
 func runHooks(root string) int {
@@ -93,15 +92,6 @@ func runHooks(root string) int {
 		}
 	}
 
-	if selected["6"] {
-		if err := hooks.GenerateKiroHook(root, kiroAgentContent); err != nil {
-			fmt.Printf("  [FAIL] Kiro hook: %v\n", err)
-		} else {
-			fmt.Println("  [OK]   .kiro/hooks/tsguard.kiro.hook (IDE hook — auto-active)")
-			fmt.Println("  [OK]   .kiro/agents/tsguard.json (CLI agent — activate with `/agent swap tsguard`)")
-			generated++
-		}
-	}
 
 	// Always update pre-commit
 	if err := hooks.GeneratePreCommit(root); err != nil {

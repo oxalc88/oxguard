@@ -219,7 +219,7 @@ func runCoverageWithWrapper(r *Runner, runner string) int {
 }
 
 // runSecurity runs secretlint → npm audit + audit-ci → opengrep SAST.
-// All are hard gates (blocking); opengrep [SKIP]s gracefully if binary is absent.
+// Every required engine is a blocking gate, including missing Opengrep.
 func runSecurity(r *Runner, initFlag bool) int {
 	r.println("  security:")
 	if initFlag {
@@ -242,8 +242,12 @@ func runSecurity(r *Runner, initFlag bool) int {
 // NOTE: Go's exec.Command does not invoke a shell — globs like **/* would be passed
 // as literals. Pass source dirs as positional arguments instead.
 func runSecretlint(r *Runner) int {
+	// No project configuration may reduce mandatory secret coverage.
+	if packagedRuntime() == "" && hasProjectConfig(r.root, ".secretlintrc.js", ".secretlintrc.cjs", ".secretlintrc.mjs") {
+		return r.executionFailure("secrets", "invalid_configuration", "Executable Secretlint configuration is not allowed for security scans.")
+	}
 	args := pkgExec(r.pkgManager, "secretlint", "--secretlintignore", ".gitignore")
-	args = append(args, r.dirs...)
+	args = append(args, ".")
 	if packagedRuntime() != "" {
 		var err error
 		args, err = r.packagedSecretArgs()
@@ -309,20 +313,17 @@ func runNpmAudit(r *Runner) int {
 }
 
 // runOpengrep runs the Opengrep SAST engine against the project's scanned dirs.
-// Uses the project-local binary (node_modules/.cache/oxguard/opengrep).
-// [SKIP]s gracefully if the binary is absent — developer is directed to run setup.
+// Uses a verified user-owned standalone binary or a bundled npm executable.
+// Missing or invalid engines fail closed; SAST is a required security gate.
 func runOpengrep(r *Runner) int {
 	binaryPath := opengrepBinaryPath(r.root)
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		if packagedRuntime() != "" {
-			r.errorf("%s\n", "tsguard: bundled Opengrep is missing; reinstall @oxguard/tsguard with optional dependencies enabled")
-			return r.executionFailure("security", "tool_missing", "Bundled Opengrep is missing; reinstall with optional dependencies.")
+
+	if packagedRuntime() == "" {
+		if err := verifyOpengrepBinary(binaryPath); err != nil {
+			return r.executionFailure("security", "tool_missing", fmt.Sprintf("Trusted Opengrep is unavailable: %v; run tsguard setup", err))
 		}
-		r.println("  [SKIP] opengrep — binary not found. Run: tsguard setup")
-		if r.machine() {
-			r.result.Execution("security", "tool_missing", "Opengrep is missing; standalone mode skipped SAST.")
-		}
-		return 0
+	} else if _, err := os.Stat(binaryPath); err != nil {
+		return r.executionFailure("security", "tool_missing", "Bundled Opengrep is missing; reinstall with optional dependencies.")
 	}
 
 	// Vendor rules from the project store; fall back to p/javascript + p/typescript.
@@ -344,7 +345,7 @@ func runOpengrep(r *Runner) int {
 		args = append(args, "--exclude", dir)
 	}
 	// Scan the project's source dirs.
-	args = append(args, r.dirs...)
+	args = append(args, ".")
 
 	res := r.RunTool(toolSpec{gate: "security", adapter: "opengrep"}, "opengrep SAST", args...)
 	if !res.ok {

@@ -179,6 +179,20 @@ func runPipAudit(r *Runner) int {
 	return 0
 }
 
+// secretsScanArgs constructs the trusted helper invocation without starting a
+// subprocess. Keeping scope selection pure makes it testable on every platform.
+func secretsScanArgs(dirs []string, machine bool) []string {
+	args := []string{"uv", "run", "python", "tools/analysis/check_secrets.py"}
+	if len(dirs) == 0 {
+		dirs = []string{"."}
+	}
+	args = append(args, dirs...)
+	if machine {
+		args = append(args, "--json")
+	}
+	return args
+}
+
 // runSecrets checks for credential leaks. Fails hard if .secrets.baseline is missing.
 func runSecrets(r *Runner, cfg config) int {
 	baseline := filepath.Join(r.root, ".secrets.baseline")
@@ -205,10 +219,7 @@ func runSecrets(r *Runner, cfg config) int {
 		return 1
 	}
 
-	args := []string{"uv", "run", "python", "tools/analysis/check_secrets.py"}
-	if r.machine() {
-		args = append(args, "--json")
-	}
+	args := secretsScanArgs(r.dirs, r.machine())
 	res := r.RunTool(toolSpec{gate: "secrets", adapter: "owned"}, "detect-secrets", args...)
 	if !res.ok {
 		return 1

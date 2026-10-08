@@ -10,7 +10,7 @@ import (
 // .github/copilot-instructions.md using content from the caller's embedded
 // skill/copilot.md. Creates the file if absent; idempotent via marker check.
 func GenerateCopilotInstructions(root string, content []byte) error {
-	ghDir := filepath.Join(root, "..", ".github")
+	ghDir := filepath.Join(root, ".github")
 	if err := os.MkdirAll(ghDir, 0o755); err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func GenerateCopilotInstructions(root string, content []byte) error {
 }
 
 func GenerateCopilotHook(root string) error {
-	hooksDir := filepath.Join(root, "..", ".github", "hooks")
+	hooksDir := filepath.Join(root, ".github", "hooks")
 	if err := os.MkdirAll(hooksDir, 0o755); err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func GenerateCopilotHook(root string) error {
 		return err
 	}
 
-	vscodeDir := filepath.Join(root, "..", ".vscode")
+	vscodeDir := filepath.Join(root, ".vscode")
 	if err := os.MkdirAll(vscodeDir, 0o755); err != nil {
 		return err
 	}

@@ -1,18 +1,17 @@
 package hooks
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 )
 
+// Hooks execute a separately installed command, never a project-owned binary.
 func tsguardBinary(root string) string {
-	name := "tsguard"
-	if runtime.GOOS == "windows" {
-		name = "tsguard.exe"
-	}
-	return filepath.Join(root, "tools", "tsguard", name)
+	if runtime.GOOS == "windows" { return "tsguard.exe" }
+	return "tsguard"
 }
 
 func jsonEscapePath(p string) string {
@@ -23,10 +22,14 @@ func writeHookFile(path, content string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	if existing, err := os.ReadFile(path); err == nil {
-		if string(existing) == content {
-			return nil
+	if info, err := os.Lstat(path); err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("refusing non-regular hook configuration: %s", path)
 		}
-	}
-	return os.WriteFile(path, []byte(content), 0o644)
+		existing, err := os.ReadFile(path)
+		if err != nil { return err }
+		if string(existing) == content { return nil }
+		return fmt.Errorf("refusing to replace existing hook configuration: %s", path)
+	} else if !os.IsNotExist(err) { return err }
+	return os.WriteFile(path, []byte(content), 0o600)
 }

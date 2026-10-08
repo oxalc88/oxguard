@@ -6,7 +6,7 @@ import (
 )
 
 func GenerateOpenCodePlugin(root string, pluginContent []byte) error {
-	pluginDir := filepath.Join(root, "..", ".opencode", "plugins", "tsguard")
+	pluginDir := filepath.Join(root, ".opencode", "plugins", "tsguard")
 	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
 		return err
 	}
@@ -20,5 +20,5 @@ func GenerateOpenCodePlugin(root string, pluginContent []byte) error {
   "plugin": [".opencode/plugins/tsguard"]
 }
 `
-	return writeHookFile(filepath.Join(root, "..", "opencode.json"), opencodeContent)
+	return writeHookFile(filepath.Join(root, "opencode.json"), opencodeContent)
 }

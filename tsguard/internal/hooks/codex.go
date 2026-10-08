@@ -6,7 +6,7 @@ import (
 )
 
 func GenerateCodexHook(root string, agentsContent []byte) error {
-	codexDir := filepath.Join(root, "..", ".codex")
+	codexDir := filepath.Join(root, ".codex")
 	if err := os.MkdirAll(codexDir, 0o755); err != nil {
 		return err
 	}
@@ -32,5 +32,5 @@ func GenerateCodexHook(root string, agentsContent []byte) error {
 		return err
 	}
 
-	return writeHookFile(filepath.Join(root, "..", "AGENTS.md"), string(agentsContent))
+	return writeHookFile(filepath.Join(root, "AGENTS.md"), string(agentsContent))
 }

@@ -5,12 +5,10 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -20,7 +18,7 @@ import (
 func runSetup(root string, cfg config) int {
 	fmt.Println("pyguard setup")
 	fmt.Println("─────────")
-	repoPkn := pyguardBinary(root)
+
 
 	fmt.Println("  [1/8] Python 3.13...")
 	if !checkPython() {
@@ -80,17 +78,8 @@ func runSetup(root string, cfg config) int {
 		fmt.Println("exists")
 	}
 
-	fmt.Print("  [7/8] repo-local pyguard... ")
-	repoStatus, err := ensureRepoPknBinary(root)
-	if err != nil {
-		fmt.Printf("failed\n  [FAIL] %v\n", err)
-		return 2
-	}
-	fmt.Println(repoStatus)
-
-	fmt.Print("  [8/8] pyguard on PATH... ")
-	pathReady, pathStatus := installPkn(root)
-	fmt.Println(pathStatus)
+	fmt.Println("  [7/8] project binary... skipped (use installed PyGuard distribution)")
+	fmt.Println("  [8/8] global PATH... unchanged (project code is not installed globally)")
 
 	// AI tool hooks
 	fmt.Println()
@@ -98,90 +87,19 @@ func runSetup(root string, cfg config) int {
 
 	fmt.Println()
 	fmt.Println("  Setup complete!")
-	fmt.Printf("  Repo-local binary: %s\n", repoPkn)
-	if pathReady || repoPknOnPath(repoPkn) {
-		fmt.Println("  Run: pyguard doctor    (verify environment)")
-		fmt.Println("  Run: pyguard check     (run quality gates)")
-	} else {
-		fmt.Printf("  Run: %s doctor\n", repoPkn)
-		fmt.Printf("  Run: %s check\n", repoPkn)
-	}
+	fmt.Println("  Run: pyguard doctor    (verify environment)")
+	fmt.Println("  Run: pyguard check     (run quality gates)")
 	return 0
 }
 
-// ensureRepoPknBinary builds the repo-local pyguard binary when it is missing.
+// Project setup never installs or globalizes binaries from the analyzed checkout.
 func ensureRepoPknBinary(root string) (string, error) {
-	dst := pyguardBinary(root)
-	if _, err := os.Stat(dst); err == nil {
-		return "ready", nil
-	}
-
-	if _, err := exec.LookPath("go"); err != nil {
-		return "", fmt.Errorf("repo-local binary missing at %s and Go is not on PATH", dst)
-	}
-
-	buildDir := filepath.Join(root, "tools", "pyguard")
-	if err := RunStreaming(buildDir, "go", "build", "-o", filepath.Base(dst), "."); err != nil {
-		return "", fmt.Errorf("could not build repo-local pyguard at %s: %w", dst, err)
-	}
-
-	if _, err := os.Stat(dst); err != nil {
-		return "", fmt.Errorf("repo-local binary still missing after build: %w", err)
-	}
-	return "built", nil
+	return "skipped (use installed PyGuard distribution)", nil
 }
-
-// installPkn creates a PATH helper only when it is safe to do so.
-// It never replaces an existing non-matching install.
 func installPkn(root string) (bool, string) {
-	if runtime.GOOS == "windows" {
-		return false, "skipped (hooks use repo-local pyguard.exe)"
-	}
-
-	src := pyguardBinary(root)
-	if _, err := os.Stat(src); os.IsNotExist(err) {
-		return false, fmt.Sprintf("skipped (repo-local binary missing at %s)", src)
-	}
-
-	home, _ := os.UserHomeDir()
-	localBin := filepath.Join(home, ".local", "bin")
-	dst := filepath.Join(localBin, "pyguard")
-
-	if err := os.MkdirAll(localBin, 0o755); err != nil {
-		return false, fmt.Sprintf("skipped (cannot create dir: %v)", err)
-	}
-
-	if info, err := os.Lstat(dst); err == nil {
-		if info.Mode()&os.ModeSymlink != 0 {
-			resolved, resolveErr := filepath.EvalSymlinks(dst)
-			if resolveErr == nil && resolved == src {
-				return true, "already linked"
-			}
-			if resolveErr != nil && errors.Is(resolveErr, os.ErrNotExist) {
-				return false, "skipped (existing pyguard symlink is broken; not replacing automatically)"
-			}
-			return false, "skipped (existing pyguard symlink points elsewhere; not replacing)"
-		}
-		return false, "skipped (existing ~/.local/bin/pyguard is not managed by setup)"
-	}
-
-	if err := os.Symlink(src, dst); err != nil {
-		return false, fmt.Sprintf("skipped (symlink failed: %v)", err)
-	}
-	return true, "installed"
+	return false, "skipped (global installation is not managed by setup)"
 }
-
-func repoPknOnPath(repoPkn string) bool {
-	pathPkn, err := exec.LookPath("pyguard")
-	if err != nil {
-		return false
-	}
-	if pathPkn == repoPkn {
-		return true
-	}
-	resolved, err := filepath.EvalSymlinks(pathPkn)
-	return err == nil && resolved == repoPkn
-}
+func repoPknOnPath(repoPkn string) bool { return false }
 
 // downloadUV downloads the uv binary from GitHub releases and installs it.
 // This bypasses PowerShell execution policies entirely — raw HTTP download.
