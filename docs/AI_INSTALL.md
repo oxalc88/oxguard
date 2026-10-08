@@ -1,13 +1,13 @@
 ---
 summary: Copy-paste prompts for installing and bootstrapping oxguard through AI coding agents.
 read_when:
-  - Guiding users to install tsguard or pyguard with Claude Code, Codex, Cursor, OpenCode, or Kiro.
+  - Guiding users to install tsguard or pyguard with Claude Code, Codex, Cursor, or OpenCode.
   - Updating agent-facing setup instructions for oxguard.
 ---
 
 # Installing oxguard via AI agent
 
-Paste one of the prompts below into Claude Code, Cursor, Codex, OpenCode, Kiro, or
+Paste one of the prompts below into Claude Code, Cursor, Codex, OpenCode, or
 any agentic CLI from the root of your project. Pick the variant that matches
 your project type.
 
