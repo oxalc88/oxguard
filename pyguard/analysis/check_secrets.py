@@ -17,7 +17,7 @@ from pathlib import Path
 
 # Resolve project data from the working directory, not the trusted helper path.
 BASELINE = Path.cwd() / ".secrets.baseline"
-SCAN_PATHS = ["functions", "cdk", "scripts"]
+SCAN_PATHS = [arg for arg in sys.argv[1:] if arg != "--json"] or ["."]
 
 
 def _scan() -> dict:  # type: ignore[type-arg]
