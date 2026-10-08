@@ -313,8 +313,8 @@ func runNpmAudit(r *Runner) int {
 }
 
 // runOpengrep runs the Opengrep SAST engine against the project's scanned dirs.
-// Uses the project-local binary (node_modules/.cache/oxguard/opengrep).
-// [SKIP]s gracefully if the binary is absent — developer is directed to run setup.
+// Uses a verified user-owned standalone binary or a bundled npm executable.
+// Missing or invalid engines fail closed; SAST is a required security gate.
 func runOpengrep(r *Runner) int {
 	binaryPath := opengrepBinaryPath(r.root)
 
