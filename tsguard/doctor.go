@@ -13,7 +13,7 @@ func runDoctor(root, pm string) int {
 	fmt.Println("──────────")
 
 	failures := 0
-	location, repair := "project-local", "Run: tsguard setup"
+	location, repair := "verified user cache", "Run: tsguard setup"
 	if packagedRuntime() != "" {
 		location, repair = "bundled", "Reinstall @oxguard/tsguard with optional dependencies enabled"
 	}
@@ -90,7 +90,17 @@ func runDoctor(root, pm string) int {
 
 	// Opengrep project-local SAST binary (required for security gate).
 	opengrepBin := opengrepBinaryPath(root)
-	if out, _, err := RunSilent("", opengrepBin, "--version"); err != nil {
+	if packagedRuntime() == "" {
+		if err := verifyOpengrepBinary(opengrepBin); err != nil {
+			fmt.Printf("  [FAIL] opengrep — unverified or missing: %v. %s\n", err, repair)
+			failures++
+		} else if out, _, err := RunSilent("", opengrepBin, "--version"); err != nil {
+			fmt.Printf("  [FAIL] opengrep — cannot start: %v\n", err)
+			failures++
+		} else {
+			fmt.Printf("  [OK]   opengrep %s (verified)\n", strings.TrimSpace(strings.Split(out, "\n")[0]))
+		}
+	} else if out, _, err := RunSilent("", opengrepBin, "--version"); err != nil {
 		fmt.Printf("  [FAIL] opengrep — not found (%s). %s\n", location, repair)
 		failures++
 	} else {
