@@ -29,10 +29,10 @@ func TestPackagedSASTFailsWhenEngineIsMissing(t *testing.T) {
 	}
 }
 
-func TestStandaloneSASTRetainsMissingEngineBehavior(t *testing.T) {
+func TestStandaloneSASTRejectsMissingEngine(t *testing.T) {
 	r, _ := newTestRunner(t)
 	t.Setenv("TSGUARD_RUNTIME", "")
-	if got := runOpengrep(r); got != 0 {
+	if got := runOpengrep(r); got != 1 {
 		t.Fatalf("standalone missing SAST returned %d", got)
 	}
 }
