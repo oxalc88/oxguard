@@ -3,7 +3,7 @@ package hooks
 import "path/filepath"
 
 func GeneratePreCommit(root string) error {
-	repoRoot := filepath.Join(root, "..")
+	repoRoot := root
 	path := filepath.Join(repoRoot, ".pre-commit-config.yaml")
 
 	content := `repos:
