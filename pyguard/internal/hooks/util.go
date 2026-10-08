@@ -7,12 +7,10 @@ import (
 	"strings"
 )
 
+// Hooks execute a separately installed command, never a project-owned binary.
 func pyguardBinary(root string) string {
-	name := "pyguard"
-	if runtime.GOOS == "windows" {
-		name = "pyguard.exe"
-	}
-	return filepath.Join(root, "tools", "pyguard", name)
+	if runtime.GOOS == "windows" { return "pyguard.exe" }
+	return "pyguard"
 }
 
 func jsonEscapePath(p string) string {
