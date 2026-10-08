@@ -9,8 +9,8 @@ import (
 func GenerateKiroHook(root string, agentTemplate []byte) error {
 	binJSON := jsonEscapePath(pyguardBinary(root))
 
-	hooksDir := filepath.Join(root, "..", ".kiro", "hooks")
-	agentsDir := filepath.Join(root, "..", ".kiro", "agents")
+	hooksDir := filepath.Join(root, ".kiro", "hooks")
+	agentsDir := filepath.Join(root, ".kiro", "agents")
 
 	hookContent := fmt.Sprintf(`{
   "name": "pyguard",
