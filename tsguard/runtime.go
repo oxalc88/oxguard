@@ -126,7 +126,9 @@ func (r *Runner) packagedSecretArgs() ([]string, error) {
 	if hasProjectConfig(r.root, ".gitignore") {
 		args = append(args, "--secretlintignore", ".gitignore")
 	}
-	if !hasProjectConfig(r.root, ".secretlintrc", ".secretlintrc.json", ".secretlintrc.yaml", ".secretlintrc.yml", ".secretlintrc.js", ".secretlintrc.cjs", ".secretlintrc.mjs") {
+	// Always select an explicit inert configuration. Never implicitly load
+	// project-controlled executable .secretlintrc.js/.cjs/.mjs files.
+	{
 		preset, err := runtimeModule(r.root, "@secretlint/secretlint-rule-preset-recommend")
 		if err != nil {
 			return nil, err
@@ -138,8 +140,6 @@ func (r *Runner) packagedSecretArgs() ([]string, error) {
 		args = append(args, "--secretlintrc", file)
 	}
 	// Secretlint accepts file globs, not directories. Let its own walker expand them.
-	for _, dir := range r.dirs {
-		args = append(args, filepath.ToSlash(filepath.Join(dir, "**", "*")))
-	}
+	args = append(args, "./**/*")
 	return packagedCommand("secretlint", args...), nil
 }
