@@ -21,10 +21,10 @@ var kiroAgentContent []byte
 var opencodePluginContent []byte
 
 // deployClaudeSkill writes the embedded SKILL.md to .claude/skills/tsguard/SKILL.md
-// one level above root (workspace/monorepo root, matching the hook convention).
+// inside the project root (never the parent workspace).
 // No-op if the file is already up to date.
 func deployClaudeSkill(root string) {
-	dest := filepath.Join(root, "..", ".claude", "skills", "tsguard", "SKILL.md")
+	dest := filepath.Join(root, ".claude", "skills", "tsguard", "SKILL.md")
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		fmt.Printf("  [WARN] Claude Code skill: %v\n", err)
 		return
