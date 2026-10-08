@@ -7,14 +7,14 @@ import (
 )
 
 func GeneratePreCommit(root string) error {
-	repoRoot := filepath.Join(root, "..")
+	repoRoot := root
 	path := filepath.Join(repoRoot, ".pre-commit-config.yaml")
 
 	binName := "pyguard"
 	if runtime.GOOS == "windows" {
 		binName = "pyguard.exe"
 	}
-	entry := filepath.ToSlash(filepath.Join("tools", "pyguard", binName))
+	entry := binName
 
 	content := fmt.Sprintf(`repos:
   - repo: local
