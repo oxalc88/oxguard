@@ -116,7 +116,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     // Only this temporary consumer overrides the unpublished native version.
     fs.writeFileSync(path.join(consumer, 'pnpm-workspace.yaml'),
       `overrides:\n  ${JSON.stringify(`@oxguard/tsguard-${host}`)}: ${JSON.stringify(`file:${tarballs[1].replaceAll('\\', '/')}`)}\n`);
-    run('pnpm', ['add', '-D', '--ignore-scripts', '--store-dir', path.join(temporary, 'store'), tarballs[0]], consumer);
+    run('pnpm', ['add', '-D', '--ignore-scripts', '--store-dir', process.env.TSGUARD_TEST_STORE || path.join(temporary, 'store'), tarballs[0]], consumer);
     const consumerManifest = JSON.parse(fs.readFileSync(path.join(consumer, 'package.json')));
     assert.deepEqual(Object.keys(consumerManifest.devDependencies), ['@oxguard/tsguard']);
   } else {
@@ -219,7 +219,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   fs.mkdirSync(rules, { recursive: true });
   fs.writeFileSync(path.join(rules, 'test.yaml'), 'rules:\n  - id: tsguard-test-eval\n    languages: [typescript, javascript]\n    message: Avoid eval\n    severity: ERROR\n    pattern: eval($X)\n');
   try {
-    assert.match(execute(['check']).stdout, /All checks passed/);
+    assert.match(execute(['check']).stdout, /All blocking checks passed/);
   } catch (error) {
     if (process.platform === 'win32') {
       const engine = path.join(nativeDirectory, 'bin', 'opengrep.exe');
@@ -247,7 +247,8 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     assert.equal(result.exit_code, expected);
     for (const key of ['findings', 'measurements', 'artifacts', 'diagnostics']) assert.ok(Array.isArray(result[key]), key);
     assert.equal(Object.hasOwn(result, 'output'), false);
-    for (const diagnostic of result.diagnostics) assert.ok(fs.existsSync(path.join(consumer, diagnostic.path)));
+    const actualRoot = args.includes('--root') ? args[args.indexOf('--root') + 1] : consumer;
+    for (const diagnostic of result.diagnostics) assert.ok(fs.existsSync(path.join(actualRoot, diagnostic.path)));
     return result;
   };
   // Real compiler-backed call resolution: imports, methods, aliases, nested
@@ -286,9 +287,10 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   assert.equal(structured(['types']).status, 'pass');
   const completeCheck = structured(['check']);
   assert.ok(['pass', 'advisory'].includes(completeCheck.status));
-  assert.equal(completeCheck.assessment, 'complete');
-  assert.deepEqual(completeCheck.gates.map(g => g.name), ['lint', 'fta', 'types', 'coverage', 'secrets', 'dependencies', 'security']);
-  assert.ok(completeCheck.gates.every(g => g.normalization === 'complete' && ['passed', 'advisory'].includes(g.status)));
+  assert.equal(completeCheck.assessment, 'incomplete'); // optional baseline is absent
+  assert.deepEqual(completeCheck.gates.map(g => g.name), ['lint', 'fta', 'types', 'typed-lint', 'coverage', 'secrets', 'dependencies', 'security', 'maintainability', 'duplicates', 'change']);
+  assert.ok(completeCheck.gates.filter(g => g.name !== 'change').every(g => g.normalization === 'complete' && ['passed', 'advisory'].includes(g.status)));
+  assert.equal(completeCheck.gates.find(g => g.name === 'change').status, 'not_run');
   assert.equal(completeCheck.measurements.filter(m => m.metric.startsWith('coverage.') && m.location.file === '').length, 4);
   const pipedAgent = run(executor, [...execArgs, 'tsguard', 'check', '--output', 'agent', '--dirs', 'src'], consumer);
   assert.match(pipedAgent.stdout, /^(?:PASS|ADVISORY)\n/);
@@ -323,6 +325,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const failFast = structured(['check'], 1);
   assert.ok(failFast.findings.every(f => f.gate === 'lint'));
   assert.ok(failFast.diagnostics.every(d => d.gate === 'lint'));
+  assert.ok(failFast.gates.filter(g => ['maintainability','duplicates','change'].includes(g.name)).every(g => g.status === 'not_run'));
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), '// first\nexport function lintLocation() {\n  debugger;\n}\n');
   const positionedLint = structured(['lint'], 1).findings.find(f => f.rule === 'lint/suspicious/noDebugger');
   assert.ok(positionedLint);
@@ -350,6 +353,16 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   assert.ifError(missingDependency.error);
   assert.equal(missingDependency.status, 1);
   assert.equal(JSON.parse(missingDependency.stdout).findings[0].category, 'tool_missing');
+  const maintainability = require('../evals/maintainability.cjs').evaluate({ execute, structured, root: consumer });
+  const maintainabilityParity = require('../evals/maintainability-parity.cjs').assess(maintainability);
+  assert.equal(maintainabilityParity.tsguard_capabilities_passed, true);
+  assert.equal(maintainabilityParity.maintainability_parity_ready, false);
+  t.diagnostic(`Installed maintainability evals: ${JSON.stringify(maintainability)}`);
+  if (process.env.OXGUARD_EVAL_REPORT_DIR) {
+    const reportDirectory = path.resolve(process.env.OXGUARD_EVAL_REPORT_DIR);
+    fs.mkdirSync(reportDirectory, { recursive: true });
+    fs.writeFileSync(path.join(reportDirectory, 'maintainability.json'), JSON.stringify(maintainability, null, 2) + '\n');
+  }
   run('go', ['build', '-o', installedBinary, path.join(__dirname, 'testdata/cli.go')], root);
   const contextProcess = spawnSync(process.execPath, [launcher, 'context', '--output', 'json', 'argument with spaces'], {
     cwd: consumer, encoding: 'utf8', env: { ...process.env, TSGUARD_FIXTURE_VALUE: 'forwarded-value' },

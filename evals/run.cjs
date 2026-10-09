@@ -55,7 +55,14 @@ function validate(testCase, result, processResult, root) {
   expect(!Object.hasOwn(result, 'output'), 'human prose output field is not a machine contract');
   if (errors.some(e => e.endsWith('must be an array'))) return errors;
   if (testCase.expected.assessment) expect(result.assessment === testCase.expected.assessment, 'assessment mismatch');
-  if (testCase.expected.gates) expect(isDeepStrictEqual(result.gates, testCase.expected.gates), 'gate execution/normalization mismatch');
+  if (testCase.expected.gates) {
+    const required = new Set(testCase.expected.gates.map(g => g.name));
+    const optional = testCase.expected.additional_gates || [];
+    expect(isDeepStrictEqual(result.gates.filter(g => required.has(g.name)), testCase.expected.gates), 'gate execution/normalization mismatch');
+    for (const gate of result.gates.filter(g => !required.has(g.name))) {
+      expect(optional.some(g => isDeepStrictEqual(g, gate)), 'unexpected additional gate or execution state');
+    }
+  }
   for (const text of testCase.expected.absent_text || []) expect(!JSON.stringify(result).includes(text), 'normalized result exposed forbidden source text');
   for (const kind of Object.values(testCase.generated_files || {})) expect(!JSON.stringify(result).includes(generatedInput(kind).forbiddenText), 'normalized result exposed generated source text');
   if (!testCase.criticality) for (const measurement of testCase.expected.measurements || []) {
