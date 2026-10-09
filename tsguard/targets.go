@@ -12,6 +12,7 @@ import (
 func runCheck(r *Runner, dirs []string, ftaCap int) int {
 	r.println("tsguard check")
 	r.println("─────────")
+	runMaintainability(r, "maintainability")
 
 	// Remove stale coverage artifacts from previous runs before lint scans the tree.
 	// vitest --coverage writes coverage/ at the end of the run; without this cleanup

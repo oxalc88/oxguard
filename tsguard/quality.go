@@ -79,6 +79,7 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 			Category string `json:"category"`
 			Message  string `json:"message"`
 		} `json:"error"`
+		Snapshot *maintainabilitySnapshot `json:"snapshot"`
 	}
 	if err := json.NewDecoder(stdout).Decode(&report); err != nil {
 		return false, err
@@ -105,6 +106,12 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 		r.result.AddFinding(f)
 	}
 	r.result.Measurements = append(r.result.Measurements, report.Measurements...)
+	if report.Snapshot != nil {
+		if err := report.Snapshot.validate(); err != nil {
+			return false, err
+		}
+		r.smellFindings(spec.gate, report.Snapshot, refs)
+	}
 	if report.Partial {
 		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".not_evaluated", Severity: "info", Status: "advisory", Category: "quality", Evidence: report.Limitation, Diagnostics: refs})
 	}
