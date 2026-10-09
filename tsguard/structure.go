@@ -10,8 +10,9 @@ import (
 )
 
 type moduleFact struct {
-	ID       string   `json:"id"`
-	Location Location `json:"location"`
+	ID         string   `json:"id"`
+	Location   Location `json:"location"`
+	SourceHash string   `json:"source_hash"`
 }
 type moduleEdge struct {
 	ID     string `json:"id"`

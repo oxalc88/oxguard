@@ -6,7 +6,14 @@ emitAnalysis(input => {
   const declarations = new Map();
   const functions = [];
   const handlers = [];
-  const modules = sources.map(s => ({ id: relative(s.fileName), location: { file: relative(s.fileName) } }));
+  const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+  const tokenFingerprint = (text, variant) => {
+    const scanner = ts.createScanner(ts.ScriptTarget.Latest, true, variant, text);
+    const tokens = [];
+    while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) tokens.push(scanner.getTokenText());
+    return digest(JSON.stringify(tokens));
+  };
+  const modules = sources.map(s => ({ id: relative(s.fileName), location: { file: relative(s.fileName) }, source_hash: digest(s.text) }));
   const moduleIDs = new Set(modules.map(m => m.id));
   const imports = new Map();
   let externalImports = 0, unresolvedImports = 0, typeImports = 0;
@@ -22,7 +29,9 @@ emitAnalysis(input => {
     if (isFunction(node) && node.body) {
       const loc = location(node, source, [...owners, name(node)].join('.'));
       const id = `${loc.file}:${loc.line}:${loc.column}:${loc.symbol}`;
-      const fact = { id, location: loc, forward_target: '', nested_branches: 0 };
+      const end = source.getLineAndCharacterOfPosition(node.end);
+      const fact = { id, location: loc, end_line: end.line + 1, end_column: end.character + 1,
+        fingerprint: tokenFingerprint(node.getText(source), source.languageVariant), forward_target: '', nested_branches: 0 };
       functions.push(fact);
       declarations.set(node, fact);
       next = [...owners, name(node)];

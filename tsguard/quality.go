@@ -117,6 +117,9 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 			r.smellFindings(spec.gate, report.Snapshot, refs)
 		}
 		if spec.gate != "smells" {
+			if err := r.functionMeasurements(report.Snapshot); err != nil {
+				return false, err
+			}
 			if err := r.structureFindings(spec.gate, report.Snapshot, refs); err != nil {
 				return false, err
 			}

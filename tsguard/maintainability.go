@@ -14,7 +14,41 @@ type functionFact struct {
 	Location      Location `json:"location"`
 	ForwardTarget string   `json:"forward_target"`
 	Branches      int      `json:"nested_branches"`
+	EndLine       int      `json:"end_line"`
+	EndColumn     int      `json:"end_column"`
+	Fingerprint   string   `json:"fingerprint"`
 }
+
+// Reuse the SCC/DAG implementation for the resolved function graph. Recursion
+// is measured, not treated as an architecture defect. Repeated call sites from
+// one function remain one edge and one caller.
+func functionStructure(s *maintainabilitySnapshot) (structureFacts, error) {
+	nodes := make([]moduleFact, 0, len(s.Functions))
+	edges := make([]moduleEdge, 0, len(s.Calls))
+	for _, f := range s.Functions {
+		nodes = append(nodes, moduleFact{ID: f.ID, Location: Location{File: f.ID}})
+	}
+	for _, e := range s.Calls {
+		edges = append(edges, moduleEdge{Caller: e.Caller, Callee: e.Callee})
+	}
+	return analyzeModules(nodes, edges)
+}
+
+func (r *Runner) functionMeasurements(s *maintainabilitySnapshot) error {
+	g, err := functionStructure(s)
+	if err != nil {
+		return err
+	}
+	for _, f := range s.Functions {
+		r.measure("function.fan_in", "structure", f.Location, float64(len(g.In[f.ID])), "callers")
+		r.measure("function.fan_out", "structure", f.Location, float64(len(g.Out[f.ID])), "callees")
+		r.measure("function.call_depth", "structure", f.Location, float64(g.Depth[f.ID]), "edges")
+		r.measure("criticality.in_degree", "structure", f.Location, float64(len(g.In[f.ID])), "callers")
+	}
+	r.measure("function.recursive_components", "structure", Location{File: "."}, float64(g.Cycles), "components")
+	return nil
+}
+
 type handlerFact struct {
 	Location    Location `json:"location"`
 	Tokens      int      `json:"tokens"`

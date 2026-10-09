@@ -55,3 +55,22 @@ func TestRepeatedHandlersRequireSameFailurePolicy(t *testing.T) {
 		t.Fatal(r.result.Findings)
 	}
 }
+
+func TestFunctionStructureCountsDistinctCallersAndCondensesRecursion(t *testing.T) {
+	s := smellSnapshot("", "", "", "")
+	s.Calls = []callEdge{{"a", "b"}, {"a", "b"}, {"b", "c"}, {"c", "b"}, {"d", "b"}}
+	g, err := functionStructure(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(g.In["b"]) != 3 || len(g.Out["a"]) != 1 || g.Cycles != 1 || g.Depth["a"] != 1 || g.Depth["b"] != 0 {
+		t.Fatalf("incorrect scoped call graph: %+v", g)
+	}
+	r := contractRunner(t)
+	if err := r.functionMeasurements(s); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.result.Findings) != 0 {
+		t.Fatal("recursion or single-use functions must not be quality findings")
+	}
+}
