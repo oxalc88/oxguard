@@ -23,6 +23,8 @@ function run(command, args, cwd, expected = 0, timeout = 120000) {
   const shell = process.platform === 'win32' && ['npm', 'npx', 'pnpm'].includes(command);
   const result = spawnSync(command, shell ? args.map(a => `"${a}"`) : args, {
     cwd, encoding: 'utf8', shell, timeout,
+    // Local SAST fixtures must not wait for an unrelated upstream version check.
+    env: { ...process.env, OPENGREP_ENABLE_VERSION_CHECK: 'false' },
   });
   if (result.error) assert.fail(`${command} ${args.join(' ')}: ${result.error.message}\n${result.stdout}\n${result.stderr}`);
   assert.equal(result.status, expected, `${command}: ${result.stdout}\n${result.stderr}`);
