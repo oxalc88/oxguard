@@ -32,6 +32,7 @@ type Runner struct {
 	ftaExclude      []string                 // additional fta-exclude globs from oxguard.toml
 	snapshot        *maintainabilitySnapshot // one compiler pass shared by smells, structure and change
 	baseline        string
+	comparison      *nativeComparison
 }
 
 // Result holds the outcome of a single tool run.

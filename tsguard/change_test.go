@@ -80,3 +80,25 @@ func TestAbsentBaselineIsNotEvaluatedAndNonBlocking(t *testing.T) {
 		t.Fatal(r.result)
 	}
 }
+
+func TestNativeFTADisplacementStillRequiresUnreducedWorkAndStructure(t *testing.T) {
+	before := changeSnapshot([]int{4}, []moduleEdge{})
+	for _, branches := range [][]int{{4, 0}, {2, 0}} {
+		r := contractRunner(t)
+		after := changeSnapshot(branches, []moduleEdge{{Caller: "a.ts", Callee: "b.ts"}})
+		b, a := metricProfile(2), metricProfile(2)
+		b.Files[0].FTA, b.Files[0].Cyclo = 60, 5
+		a.Files[0].FTA, a.Files[0].Cyclo = 30, 5
+		r.comparison = &nativeComparison{Baseline: b, Candidate: a, Policy: map[string]any{"native": true}}
+		if err := r.compareSnapshots(before, after, "sha"); err != nil {
+			t.Fatal(err)
+		}
+		want := 0
+		if branches[0] == 4 {
+			want = 1
+		}
+		if len(r.result.Findings) != want {
+			t.Fatal(r.result.Findings)
+		}
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 )
 
 //go:embed analysis/project.cjs
@@ -44,10 +45,27 @@ func (r *Runner) runOwnedAnalysis(gate, source string, advisory bool, extra map[
 	if err != nil {
 		return r.executionFailure(gate, "invalid_configuration", err.Error())
 	}
+	// Snapshot arguments exceed Windows' command-line limit on real projects.
+	// Pass a private input file, not the entire graph on the command line.
+	inputDir := filepath.Join(r.root, opengrepCacheDir, "diagnostics")
+	if err := os.MkdirAll(inputDir, 0755); err != nil {
+		return r.executionFailure(gate, "diagnostics_failure", err.Error())
+	}
+	inputFile, err := os.CreateTemp(inputDir, "analysis-input-*.json")
+	if err != nil {
+		return r.executionFailure(gate, "diagnostics_failure", err.Error())
+	}
+	defer os.Remove(inputFile.Name())
+	_, writeErr := inputFile.Write(data)
+	closeErr := inputFile.Close()
+	if writeErr != nil || closeErr != nil {
+		return r.executionFailure(gate, "diagnostics_failure", "Cannot write analyzer input.")
+	}
 	analyzer := *r
 	analyzer.outputMode = "json"
-	res := analyzer.RunTool(toolSpec{gate: gate, adapter: "owned-analysis", advisory: advisory}, gate, node, "-e", compilerProject+"\n"+source, string(data))
+	res := analyzer.RunTool(toolSpec{gate: gate, adapter: "owned-analysis", advisory: advisory}, gate, node, "-e", compilerProject+"\n"+source, "@"+inputFile.Name())
 	r.snapshot = analyzer.snapshot
+	r.comparison = analyzer.comparison
 	failed := !res.ok
 	for _, f := range r.result.Findings {
 		if f.Gate == gate && (f.Status == "execution_error" || f.Status == "blocking") {
@@ -82,17 +100,19 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 			Category string `json:"category"`
 			Message  string `json:"message"`
 		} `json:"error"`
-		Snapshot *maintainabilitySnapshot `json:"snapshot"`
+		Snapshot   *maintainabilitySnapshot `json:"snapshot"`
+		Comparison *nativeComparison        `json:"comparison_metrics"`
 	}
 	if err := json.NewDecoder(stdout).Decode(&report); err != nil {
 		return false, err
 	}
 	if report.Error != nil {
 		category := report.Error.Category
-		if category != "tool_missing" && category != "invalid_configuration" && category != "analyzer_failure" {
+		if category != "tool_missing" && category != "invalid_configuration" && category != "analyzer_failure" && category != "timeout" {
 			return false, fmt.Errorf("unknown analyzer error")
 		}
 		r.result.Execution(spec.gate, category, report.Error.Message)
+		r.result.Findings[len(r.result.Findings)-1].Diagnostics = refs
 		return false, nil
 	}
 	if report.Findings == nil || report.Measurements == nil {
@@ -109,6 +129,12 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 		r.result.AddFinding(f)
 	}
 	r.result.Measurements = append(r.result.Measurements, report.Measurements...)
+	if report.Comparison != nil {
+		if err := report.Comparison.validate(); err != nil {
+			return false, err
+		}
+		r.comparison = report.Comparison
+	}
 	if report.Snapshot != nil {
 		if err := report.Snapshot.validate(); err != nil {
 			return false, err

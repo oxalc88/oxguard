@@ -186,7 +186,14 @@ func copyBaselineBlobs(reader *bufio.Reader, root string, blobs []baselineBlob) 
 
 func (r *Runner) comparisonUnavailable(rule, message string) {
 	r.result.Plan("change")
-	r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change." + rule, Status: "advisory", Severity: "info", Category: "quality", Evidence: message, Remediation: "Provide an available Git commit with --baseline and rerun change; do not infer an improvement from per-file scores alone."})
+	remediation := "Provide an available Git commit with --baseline and rerun change; do not infer an improvement from per-file scores alone."
+	if rule == "INCOMPLETE_METRICS" {
+		remediation = "Inspect the native analyzer diagnostics, restore missing tools or resolve measurement errors, and rerun with the same baseline."
+	}
+	if rule == "INCOMPLETE_INPUT" {
+		remediation = "Resolve compiler, source-scope or local-import errors and rerun the same baseline comparison."
+	}
+	r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change." + rule, Status: "advisory", Severity: "info", Category: "quality", Evidence: message, Remediation: remediation})
 	r.printf("  change: not evaluated — %s\n", message)
 }
 
@@ -247,16 +254,32 @@ func runChange(r *Runner) int {
 		r.comparisonUnavailable("INCOMPLETE_INPUT", "Baseline or candidate structural inputs are incomplete; comparison was not evaluated.")
 		return 0
 	}
+	if baseline.snapshot.CompilerVersion != r.snapshot.CompilerVersion {
+		r.comparisonUnavailable("INCOMPLETE_INPUT", "Baseline and candidate compiler versions differ; comparison was not evaluated.")
+		return 0
+	}
+	r.comparison = nil
+	r.runOwnedAnalysis("change", changeMetricsAnalyzer, true, map[string]any{"baselineRoot": root, "baselineSnapshot": baseline.snapshot, "candidateSnapshot": r.snapshot, "timeout": timeout})
 	if err := r.compareSnapshots(baseline.snapshot, r.snapshot, sha); err != nil {
 		r.executionFailure("change", "adapter_failure", err.Error())
 		return 0
 	}
-	r.result.RecordGate("change", true, true)
+	if r.comparison == nil {
+		r.result.RecordGate("change", false, false)
+		r.comparisonUnavailable("INCOMPLETE_METRICS", "Native FTA, cognitive or duplication metrics could not be evaluated; structural observations alone do not complete Level 3.")
+		return 0
+	}
+	if err := r.compareNativeMetrics(baseline.snapshot, r.snapshot, sha); err != nil {
+		r.executionFailure("change", "adapter_failure", err.Error())
+		return 0
+	}
+	r.result.RecordGate("change", true, r.comparison.Baseline.CognitiveComplete && r.comparison.Candidate.CognitiveComplete)
 	return 0
 }
 
 type changeMetrics struct {
 	Modules, Edges, Cycles, Depth, Wrappers, Branches, MaxFileBranches, MaxFunctionBranches int
+	MaxFanIn, MaxFanOut, CouplingHotspots, FunctionDepth, FunctionCycles                    int
 }
 
 func snapshotMetrics(s *maintainabilitySnapshot) (changeMetrics, error) {
@@ -267,6 +290,21 @@ func snapshotMetrics(s *maintainabilitySnapshot) (changeMetrics, error) {
 	m := changeMetrics{Modules: len(s.Modules), Edges: len(s.Imports), Cycles: g.Cycles}
 	for _, n := range g.Depth {
 		m.Depth = max(m.Depth, n)
+	}
+	for id := range g.Out {
+		m.MaxFanIn = max(m.MaxFanIn, len(g.In[id]))
+		m.MaxFanOut = max(m.MaxFanOut, len(g.Out[id]))
+		if len(g.In[id]) >= 3 && len(g.Out[id]) >= 8 {
+			m.CouplingHotspots++
+		}
+	}
+	functions, err := functionStructure(s)
+	if err != nil {
+		return changeMetrics{}, err
+	}
+	m.FunctionCycles = functions.Cycles
+	for _, n := range functions.Depth {
+		m.FunctionDepth = max(m.FunctionDepth, n)
 	}
 	perFile := map[string]int{}
 	for _, f := range s.Functions {
@@ -297,19 +335,39 @@ func (r *Runner) compareSnapshots(before, after *maintainabilitySnapshot, sha st
 		a, b int
 	}{
 		{"module_count", base.Modules, candidate.Modules}, {"module_edges", base.Edges, candidate.Edges}, {"module_cycles", base.Cycles, candidate.Cycles}, {"dependency_depth", base.Depth, candidate.Depth}, {"wrappers", base.Wrappers, candidate.Wrappers}, {"total_branches", base.Branches, candidate.Branches}, {"max_file_branches", base.MaxFileBranches, candidate.MaxFileBranches}, {"max_function_branches", base.MaxFunctionBranches, candidate.MaxFunctionBranches},
+		{"max_module_fan_in", base.MaxFanIn, candidate.MaxFanIn}, {"max_module_fan_out", base.MaxFanOut, candidate.MaxFanOut}, {"coupling_hotspots", base.CouplingHotspots, candidate.CouplingHotspots}, {"function_call_depth", base.FunctionDepth, candidate.FunctionDepth}, {"function_recursive_components", base.FunctionCycles, candidate.FunctionCycles},
 	}
 	for _, metric := range metrics {
 		r.measure("change.baseline."+metric.name, "change", Location{File: "."}, float64(metric.a), "count")
 		r.measure("change.candidate."+metric.name, "change", Location{File: "."}, float64(metric.b), "count")
 	}
 	// Multiple independent facts, never a raw file/dependency count judgment.
-	displaced := base.MaxFileBranches > 0 && candidate.MaxFileBranches < base.MaxFileBranches && candidate.Branches >= base.Branches && candidate.Edges > base.Edges && (candidate.Depth > base.Depth || candidate.Wrappers > base.Wrappers || candidate.Cycles > base.Cycles)
+	fileReduction := base.MaxFileBranches > 0 && candidate.MaxFileBranches < base.MaxFileBranches
+	nativeEvidence := ""
+	if r.comparison != nil {
+		b, a := r.comparison.Baseline, r.comparison.Candidate
+		var maxB, maxA, cycloB, cycloA float64
+		for _, f := range b.Files {
+			maxB = max(maxB, f.FTA)
+			cycloB += f.Cyclo
+		}
+		for _, f := range a.Files {
+			maxA = max(maxA, f.FTA)
+			cycloA += f.Cyclo
+		}
+		fileReduction = fileReduction || maxB > maxA && cycloA >= cycloB
+		nativeEvidence = fmt.Sprintf(" Native FTA maximum %g→%g, total file cyclomatic paths %g→%g, duplicated tokens %d→%d.", maxB, maxA, cycloB, cycloA, b.Duplicates.Tokens, a.Duplicates.Tokens)
+	}
+	displaced := fileReduction && candidate.Branches >= base.Branches && candidate.Edges > base.Edges && (candidate.Depth > base.Depth || candidate.Wrappers > base.Wrappers || candidate.Cycles > base.Cycles)
 	if displaced {
 		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.POSSIBLE_COMPLEXITY_DISPLACEMENT", Status: "advisory", Severity: "warning", Category: "quality", Location: &Location{File: "."},
-			Evidence: fmt.Sprintf("Baseline %s: maximum per-file branches %d→%d, total branches %d→%d, runtime edges %d→%d, dependency depth %d→%d, unchanged forwarding functions %d→%d, cycles %d→%d.", sha, base.MaxFileBranches, candidate.MaxFileBranches, base.Branches, candidate.Branches, base.Edges, candidate.Edges, base.Depth, candidate.Depth, base.Wrappers, candidate.Wrappers, base.Cycles, candidate.Cycles), Remediation: "Review the end-to-end workflow and behavior before claiming simplification; smaller file scores alone do not show reduced maintainability cost."})
+			Evidence: fmt.Sprintf("Baseline %s: maximum per-file branches %d→%d, total branches %d→%d, runtime edges %d→%d, dependency depth %d→%d, unchanged forwarding functions %d→%d, cycles %d→%d.", sha, base.MaxFileBranches, candidate.MaxFileBranches, base.Branches, candidate.Branches, base.Edges, candidate.Edges, base.Depth, candidate.Depth, base.Wrappers, candidate.Wrappers, base.Cycles, candidate.Cycles) + nativeEvidence, Remediation: "Review the end-to-end workflow and behavior before claiming simplification; smaller file scores alone do not show reduced maintainability cost."})
 	}
 	if candidate.Cycles > base.Cycles {
 		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.NEW_DEPENDENCY_CYCLES", Status: "advisory", Severity: "warning", Category: "quality", Location: &Location{File: "."}, Evidence: fmt.Sprintf("Runtime dependency cycles increased from %d to %d against %s.", base.Cycles, candidate.Cycles, sha)})
+	}
+	if candidate.CouplingHotspots > base.CouplingHotspots {
+		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.INCREASED_COUPLING", Status: "advisory", Severity: "warning", Category: "quality", Location: &Location{File: "."}, Evidence: fmt.Sprintf("Modules with at least 3 importers and 8 runtime dependencies increased from %d to %d against %s.", base.CouplingHotspots, candidate.CouplingHotspots, sha), Remediation: "Review the changed dependency surface and cohesion; these counts do not prescribe an architecture."})
 	}
 	return nil
 }

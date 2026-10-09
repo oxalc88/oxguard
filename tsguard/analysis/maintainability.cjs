@@ -132,6 +132,6 @@ emitAnalysis(input => {
   const ordered = values => values.sort((a,b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : JSON.stringify(a) > JSON.stringify(b) ? 1 : 0);
   return { findings: [], measurements: [], partial: unresolvedImports > 0,
     limitation: unresolvedImports > 0 ? `${unresolvedImports} local or dynamic module references could not be resolved; the graph is partial.` : '',
-    snapshot: { functions: ordered(functions), calls: ordered([...edges.values()]), handlers: ordered(handlers), unresolved_calls: unresolved,
+    snapshot: { compiler_version: ts.version, functions: ordered(functions), calls: ordered([...edges.values()]), handlers: ordered(handlers), unresolved_calls: unresolved,
       modules: ordered(modules), imports: ordered([...imports.values()]), external_imports: externalImports, unresolved_imports: unresolvedImports, type_imports: typeImports } };
 });

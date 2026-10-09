@@ -8,7 +8,12 @@ function loadProject(input) {
   const project = createRequire(path.join(root, 'package.json'));
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const owned = input.runtime ? createRequire(path.join(input.runtime, 'bin/tool.cjs')) : input.compilerRoot ? createRequire(path.join(input.compilerRoot, 'package.json')) : project;
-  const ts = (!input.sourceOnly && (manifest.dependencies?.typescript || manifest.devDependencies?.typescript) ? project : owned)('typescript');
+  // A baseline uses the current project's selected compiler, never historical
+  // dependencies. This keeps both graph profiles on the same compiler version.
+  const compilerRoot = input.sourceOnly && input.compilerRoot ? input.compilerRoot : root;
+  const compilerManifest = input.sourceOnly ? JSON.parse(fs.readFileSync(path.join(compilerRoot, 'package.json'), 'utf8')) : manifest;
+  const compilerProject = input.sourceOnly ? createRequire(path.join(compilerRoot, 'package.json')) : project;
+  const ts = (compilerManifest.dependencies?.typescript || compilerManifest.devDependencies?.typescript ? compilerProject : owned)('typescript');
   const relative = file => path.relative(root, file).split(path.sep).join('/');
   const excluded = file => input.exclude.some(dir => {
     const normalized = dir.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/$/, '');
@@ -49,7 +54,11 @@ function loadProject(input) {
 }
 
 async function emitAnalysis(analyze) {
-  try { process.stdout.write(JSON.stringify(await analyze(JSON.parse(process.argv[1]))) + '\n'); }
+  try {
+    const argument = process.argv[1];
+    const payload = argument.startsWith('@') ? require('node:fs').readFileSync(argument.slice(1), 'utf8') : argument;
+    process.stdout.write(JSON.stringify(await analyze(JSON.parse(payload))) + '\n');
+  }
   catch (error) {
     const category = error.category || (['MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND'].includes(error.code) ? 'tool_missing' : 'analyzer_failure');
     console.error(error.stack);

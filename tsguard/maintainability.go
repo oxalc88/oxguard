@@ -56,6 +56,7 @@ type handlerFact struct {
 	Fallback    bool     `json:"fallback"`
 }
 type maintainabilitySnapshot struct {
+	CompilerVersion   string         `json:"compiler_version"`
 	Functions         []functionFact `json:"functions"`
 	Calls             []callEdge     `json:"calls"`
 	Handlers          []handlerFact  `json:"handlers"`
