@@ -10,5 +10,7 @@
   "jscpd": "5.3.2",
   "secretlint": "13.0.6",
   "@secretlint/secretlint-rule-preset-recommend": "13.0.6",
-  "audit-ci": "7.1.0"
+  "audit-ci": "7.1.0",
+  "eslint": "10.12.0",
+  "typescript-eslint": "8.71.1"
 }

@@ -66,6 +66,8 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	}
 	var adapterErr error
 	switch spec.adapter {
+	case "owned-analysis":
+		if res.ok { complete, adapterErr = r.normalizeOwnedAnalysis(spec, stdout, refs) }
 	case "secretlint", "knip", "jscpd", "coverage-summary", "dependency-audit", "audit-ci":
 		if r.machine() {
 			if err := r.normalizeNative(spec, res, stdout, refs); err != nil {

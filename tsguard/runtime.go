@@ -47,7 +47,7 @@ func writeRuntimeConfig(root, name string, value any) (string, error) {
 }
 
 func (r *Runner) runPackagedBiome(fix bool) int {
-	if !hasProjectConfig(r.root, "biome.json", "biome.jsonc", ".biome.json", ".biome.jsonc") && hasProjectConfig(r.root, "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs", "eslint.config.ts", ".oxlintrc.json", "oxlint.config.ts") {
+	if !hasProjectConfig(r.root, "biome.json", "biome.jsonc", ".biome.json", ".biome.jsonc") && hasLintConfig(r.root) {
 		command := "check"
 		if fix {
 			command = "fix"
@@ -72,6 +72,7 @@ func (r *Runner) runPackagedBiome(fix bool) int {
 		}
 		file, err := writeRuntimeConfig(r.root, "biome.json", map[string]any{
 			"root": true, "extends": []string{preset},
+			"linter": map[string]any{"rules": qualityBaselineRules()},
 			"vcs": map[string]any{"enabled": hasProjectConfig(r.root, ".gitignore"), "useIgnoreFile": hasProjectConfig(r.root, ".gitignore")},
 		})
 		if err != nil {
@@ -79,6 +80,7 @@ func (r *Runner) runPackagedBiome(fix bool) int {
 			return r.executionFailure("lint", "invalid_configuration", err.Error())
 		}
 		args = append(args, "--config-path", filepath.Dir(file))
+		r.result.Measurements = append(r.result.Measurements, Measurement{Metric:"lint.baseline_version", Level:"code", Location:Location{File:"."}, Value:qualityBaselineVersion, Unit:"version"})
 	}
 	args = append(args, r.dirs...)
 	if !r.RunTool(toolSpec{gate: "lint", adapter: "biome"}, "Biome/Ultracite", packagedCommand("biome", args...)...).ok {

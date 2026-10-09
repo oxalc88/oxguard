@@ -25,3 +25,4 @@ __pycache__/
 
 # Generated capability eval reports
 /eval-reports/
+/.test-runtime/

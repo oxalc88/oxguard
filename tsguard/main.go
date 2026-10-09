@@ -20,6 +20,7 @@ Quality gates (replaces npm scripts):
   tsguard fix            auto-format: ultracite fix
   tsguard lint           lint + format check (ultracite check)
   tsguard types          type checking (tsc --noEmit)
+  tsguard typed-lint     type-aware unsafe operations and unnecessary conditions
   tsguard complexity     compatibility alias; complexity is enforced by ultracite check
   tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)
   tsguard coverage       run tests with coverage (vitest --coverage)
@@ -150,7 +151,7 @@ func runCLI(cmd string, args []string) int {
 var analysisCommands = map[string]bool{
 	"check": true, "fix": true, "lint": true, "types": true, "complexity": true,
 	"fta": true, "coverage": true, "security": true, "npm-audit": true,
-	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true,
+	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true, "typed-lint": true,
 }
 
 func dispatchResult(cmd string, cfg config, root string, result *RunResult) int {
@@ -174,6 +175,7 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		switch cmd {
 		case "check":
 			result.Plan("lint", "fta", "types", "coverage", "secrets", "dependencies", "security")
+			if !hasLintConfig(root) { result.Plan("typed-lint") }
 		case "security":
 			result.Plan("secrets", "dependencies", "security")
 		case "audit":
@@ -199,6 +201,8 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		return runLint(r)
 	case "types":
 		return runTypes(r)
+	case "typed-lint":
+		return runTypedLint(r)
 	case "complexity":
 		return runComplexity(r, cfg.dirs)
 	case "fta":
