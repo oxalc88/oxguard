@@ -4,23 +4,21 @@
 **Canonical code evaluated:** `main` at `c26afb524d68dc49fe2ecdc235e742bbe7ec8da6`  
 **Scope:** architecture and agent-facing behavior only. No Tsguard features, gates, thresholds, npm behavior, or skills are changed by this evaluation.
 
-## Implementation status after PR #3
+## Current implementation status — v0.8 Tsguard
 
-The evaluation below remains the evidence-based assessment of `main` at the recorded SHA. Its conclusions and scorecard are preserved. This implementation adds the first recommended contract step and the requested PyGuard criticality parity milestone. It does not add blocking structural rules or change analysis.
+The original evaluation below records main at the SHA above. Its historical missing-capability statements do not describe this candidate. The current implementation is:
 
-| Area | Implementation status |
+| Area | Tsguard status |
 |---|---|
-| Level 1 analyzers | Existing; analyzers, thresholds, gate order and native fail-fast behavior preserved |
-| Normalized result contract | Implemented in Go by this PR: schema version 1, explicit gate execution/normalization status, assessment completeness, findings, measurements, diagnostic references and artifacts |
-| Agent / JSON outputs | Implemented: `--output agent` is bounded; `--output json` contains the complete normalized run |
-| Input contract | Unknown/missing/invalid flags rejected; explicit `--root`; structured modes reject unreadable/malformed `oxguard.toml` |
-| Progressive disclosure | CLI reduction implemented for tsc, FTA, packaged Biome, Opengrep, coverage, secrets, dependencies, Knip and jscpd; unsupported backends remain explicitly partial |
-| Human / npm interfaces | Human rendering retained; launcher and packaging unchanged; structured modes accept piped stdout |
-| Skill debt | Agent skill updated to use installed npm/pnpm CLI, normalized outputs, omitted-finding JSON retrieval, execution categories and advisory criticality |
-| Level 2 | PyGuard criticality parity implemented: compiler-resolved function/method caller graph, in-degree, top 30, advisory `CRITICALITY.md` in audit; remaining structural analysis still missing |
-| Level 3 | Still missing |
+| Level 1 — Code | Implemented: pinned Ultracite/Biome, FTA, types, coverage and security; native schema-1 results; Knip audit and jscpd check/audit |
+| Level 2 — Structure | Implemented: compiler-resolved function/method and module graphs, distinct callers/callees, criticality, fan-in/out, SCC call/dependency depth, cycles, coupling, delegation and forwarding fragmentation |
+| Level 3 — Change | Implemented: explicit inert Git baseline, native FTA/cyclomatic/Halstead/cognitive/duplication comparisons, structural/coupling changes, conservative file/symbol matching and multiple-evidence displacement findings |
+| Agent contract | Implemented: complete JSON, bounded agent output, explicit partial/not-run/execution states, stable findings, diagnostic and graph/change artifacts |
+| Python parity | Existing code/contract/criticality retained; new structural/change parity deferred independently |
 
-See [agent and JSON contract](guides/tsguard-result-contract.md) for schema, semantic categories, diagnostic lifecycle and adapter limits. Historical claims of missing contracts below describe the evaluated revision, not this follow-up.
+Level 2/3 findings are advisory. Missing baselines remain optional and not evaluated. Static analysis does not prove behavioral equivalence, full runtime dispatch, arbitrary semantic renames or domain responsibility; single-use functions, recursion and raw file counts are not architecture violations. Compiler-backed unsafe-operation lint beyond the Biome baseline remains a disclosed limitation of the selected lint provider.
+
+See [current implemented levels and boundaries](maintainability.md), [validation evidence](maintainability-validation.md) and [agent result contract](guides/tsguard-result-contract.md).
 
 ## Python contract parity implemented by PR #5
 
@@ -30,7 +28,7 @@ The Python corpus retains 15 baseline behavior passes and passes 20 parity cases
 
 ## Executive assessment
 
-**v0.8 candidate implementation update (2026-10-09):** Tsguard now adds an explicit zero-config Ultracite/Biome baseline, advisory delegation/handler findings, a static module graph with SCC depth and coupling measurements, and inert Git source comparisons for supported complexity-displacement scenarios. The existing normalized contract and Level 1 fail-fast gates remain. Tsguard readiness is assessed independently of deferred new PyGuard maintainability parity; broader change metrics and compiler-aware unsafe-operation lint remain disclosed later capabilities. See [scope and boundaries](maintainability.md) and [validation](maintainability-validation.md). The executive assessment below describes the original evaluated revision.
+**Current v0.8 implementation:** the three planned Tsguard levels are implemented as described in the status table above. Native baseline metrics and regular function graph measurements close the earlier candidate gaps. Python parity is deferred independently. The following executive assessment and detailed sections are the historical evaluation of the recorded main revision.
 
 Tsguard is a useful **Level 1 code-quality gate** with a strong npm delivery path, but it is not yet an agent-native analysis engine. The Go CLI orchestrates deterministic analyzers well, but its public result contract is still human CLI text. There is no common finding model, no machine-readable output, no Level 2 graph model, and no Level 3 baseline/change model.
 
@@ -60,7 +58,7 @@ skill reads raw logs and interprets them with the LLM
 
 That makes execution deterministic, but interpretation is not deterministic or context-efficient.
 
-**Current maturity**
+**Historical maturity at the evaluated SHA**
 
 | Area | Assessment |
 |---|---|
@@ -417,7 +415,7 @@ The LLM should choose remediation and explain tradeoffs. It should not be the pa
 
 ## 5. Quality phase evaluation
 
-## Level 1 — Code quality
+## Historical Level 1 assessment
 
 Question: **Is this individual unit of code difficult or risky to maintain?**
 
@@ -437,7 +435,7 @@ Question: **Is this individual unit of code difficult or risky to maintain?**
 
 Level 1 is functionally strong. Its primary weakness is not missing analyzers; it is the lack of normalized findings and stable machine output.
 
-## Level 2 — Structural quality
+## Historical Level 2 assessment
 
 Question: **Is the structure of the system unnecessarily difficult to understand or change?**
 
@@ -499,7 +497,7 @@ Tsguard currently has **none** of the parity chain:
 
 This is a feature gap. It should not be solved by an LLM inspecting imports or reading source heuristically. The intended path remains deterministic AST -> graph -> metric -> finding/artifact.
 
-## Level 3 — Change quality
+## Historical Level 3 assessment
 
 Question: **Did this change genuinely simplify the system, or only move complexity elsewhere?**
 

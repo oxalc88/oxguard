@@ -6,8 +6,8 @@ Delivery: atomic commits in one PR, based on main `94ef5cf`, following the user'
 
 - [x] Quality baseline: inspect v0.7.2 and PR #5; pin zero-config Biome policy; preserve project lint configs; retain the single Biome lint engine; report deferred typed-lint capabilities.
 - [x] Code smells: compiler AST evidence for pass-through chains and repeated handlers; upstream jscpd for repeated validation; advisory false-positive policy; legitimate abstractions and failure-policy controls.
-- [x] Structure: module graph, cycles, fan-in/out, SCC dependency depth, coupling and fragmentation evidence; deterministic module/symbol identities; reuse compiler parse.
-- [x] Change: explicit inert Git snapshot comparison; multiple-evidence displacement findings; absent baseline remains not evaluated; no baseline code execution.
+- [x] Structure: module and function/method graphs, cycles, distinct fan-in/out, criticality and SCC dependency/call depth, coupling and fragmentation evidence; deterministic module/symbol identities; reuse compiler parse.
+- [x] Change: explicit inert Git snapshot comparison; native FTA/cognitive/duplication distributions and deltas; conservative identity matching; multiple-evidence displacement findings; absent baseline remains not evaluated; no baseline code/config execution.
 - [x] Evals and guidance: installed npm adversarial controls, preserved Level 1 checks, explicit Python capability gaps, resource observations and independently exercised skill.
 - [x] Preserve cross-platform installed-distribution verification in the existing PR matrix, including pnpm; record the final run in the PR description.
 - [x] Separate selected Tsguard readiness from deferred Python structural/change parity.

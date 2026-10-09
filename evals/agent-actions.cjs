@@ -105,6 +105,16 @@ function score(trace, skill) {
 			response.execution.source_edit_needed === false &&
 			response.execution.explanation.includes("tool_missing"),
 	);
+	if (trace.language === "typescript") {
+		const nativeChange = trace.change_events?.find(e=>e.result?.command === "change")?.result;
+		const responseChange = response?.change;
+		const nativeMetrics = nativeChange?.measurements || [];
+		check("agent.native_change_interpretation", nativeChange?.assessment === "complete" &&
+			nativeChange.status === "advisory" && nativeChange.exit_code === 0 &&
+			["change.baseline.fta.score","change.candidate.fta.score","change.baseline.duplicated_tokens","change.candidate.function.cognitive_min"].every(metric=>nativeMetrics.some(m=>m.metric===metric)) &&
+			responseChange?.semantic_status === nativeChange.status && responseChange.exit_code === 0 &&
+			responseChange.simplification_proven === false && responseChange.explanation.length > 0 && responseChange.limitations.length > 0);
+	}
 	return {
 		language: trace.language,
 		ready: checks.every((c) => c.outcome === "pass"),

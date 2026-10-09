@@ -62,7 +62,7 @@ copies to the project's `tools/analysis/`; these are not executed during checks.
 
 ### `tsguard` — TypeScript quality gate
 
-The v0.8 candidate adds a versioned zero-config Ultracite/Biome baseline, advisory AST/module analysis and inert Git baseline comparisons. See [maintainability behavior, limits and parity](docs/maintainability.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
+The v0.8 candidate implements three Tsguard levels: **code** (Ultracite/Biome and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
 
 `tsguard/` is the CLI for TypeScript projects. Runs:
 
@@ -84,9 +84,12 @@ Informational:
 | Duplicate code | jscpd | Copy-pasted blocks that should be abstracted |
 
 ```bash
-tsguard check        # full gate (lint → fta → types → coverage → security)
+tsguard check        # blocking gates, then advisory maintainability and duplication
+tsguard check --baseline HEAD~1  # also compare change quality with a Git baseline
+tsguard maintainability --output json  # focused function/module structure and smells
+tsguard change --baseline HEAD~1 --output json  # focused native baseline comparison
 tsguard fix          # auto-format (ultracite fix)
-tsguard audit        # informational: dead code + duplicates
+tsguard audit        # informational: criticality + dead code + duplicates
 tsguard security     # security: secretlint + audit/audit-ci + opengrep SAST
 tsguard fta          # FTA score gate only
 tsguard complexity   # compatibility alias: complexity is enforced by ultracite check
