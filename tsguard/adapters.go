@@ -67,7 +67,9 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	var adapterErr error
 	switch spec.adapter {
 	case "owned-analysis":
-		if res.ok { complete, adapterErr = r.normalizeOwnedAnalysis(spec, stdout, refs) }
+		if res.ok {
+			complete, adapterErr = r.normalizeOwnedAnalysis(spec, stdout, refs)
+		}
 	case "secretlint", "knip", "jscpd", "coverage-summary", "dependency-audit", "audit-ci":
 		if r.machine() {
 			if err := r.normalizeNative(spec, res, stdout, refs); err != nil {
@@ -227,7 +229,7 @@ func (r *Runner) addFTA(spec toolSpec, file string, value, threshold float64, re
 	if value > threshold {
 		r.result.AddFinding(Finding{Gate: "fta", Rule: "tsguard.fta.score_exceeded", Severity: "error", Status: status, Category: "quality",
 			Location: &location, Observed: &value, Threshold: &threshold,
-			Evidence: fmt.Sprintf("FTA score %g exceeds %g.", value, threshold), Diagnostics: refs})
+			Evidence: fmt.Sprintf("FTA score %g exceeds %g.", value, threshold), Remediation: "Review function branch counts, nesting and source locations in the complexity-context graph. These are structural observations, not per-function FTA scores; retain required domain behavior.", Diagnostics: refs})
 	}
 }
 

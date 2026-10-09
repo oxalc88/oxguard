@@ -10,13 +10,16 @@ import (
 var maintainabilityAnalyzer string
 
 type functionFact struct {
-	ID            string   `json:"id"`
-	Location      Location `json:"location"`
-	ForwardTarget string   `json:"forward_target"`
-	Branches      int      `json:"nested_branches"`
-	EndLine       int      `json:"end_line"`
-	EndColumn     int      `json:"end_column"`
-	Fingerprint   string   `json:"fingerprint"`
+	ID               string     `json:"id"`
+	Location         Location   `json:"location"`
+	ForwardTarget    string     `json:"forward_target"`
+	Branches         int        `json:"nested_branches"`
+	EndLine          int        `json:"end_line"`
+	EndColumn        int        `json:"end_column"`
+	Fingerprint      string     `json:"fingerprint"`
+	ForwardingMode   string     `json:"forwarding_mode"`
+	MaxBranchNesting int        `json:"max_branch_nesting"`
+	BranchLocations  []Location `json:"branch_locations"`
 }
 
 // Reuse the SCC/DAG implementation for the resolved function graph. Recursion
@@ -54,6 +57,7 @@ type handlerFact struct {
 	Tokens      int      `json:"tokens"`
 	Fingerprint string   `json:"fingerprint"`
 	Fallback    bool     `json:"fallback"`
+	SilentExit  bool     `json:"silent_exit"`
 }
 type maintainabilitySnapshot struct {
 	CompilerVersion   string         `json:"compiler_version"`
@@ -134,6 +138,7 @@ func (r *Runner) smellFindings(gate string, s *maintainabilitySnapshot, refs []s
 		n := depth(f.ID)
 		r.measure("delegation.depth", "structure", f.Location, float64(max(0, n)), "layers")
 		r.measure("function.branches", "code", f.Location, float64(f.Branches), "branches")
+		r.measure("function.max_branch_nesting", "code", f.Location, float64(f.MaxBranchNesting), "levels")
 		if n < 3 {
 			continue
 		}
@@ -143,12 +148,15 @@ func (r *Runner) smellFindings(gate string, s *maintainabilitySnapshot, refs []s
 		}
 		value, threshold := float64(n), float64(3)
 		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.maintainability.LONG_DELEGATION_CHAIN", Severity: "warning", Status: "advisory", Category: "quality", Location: &f.Location, Related: locations, Observed: &value, Threshold: &threshold,
-			Evidence: fmt.Sprintf("%d resolved synchronous layers forward the same arguments and return type without transformation.", n), Remediation: "Review whether intermediate layers provide a required boundary; preserve deliberate interfaces and failure policies.", Diagnostics: refs})
+			Evidence: fmt.Sprintf("%d resolved single-return layers forward the same arguments and return type without transformation; async modes are recorded in the graph and may preserve intentional timing or stack boundaries.", n), Remediation: "Review whether intermediate layers provide a required boundary; preserve deliberate interfaces and failure policies.", Diagnostics: refs})
 	}
 	handlers := map[string][]handlerFact{}
 	for _, h := range s.Handlers {
 		if h.Fallback {
 			r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.SILENT_EXCEPTION_FALLBACK", Status: "advisory", Severity: "warning", Category: "quality", Location: &h.Location, Evidence: "The catch body returns only a constant or no value; it does not inspect, propagate or record the caught failure.", Remediation: "Verify this is an intentional best-effort policy; preserve valid recovery and make unexpected failures diagnosable.", Diagnostics: refs})
+		}
+		if h.SilentExit {
+			r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.SILENT_EXCEPTION_EXIT", Status: "advisory", Severity: "warning", Category: "quality", Location: &h.Location, Evidence: "The catch body only continues or breaks; it does not inspect, propagate or record the caught failure.", Remediation: "Verify the project recovery policy and failure visibility; an intentional best-effort exit need not rethrow.", Diagnostics: refs})
 		}
 		if h.Tokens >= 12 {
 			handlers[h.Fingerprint] = append(handlers[h.Fingerprint], h)

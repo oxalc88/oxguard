@@ -31,7 +31,7 @@ emitAnalysis(input => {
       const id = `${loc.file}:${loc.line}:${loc.column}:${loc.symbol}`;
       const end = source.getLineAndCharacterOfPosition(node.end);
       const fact = { id, location: loc, end_line: end.line + 1, end_column: end.character + 1,
-        fingerprint: tokenFingerprint(node.getText(source), source.languageVariant), forward_target: '', nested_branches: 0 };
+        fingerprint: tokenFingerprint(node.getText(source), source.languageVariant), forward_target: '', forwarding_mode: '', nested_branches: 0, max_branch_nesting: 0, branch_locations: [] };
       functions.push(fact);
       declarations.set(node, fact);
       next = [...owners, name(node)];
@@ -66,18 +66,22 @@ emitAnalysis(input => {
       const tokens = [];
       while (scanner.scan() !== ts.SyntaxKind.EndOfFileToken) tokens.push(scanner.getTokenText());
       const statement = node.block.statements.length === 1 ? node.block.statements[0] : undefined;
-      const fallback = statement && ts.isReturnStatement(statement) && (!statement.expression || ts.isLiteralExpression(statement.expression) || [ts.SyntaxKind.NullKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.TrueKeyword].includes(statement.expression.kind));
-      handlers.push({ location: location(node, source), tokens: tokens.length, fallback: !!fallback,
+      const fallback = statement && ts.isReturnStatement(statement) && (!statement.expression || ts.isLiteralExpression(statement.expression) || [ts.SyntaxKind.NullKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.TrueKeyword].includes(statement.expression.kind) || ts.isIdentifier(statement.expression) && (!node.variableDeclaration || checker.getSymbolAtLocation(statement.expression) !== checker.getSymbolAtLocation(node.variableDeclaration.name)) || ts.isArrayLiteralExpression(statement.expression) && !statement.expression.elements.length);
+      const silentExit = statement && (ts.isContinueStatement(statement) || ts.isBreakStatement(statement));
+      handlers.push({ location: location(node, source), tokens: tokens.length, fallback: !!fallback, silent_exit: !!silentExit,
         fingerprint: crypto.createHash('sha256').update(JSON.stringify(tokens)).digest('hex') });
     }
     ts.forEachChild(node, child => visit(child, owner, source));
   }
   for (const [node, fact] of declarations) {
-    // Only unchanged, synchronous positional forwarding to a resolved function.
-    // Exclude DI methods, async boundaries, rest/default/optional/destructured
-    // parameters and return/type transformations.
-    const expression = ts.isBlock(node.body) ? (node.body.statements.length === 1 && ts.isReturnStatement(node.body.statements[0]) ? node.body.statements[0].expression : undefined) : node.body;
-    if (!(ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) || node.typeParameters?.length || node.modifiers?.some(m => m.kind === ts.SyntaxKind.AsyncKeyword)) continue;
+    // Only single-return positional forwarding to a resolved function. Async
+    // return/return-await are advisory boundaries, never equivalence claims.
+    // Exclude methods, generic/default/rest/optional/destructured parameters.
+    let expression = ts.isBlock(node.body) ? (node.body.statements.length === 1 && ts.isReturnStatement(node.body.statements[0]) ? node.body.statements[0].expression : undefined) : node.body;
+    if (!(ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) || node.typeParameters?.length) continue;
+    const asyncBoundary = !!node.modifiers?.some(m => m.kind === ts.SyntaxKind.AsyncKeyword);
+    const awaited = expression && ts.isAwaitExpression(expression);
+    if (awaited) expression = expression.expression;
     if (!expression || !ts.isCallExpression(expression) || !ts.isIdentifier(expression.expression)) continue;
     if (node.parameters.some(p => !ts.isIdentifier(p.name) || p.initializer || p.dotDotDotToken || p.questionToken)) continue;
     if (expression.arguments.length !== node.parameters.length || expression.arguments.some((a, i) => !ts.isIdentifier(a) || checker.getSymbolAtLocation(a) !== checker.getSymbolAtLocation(node.parameters[i].name))) continue;
@@ -87,6 +91,7 @@ emitAnalysis(input => {
     const calleeType = checker.getResolvedSignature(expression);
     if (!callerType || !calleeType || checker.typeToString(checker.getReturnTypeOfSignature(callerType)) !== checker.typeToString(checker.getReturnTypeOfSignature(calleeType))) continue;
     fact.forward_target = callee.id;
+    fact.forwarding_mode = asyncBoundary ? (awaited ? 'async-return-await' : 'async-return') : 'sync';
   }
   for (const source of sources) visit(source, undefined, source);
   function dependency(node, source) {
@@ -123,15 +128,112 @@ emitAnalysis(input => {
   }
   for (const source of sources) dependency(source, source);
   // Branch counts are compiler facts for comparison, not a new complexity score.
-  function count(node, owner) {
-    if (isFunction(node)) owner = declarations.get(node);
-    if (owner && (ts.isIfStatement(node) || ts.isSwitchStatement(node) || ts.isConditionalExpression(node) || ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node) || ts.isWhileStatement(node) || ts.isDoStatement(node) || ts.isCatchClause(node))) owner.nested_branches++;
-    ts.forEachChild(node, child => count(child, owner));
+  function count(node, owner, depth) {
+    if (isFunction(node)) { owner = declarations.get(node); depth = 0; }
+    const branch = ts.isIfStatement(node) || ts.isSwitchStatement(node) || ts.isConditionalExpression(node) || ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node) || ts.isWhileStatement(node) || ts.isDoStatement(node) || ts.isCatchClause(node);
+    if (owner && branch) {
+      owner.nested_branches++;
+      owner.max_branch_nesting = Math.max(owner.max_branch_nesting, depth + 1);
+      owner.branch_locations.push(location(node, node.getSourceFile()));
+    }
+    ts.forEachChild(node, child => count(child, owner, depth + (branch ? 1 : 0)));
   }
-  for (const source of sources) count(source, undefined);
+  for (const source of sources) count(source, undefined, 0);
+  const failureFindings = collectFailureFindings({ ts, checker, sources, location, isFunction });
   const ordered = values => values.sort((a,b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : JSON.stringify(a) > JSON.stringify(b) ? 1 : 0);
-  return { findings: [], measurements: [], partial: unresolvedImports > 0,
+  return { findings: failureFindings, measurements: [], partial: unresolvedImports > 0,
     limitation: unresolvedImports > 0 ? `${unresolvedImports} local or dynamic module references could not be resolved; the graph is partial.` : '',
     snapshot: { compiler_version: ts.version, functions: ordered(functions), calls: ordered([...edges.values()]), handlers: ordered(handlers), unresolved_calls: unresolved,
       modules: ordered(modules), imports: ordered([...imports.values()]), external_imports: externalImports, unresolved_imports: unresolvedImports, type_imports: typeImports } };
 });
+
+// Bounded, symbol-aware failure paths. Do not infer project recovery policy.
+function collectFailureFindings({ ts, checker, sources, location, isFunction }) {
+  const findings = [];
+  const add = (rule, node, evidence) => findings.push({ rule: `tsguard.maintainability.${rule}`, level: 'code',
+    severity: 'warning', status: 'advisory', category: 'quality', location: location(node, node.getSourceFile()), evidence,
+    remediation: 'Check the project recovery policy and retain failure visibility; do not require every recovery path to throw.' });
+  const symbol = n => checker.getSymbolAtLocation(n);
+  const unwrap = n => n && (ts.isAwaitExpression(n) || ts.isParenthesizedExpression(n)) ? unwrap(n.expression) : n;
+  const emptyReturn = n => ts.isReturnStatement(n) && n.expression && ts.isArrayLiteralExpression(n.expression) && n.expression.elements.length === 0;
+  function mentionsReason(node, result) {
+    if (isFunction(node)) return false;
+    if (ts.isPropertyAccessExpression(node) && node.name.text === 'reason' && symbol(node.expression) === result) return true;
+    return !!ts.forEachChild(node, child => mentionsReason(child, result));
+  }
+  function statusCondition(node, result) {
+    node = unwrap(node);
+    if (!node || !ts.isBinaryExpression(node)) return;
+    const left = node.left, right = node.right;
+    const access = ts.isPropertyAccessExpression(left) ? left : ts.isPropertyAccessExpression(right) ? right : undefined;
+    const literal = access === left ? right : left;
+    if (!access || access.name.text !== 'status' || symbol(access.expression) !== result || !ts.isStringLiteral(literal) || !['fulfilled','rejected'].includes(literal.text)) return;
+    const equal = [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken].includes(node.operatorToken.kind);
+    const unequal = [ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken].includes(node.operatorToken.kind);
+    if (!equal && !unequal) return;
+    const positive = equal ? literal.text : literal.text === 'fulfilled' ? 'rejected' : 'fulfilled';
+    return [positive, positive === 'fulfilled' ? 'rejected' : 'fulfilled'];
+  }
+  function settledOrigin(node, seen = new Set()) {
+    node = unwrap(node);
+    if (!node) return false;
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'allSettled') {
+      const decl = checker.getResolvedSignature(node)?.declaration;
+      return !!decl?.getSourceFile().isDeclarationFile && /(?:^|[\\/])lib\..*\.d\.ts$/.test(decl.getSourceFile().fileName);
+    }
+    if (ts.isIdentifier(node)) {
+      const sym = symbol(node);
+      if (!sym || seen.has(sym)) return false;
+      seen.add(sym);
+      const decl = sym.valueDeclaration;
+      return !!decl && ts.isVariableDeclaration(decl) && !!(decl.parent.flags & ts.NodeFlags.Const) && !!decl.initializer && settledOrigin(decl.initializer, seen);
+    }
+    return false;
+  }
+  function callbackPaths(node, result, state = 'unknown', recorded = false) {
+    if (!node || isFunction(node)) return { exits: false, recorded };
+    if (ts.isBlock(node)) {
+      for (const statement of node.statements) {
+        const outcome = callbackPaths(statement, result, state, recorded);
+        if (outcome.exits) return outcome;
+        state = outcome.state || state;
+        recorded = outcome.recorded;
+      }
+      return { exits: false, recorded, state };
+    }
+    if (ts.isIfStatement(node)) {
+      const status = statusCondition(node.expression, result);
+      const inspected = recorded || mentionsReason(node.expression, result);
+      const yes = callbackPaths(node.thenStatement, result, status?.[0] || state, inspected);
+      const no = node.elseStatement ? callbackPaths(node.elseStatement, result, status?.[1] || state, inspected) : { exits: false, recorded: inspected };
+      return { exits: yes.exits && no.exits,
+        recorded: yes.exits ? no.recorded : no.exits ? yes.recorded : yes.recorded && no.recorded,
+        state: status && yes.exits ? status[1] : status && no.exits ? status[0] : state };
+    }
+    if (emptyReturn(node) && state === 'rejected' && !recorded) add('DISCARDED_SETTLED_REJECTION', node,
+      'A flatMap path narrowed to a rejected native Promise.allSettled result returns an empty array without referencing its reason on that path. Reachability and intentional recovery require review.');
+    return { exits: ts.isReturnStatement(node) || ts.isThrowStatement(node), recorded: recorded || mentionsReason(node, result), state };
+  }
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      const method = node.expression.name.text;
+      const callback = node.arguments[0];
+      if (callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))) {
+        if (method === 'flatMap' && settledOrigin(node.expression.expression) && callback.parameters.length && ts.isIdentifier(callback.parameters[0].name) && ts.isBlock(callback.body)) {
+          callbackPaths(callback.body, symbol(callback.parameters[0].name));
+        }
+        const receiverType = method === 'catch' ? checker.getTypeAtLocation(node.expression.expression) : undefined;
+        const awaitedType = receiverType && checker.getAwaitedType(receiverType);
+        const catchDeclaration = method === 'catch' ? checker.getResolvedSignature(node)?.declaration : undefined;
+        const nativeCatch = catchDeclaration?.getSourceFile().isDeclarationFile && /(?:^|[\\/])lib\..*\.d\.ts$/.test(catchDeclaration.getSourceFile().fileName);
+        if (nativeCatch && awaitedType && awaitedType !== receiverType) {
+          const expression = ts.isBlock(callback.body) && callback.body.statements.length === 1 && ts.isReturnStatement(callback.body.statements[0]) ? callback.body.statements[0].expression : ts.isBlock(callback.body) ? undefined : callback.body;
+          if (expression && (ts.isLiteralExpression(expression) || [ts.SyntaxKind.NullKeyword,ts.SyntaxKind.TrueKeyword,ts.SyntaxKind.FalseKeyword].includes(expression.kind) || ts.isArrayLiteralExpression(expression) && !expression.elements.length)) add('SILENT_PROMISE_REJECTION', callback, 'A native promise rejection callback returns only a literal or empty array without recording or propagating the failure.');
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+  for (const source of sources) visit(source);
+  return findings;
+}

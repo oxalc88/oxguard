@@ -119,6 +119,9 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 		return false, fmt.Errorf("missing findings/measurements arrays")
 	}
 	for _, f := range report.Findings {
+		if spec.gate == "structure" && f.Level == "code" {
+			continue
+		}
 		if f.Rule == "" || f.Evidence == "" || f.Location == nil || f.Location.File == "" {
 			return false, fmt.Errorf("invalid owned finding")
 		}

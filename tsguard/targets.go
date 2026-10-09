@@ -122,6 +122,16 @@ func runFTA(r *Runner, dirs []string, scoreCap int) int {
 		}
 		args = append(args, dir)
 		if !r.RunTool(toolSpec{gate: "fta", adapter: "fta", subject: dir, threshold: float64(scoreCap)}, "fta "+dir, args...).ok {
+			if r.machine() {
+				for _, finding := range r.result.Findings {
+					if finding.Rule == "tsguard.fta.score_exceeded" && finding.Location != nil {
+						context := *r
+						context.dirs = []string{finding.Location.File}
+						context.runOwnedAnalysis("complexity-context", maintainabilityAnalyzer, true, map[string]any{"excludeTests": r.ftaExcludeTests})
+						break
+					}
+				}
+			}
 			return 1
 		}
 	}
