@@ -1,7 +1,7 @@
 # @oxguard/tsguard
 
 Install the complete Go-powered toolchain as a project development dependency
-(Node.js 22.12+ on the 22.x line, 24.x, or 26+):
+(Node.js 22.13+ on the 22.x line, 24.x, or 26+):
 
 ```sh
 npm install -D @oxguard/tsguard

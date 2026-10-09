@@ -153,7 +153,7 @@ Maintainers: see [Publishing oxguard](docs/guides/releases.md) for release tags,
 publication checks and recovery from failed releases.
 
 TypeScript projects can install the complete Go-powered toolchain through npm
-(Node.js 22.12+ on the 22.x line, 24.x, or 26+):
+(Node.js 22.13+ on the 22.x line, 24.x, or 26+):
 
 ```bash
 npm install -D @oxguard/tsguard
