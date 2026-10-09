@@ -1,12 +1,11 @@
 {
   "schema_version": "1",
   "language": "python",
-  "skill_sha256": "c8892de0e83a409160d36782760b79184ec9d0988583aac6c8088023e77dcfba",
-  "capture_date": "2026-10-06",
-  "provenance": "Fresh independent Codex agents read the updated repository skill and chose real CLI/package-manager actions in isolated fixtures. evals/record-agent-command.cjs recorded argv, process results, and before/after fingerprints of fixture src files. Python omission/interpretation and exact-JSON dependency repair used separate independent agents. Read-only interpretation inputs were real native CLI preflight records. CI replays recorded evidence; it does not call live models. No historical actions were relabelled with a new skill hash.",
+  "skill_sha256": "4b2f1acaf7d05faad0a52744b9b5d3e864991eea89602aebdcd42f57e8af4cd7",
+  "capture_date": "2026-10-09",
+  "provenance": "Fresh independent Codex agent read the current bundled skill and chose real CLI and offline package-manager actions in isolated fixtures. evals/record-agent-command.cjs recorded argv, process results and source fingerprints. Read-only interpretation uses real native CLI results. CI replays recorded evidence and makes no live model calls. Previous actions were not relabelled. A verification follow-up reran the repaired isolated gate and full check without changing source.",
   "agent_tasks": [
-    "python_skill_forward",
-    "python_repair_forward"
+    "python_skill_forward"
   ],
   "omitted_events": [
     {
@@ -23,32 +22,32 @@
       "tool": "uv",
       "argv": [
         "run",
-        "mypy",
-        "--output",
+        "ruff",
+        "check",
+        "--output-format",
         "json",
         "src"
       ],
-      "exit_code": 1,
+      "exit_code": 0,
       "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
       "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
-      "tool_output": "{\"file\": \"src/main.py\", \"line\": 1, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 2, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 3, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 4, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 5, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 6, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 7, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 8, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 9, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 10, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 11, \"column\": 15, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 12, \"column\": 15, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n",
+      "tool_output": "[]",
       "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
     {
-      "tool": "pyguard",
+      "tool": "uv",
       "argv": [
-        "mypy",
-        "--root",
-        "/tmp/oxguard-agent-refresh/python/omitted",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        "src"
       ],
-      "exit_code": 1,
+      "exit_code": 0,
       "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
       "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
-      "summary": "FAIL\ncommand: mypy\ngate: mypy; assessment: complete; not_run: 0; partial: 0\nfindings: 12\nassignment src/main.py:1 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:2 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:3 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:4 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:5 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:6 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:7 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:8 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:9 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:10 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nomitted: 2 (use --output json)\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log (paths in --output json)\n"
+      "tool_output": "1 file already formatted\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
     {
       "tool": "uv",
@@ -68,9 +67,71 @@
     {
       "tool": "pyguard",
       "argv": [
-        "mypy",
+        "check",
         "--root",
-        "/tmp/oxguard-agent-refresh/python/omitted",
+        "/tmp/oxguard-forward-20261009/py-quality",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "summary": "FAIL\ncommand: check\ngate: mypy; assessment: incomplete; not_run: 6; partial: 0\nfindings: 12\nassignment src/main.py:1 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:2 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:3 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:4 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:5 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:6 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:7 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:8 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:9 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nassignment src/main.py:10 [quality/blocking]\nIncompatible types in assignment (expression has type \"str\", variable has type \"int\")\nomitted: 2 (use --output json)\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-ruff-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "ruff",
+        "check",
+        "--output-format",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "tool_output": "[]",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "tool_output": "1 file already formatted\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 1,
+      "source_before": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "source_after": "7c7126bd39f55be2b5e5e16b68f98e2518cd5994eea22bb2e42f30da8a50ced5",
+      "tool_output": "{\"file\": \"src/main.py\", \"line\": 1, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 2, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 3, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 4, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 5, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 6, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 7, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 8, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 9, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 10, \"column\": 14, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 11, \"column\": 15, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n{\"file\": \"src/main.py\", \"line\": 12, \"column\": 15, \"message\": \"Incompatible types in assignment (expression has type \\\"str\\\", variable has type \\\"int\\\")\", \"hint\": null, \"code\": \"assignment\", \"severity\": \"error\"}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "pyguard",
+      "argv": [
+        "check",
+        "--root",
+        "/tmp/oxguard-forward-20261009/py-quality",
         "--dirs",
         "src",
         "--output",
@@ -82,15 +143,50 @@
       "result": {
         "schema_version": "1",
         "status": "fail",
-        "assessment": "complete",
+        "assessment": "incomplete",
         "gates": [
+          {
+            "name": "ruff",
+            "status": "passed",
+            "normalization": "complete"
+          },
           {
             "name": "mypy",
             "status": "failed",
             "normalization": "complete"
+          },
+          {
+            "name": "radon",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "types",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "coverage",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "bandit",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "pip-audit",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
           }
         ],
-        "command": "mypy",
+        "command": "check",
         "exit_code": 1,
         "findings": [
           {
@@ -108,8 +204,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -127,8 +223,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -146,8 +242,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -165,8 +261,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -184,8 +280,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -203,8 +299,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -222,8 +318,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -241,8 +337,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -260,8 +356,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -279,8 +375,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -298,8 +394,8 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -317,11 +413,386 @@
             },
             "evidence": "Incompatible types in assignment (expression has type \"str\", variable has type \"int\")",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           }
         ],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "ruff",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-001-ruff-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "ruff",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-002-ruff-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "ruff",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-003-ruff-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "ruff",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-004-ruff-stderr.log"
+          },
+          {
+            "id": "diagnostic-005",
+            "gate": "mypy",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-005-mypy-stdout.log"
+          },
+          {
+            "id": "diagnostic-006",
+            "gate": "mypy",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-006-mypy-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "ruff",
+        "check",
+        "--output-format",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "[]",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "ruff",
+        "format",
+        "--check",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "1 file already formatted\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "radon",
+        "cc",
+        "--json",
+        "--exclude",
+        "*/test_*.py,*/*_test.py,*/conftest.py",
+        "--ignore",
+        "tests,test",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "{}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "radon",
+        "mi",
+        "--json",
+        "--exclude",
+        "*/test_*.py,*/*_test.py,*/conftest.py",
+        "--ignore",
+        "tests,test",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "{\"src/main.py\": {\"mi\": 100.0, \"rank\": \"A\"}}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "python",
+        "/tmp/pyguard-analysis-851655717/check_halstead.py",
+        "--json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "{\"artifacts\": [], \"findings\": [], \"measurements\": [], \"schema_version\": \"1\"}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "python",
+        "/tmp/pyguard-analysis-3073126756/check_type_complexity.py",
+        "src",
+        "--json"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "{\"artifacts\": [], \"findings\": [], \"measurements\": [], \"schema_version\": \"1\"}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "pyguard",
+      "argv": [
+        "check",
+        "--root",
+        "/tmp/oxguard-forward-20261009/py-quality",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "ruff",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "mypy",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "radon",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "coverage",
+            "status": "error",
+            "normalization": "complete"
+          },
+          {
+            "name": "bandit",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "pip-audit",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ],
+        "command": "check",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "pyguard.execution.tool_missing:57c6e3310719e9ea7fbf30dc7399548ddce843fd759b6911a6115f2a5d105313",
+            "level": "code",
+            "gate": "coverage",
+            "rule": "pyguard.execution.tool_missing",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "tool_missing",
+            "evidence": "No test runner or test files found.",
+            "diagnostics": []
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "radon.mi",
+            "level": "code",
+            "location": {
+              "file": "src/main.py"
+            },
+            "value": 100,
+            "unit": "score",
+            "threshold": 19
+          }
+        ],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "ruff",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-001-ruff-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "ruff",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-002-ruff-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "ruff",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-003-ruff-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "ruff",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-004-ruff-stderr.log"
+          },
+          {
+            "id": "diagnostic-005",
+            "gate": "mypy",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-005-mypy-stdout.log"
+          },
+          {
+            "id": "diagnostic-006",
+            "gate": "mypy",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-006-mypy-stderr.log"
+          },
+          {
+            "id": "diagnostic-007",
+            "gate": "radon",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-007-radon-stdout.log"
+          },
+          {
+            "id": "diagnostic-008",
+            "gate": "radon",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-008-radon-stderr.log"
+          },
+          {
+            "id": "diagnostic-009",
+            "gate": "radon",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-009-radon-stdout.log"
+          },
+          {
+            "id": "diagnostic-010",
+            "gate": "radon",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-010-radon-stderr.log"
+          },
+          {
+            "id": "diagnostic-011",
+            "gate": "radon",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-011-radon-stdout.log"
+          },
+          {
+            "id": "diagnostic-012",
+            "gate": "radon",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-012-radon-stderr.log"
+          },
+          {
+            "id": "diagnostic-013",
+            "gate": "types",
+            "channel": "stdout",
+            "path": ".pyguard-cache/diagnostics/diagnostic-013-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-014",
+            "gate": "types",
+            "channel": "stderr",
+            "path": ".pyguard-cache/diagnostics/diagnostic-014-types-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "uv",
+      "argv": [
+        "run",
+        "mypy",
+        "--output",
+        "json",
+        "src"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
+    },
+    {
+      "tool": "pyguard",
+      "argv": [
+        "mypy",
+        "--root",
+        "/tmp/oxguard-forward-20261009/py-quality",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "result": {
+        "schema_version": "1",
+        "status": "pass",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "mypy",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "mypy",
+        "exit_code": 0,
+        "findings": [],
         "measurements": [],
         "artifacts": [],
         "diagnostics": [
@@ -344,37 +815,6 @@
       "tool": "uv",
       "argv": [
         "run",
-        "mypy",
-        "--output",
-        "json",
-        "src"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "tool_output": "\n",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
-    },
-    {
-      "tool": "pyguard",
-      "argv": [
-        "mypy",
-        "--root",
-        "/tmp/oxguard-agent-refresh/python/omitted",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "summary": "PASS\ncommand: mypy\ngate: none; assessment: complete; not_run: 0; partial: 0\nfindings: 0\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "uv",
-      "argv": [
-        "run",
         "ruff",
         "check",
         "--output-format",
@@ -382,8 +822,8 @@
         "src"
       ],
       "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
       "tool_output": "[]",
       "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
@@ -397,8 +837,8 @@
         "src"
       ],
       "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
       "tool_output": "1 file already formatted\n",
       "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
@@ -412,8 +852,8 @@
         "src"
       ],
       "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
       "tool_output": "\n",
       "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
@@ -431,8 +871,8 @@
         "src"
       ],
       "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
       "tool_output": "{}\n",
       "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
@@ -450,8 +890,8 @@
         "src"
       ],
       "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
       "tool_output": "{\"src/main.py\": {\"mi\": 100.0, \"rank\": \"A\"}}\n",
       "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
@@ -460,195 +900,45 @@
       "argv": [
         "run",
         "python",
-        "tools/analysis/check_halstead.py",
+        "/tmp/pyguard-analysis-2764209398/check_halstead.py",
         "--json",
         "src"
       ],
       "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n",
-      "native_result": {
-        "artifacts": [],
-        "findings": [],
-        "measurements": [],
-        "schema_version": "1"
-      }
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "{\"artifacts\": [], \"findings\": [], \"measurements\": [], \"schema_version\": \"1\"}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
     {
       "tool": "uv",
       "argv": [
         "run",
         "python",
-        "tools/analysis/check_type_complexity.py",
+        "/tmp/pyguard-analysis-3484904345/check_type_complexity.py",
         "src",
         "--json"
       ],
       "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n",
-      "native_result": {
-        "artifacts": [],
-        "findings": [],
-        "measurements": [],
-        "schema_version": "1"
-      }
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "tool_output": "{\"artifacts\": [], \"findings\": [], \"measurements\": [], \"schema_version\": \"1\"}\n",
+      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
     },
     {
       "tool": "pyguard",
       "argv": [
         "check",
         "--root",
-        "/tmp/oxguard-agent-refresh/python/omitted",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 1,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "summary": "ERROR\ncommand: check\ngate: coverage; assessment: incomplete; not_run: 3; partial: 0\nfindings: 1\npyguard.execution.tool_missing [tool_missing/execution_error]\nNo test runner or test files found.\ndiagnostics: .pyguard-cache/diagnostics/diagnostic-001-ruff-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "uv",
-      "argv": [
-        "run",
-        "ruff",
-        "check",
-        "--output-format",
-        "json",
-        "src"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "tool_output": "[]",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
-    },
-    {
-      "tool": "uv",
-      "argv": [
-        "run",
-        "ruff",
-        "format",
-        "--check",
-        "src"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "tool_output": "1 file already formatted\n",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
-    },
-    {
-      "tool": "uv",
-      "argv": [
-        "run",
-        "mypy",
-        "--output",
-        "json",
-        "src"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "tool_output": "\n",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
-    },
-    {
-      "tool": "uv",
-      "argv": [
-        "run",
-        "radon",
-        "cc",
-        "--json",
-        "--exclude",
-        "*/test_*.py,*/*_test.py,*/conftest.py",
-        "--ignore",
-        "tests,test",
-        "src"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "tool_output": "{}\n",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
-    },
-    {
-      "tool": "uv",
-      "argv": [
-        "run",
-        "radon",
-        "mi",
-        "--json",
-        "--exclude",
-        "*/test_*.py,*/*_test.py,*/conftest.py",
-        "--ignore",
-        "tests,test",
-        "src"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "tool_output": "{\"src/main.py\": {\"mi\": 100.0, \"rank\": \"A\"}}\n",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n"
-    },
-    {
-      "tool": "uv",
-      "argv": [
-        "run",
-        "python",
-        "tools/analysis/check_halstead.py",
-        "--json",
-        "src"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n",
-      "native_result": {
-        "artifacts": [],
-        "findings": [],
-        "measurements": [],
-        "schema_version": "1"
-      }
-    },
-    {
-      "tool": "uv",
-      "argv": [
-        "run",
-        "python",
-        "tools/analysis/check_type_complexity.py",
-        "src",
-        "--json"
-      ],
-      "exit_code": 0,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "stderr": "warning: `--no-sync` has no effect when used outside of a project\n",
-      "native_result": {
-        "artifacts": [],
-        "findings": [],
-        "measurements": [],
-        "schema_version": "1"
-      }
-    },
-    {
-      "tool": "pyguard",
-      "argv": [
-        "check",
-        "--root",
-        "/tmp/oxguard-agent-refresh/python/omitted",
+        "/tmp/oxguard-forward-20261009/py-quality",
         "--dirs",
         "src",
         "--output",
         "json"
       ],
       "exit_code": 1,
-      "source_before": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
-      "source_after": "9d416e3afa4842e8921ee3b79343beaba05051a6d45dbf6cf6b548a27261c45a",
+      "source_before": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
+      "source_after": "f381dce538c70c4fcd6af6e962f75d2fae7ee26ef6bbb97ba4c2a5c5eef0c8f4",
       "result": {
         "schema_version": "1",
         "status": "error",
@@ -814,16 +1104,6 @@
   ],
   "repair_events": [
     {
-      "tool": "pyguard",
-      "argv": [
-        "--help"
-      ],
-      "exit_code": 0,
-      "source_before": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
-      "source_after": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
-      "tool_output": "pyguard \u2014 Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . \u2014 project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, security, coverage) pyguard refuses to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter commands warn on piped stdout but still run.\n"
-    },
-    {
       "tool": "uv",
       "argv": [
         "run",
@@ -843,7 +1123,7 @@
       "argv": [
         "mypy",
         "--root",
-        "/tmp/oxguard-agent-refresh/python/repair",
+        "/tmp/oxguard-forward-20261009/py-repair",
         "--dirs",
         "src",
         "--output",
@@ -906,14 +1186,14 @@
         "install",
         "--offline",
         "--python",
-        "/tmp/oxguard-agent-refresh/python/repair/.venv/bin/python",
+        "/tmp/oxguard-forward-20261009/py-repair-env/bin/python",
         "mypy==1.18.2"
       ],
       "exit_code": 0,
       "source_before": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
       "source_after": "8e838e3825c2d30895d5c75110ba64bcd9cb70982fe54df79fdc30b9af83d95f",
       "tool_output": "",
-      "stderr": "Resolved 4 packages in 4ms\nwarning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.\n         If the cache and target directories are on different filesystems, hardlinking may not be supported.\n         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.\nInstalled 1 package in 99ms\n + mypy==1.18.2\n"
+      "stderr": "Using Python 3.12.13 environment at: /tmp/oxguard-forward-20261009/py-repair-env\nResolved 4 packages in 12ms\nwarning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.\n         If the cache and target directories are on different filesystems, hardlinking may not be supported.\n         If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.\nInstalled 4 packages in 266ms\n + mypy==1.18.2\n + mypy-extensions==1.1.0\n + pathspec==1.1.1\n + typing-extensions==4.16.0\n"
     },
     {
       "tool": "uv",
@@ -935,7 +1215,7 @@
       "argv": [
         "mypy",
         "--root",
-        "/tmp/oxguard-agent-refresh/python/repair",
+        "/tmp/oxguard-forward-20261009/py-repair",
         "--dirs",
         "src",
         "--output",
@@ -978,52 +1258,6 @@
     }
   ],
   "interpretation": {
-    "execution": {
-      "schema_version": "1",
-      "status": "error",
-      "assessment": "incomplete",
-      "gates": [
-        {
-          "name": "mypy",
-          "status": "error",
-          "normalization": "complete"
-        }
-      ],
-      "command": "mypy",
-      "exit_code": 1,
-      "findings": [
-        {
-          "id": "pyguard.execution.tool_missing:cfaf374fa8e9bb0b51de3e3cbfd3d4e80b56bc77500b47d6729f035238c9d5b6",
-          "level": "code",
-          "gate": "mypy",
-          "rule": "pyguard.execution.tool_missing",
-          "severity": "error",
-          "status": "execution_error",
-          "category": "tool_missing",
-          "evidence": "Project analyzer or module is missing.",
-          "diagnostics": [
-            "diagnostic-001",
-            "diagnostic-002"
-          ]
-        }
-      ],
-      "measurements": [],
-      "artifacts": [],
-      "diagnostics": [
-        {
-          "id": "diagnostic-001",
-          "gate": "mypy",
-          "channel": "stdout",
-          "path": ".pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log"
-        },
-        {
-          "id": "diagnostic-002",
-          "gate": "mypy",
-          "channel": "stderr",
-          "path": ".pyguard-cache/diagnostics/diagnostic-002-mypy-stderr.log"
-        }
-      ]
-    },
     "advisory": {
       "schema_version": "1",
       "status": "advisory",
@@ -1115,27 +1349,74 @@
         }
       ]
     },
+    "execution": {
+      "schema_version": "1",
+      "status": "error",
+      "assessment": "incomplete",
+      "gates": [
+        {
+          "name": "mypy",
+          "status": "error",
+          "normalization": "complete"
+        }
+      ],
+      "command": "mypy",
+      "exit_code": 1,
+      "findings": [
+        {
+          "id": "pyguard.execution.tool_missing:cfaf374fa8e9bb0b51de3e3cbfd3d4e80b56bc77500b47d6729f035238c9d5b6",
+          "level": "code",
+          "gate": "mypy",
+          "rule": "pyguard.execution.tool_missing",
+          "severity": "error",
+          "status": "execution_error",
+          "category": "tool_missing",
+          "evidence": "Project analyzer or module is missing.",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [],
+      "artifacts": [],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "mypy",
+          "channel": "stdout",
+          "path": ".pyguard-cache/diagnostics/diagnostic-001-mypy-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "mypy",
+          "channel": "stderr",
+          "path": ".pyguard-cache/diagnostics/diagnostic-002-mypy-stderr.log"
+        }
+      ]
+    },
     "response": {
       "advisory": {
         "semantic_status": "advisory",
         "exit_code": 0,
         "source_edit_needed": false,
-        "explanation": "The criticality analysis completed with one advisory quality finding: core.target at functions/core.py:1 has 2 distinct static callers and rank 1. This is informational prioritization, not a blocking source defect. The supplied record lists CRITICALITY.md as an artifact.",
+        "explanation": "The supplied schema-1 criticality result has a complete assessment with one advisory quality finding: pyguard.criticality.ranked at functions/core.py:1, symbol core.target, reports 2 distinct static callers and rank 1. This is informational ranking evidence, not a blocking quality defect; no blocking quality fix is required. The result lists CRITICALITY.md as its artifact.",
         "limitations": [
-          "Static caller counts do not establish runtime impact.",
-          "This complete assessment covers criticality only; no other quality gates are evidenced by this result.",
-          "The artifact is listed in the supplied record; its contents were not inspected."
+          "Distinct static caller counts do not prove runtime impact or runtime execution frequency.",
+          "Completeness applies only to the requested criticality gate; this supplied result does not establish whole-project quality.",
+          "The listed artifact and referenced diagnostics were not independently inspected; the interpretation uses the supplied record without rerunning."
         ]
       },
       "execution": {
         "semantic_status": "error",
         "exit_code": 1,
         "source_edit_needed": false,
-        "explanation": "The supplied mypy result has one tool_missing execution error: the project analyzer or module is missing. Mypy did not complete an assessment of source quality. Repair the analyzer/environment rather than changing source based on this finding.",
+        "explanation": "The supplied schema-1 mypy result reports pyguard.execution.tool_missing, category tool_missing and status execution_error: the project analyzer or module is missing. This requires tool/environment repair rather than a source edit or blocking source-quality fix. Restore the analyzer and rerun mypy before judging source quality.",
         "limitations": [
-          "Assessment is incomplete despite complete normalization of the execution error.",
-          "No completed source type-checking result is provided.",
-          "No other quality gates are evidenced by this supplied result."
+          "Assessment is incomplete even though the mypy failure normalization is complete.",
+          "No successful type analysis occurred, so the absence of source findings is not evidence that source passes mypy.",
+          "The supplied record identifies the execution-error category but does not establish the precise installation cause; referenced diagnostics were not inspected and this supplied result was not rerun.",
+          "Exit code 1 alone does not imply a source defect."
         ]
       }
     }
