@@ -24,7 +24,7 @@ function run(command, args, cwd, expected = 0, timeout = 120000) {
   const result = spawnSync(command, shell ? args.map(a => `"${a}"`) : args, {
     cwd, encoding: 'utf8', shell, timeout,
   });
-  assert.ifError(result.error);
+  if (result.error) assert.fail(`${command} ${args.join(' ')}: ${result.error.message}\n${result.stdout}\n${result.stderr}`);
   assert.equal(result.status, expected, `${command}: ${result.stdout}\n${result.stderr}`);
   return result;
 }
@@ -191,7 +191,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   fs.mkdirSync(path.join(consumer, 'src'));
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
   fs.writeFileSync(path.join(consumer, 'src/add.test.ts'), 'import { expect, test } from "vitest";\nimport { add } from "./add";\ntest("adds", () => { expect(add(1, 2)).toBe(3); });\n');
-  const execute = (args, expected = 0) => run(executor, [...execArgs, 'tsguard', ...args, '--allow-pipe', ...(args.includes('--dirs') ? [] : ['--dirs', 'src'])], consumer, expected);
+  const execute = (args, expected = 0) => run(executor, [...execArgs, 'tsguard', ...args, '--allow-pipe', '--timeout', '45', ...(args.includes('--dirs') ? [] : ['--dirs', 'src'])], consumer, expected);
   execute(['doctor']);
   execute(['fix']);
   execute(['lint']);
