@@ -16,7 +16,7 @@ var version = "dev"
 const usage = `tsguard — TypeScript quality gate runner
 
 Quality gates (replaces npm scripts):
-  tsguard check          full gate: lint + fta + types + coverage + security
+  tsguard check          full quality gate + advisory maintainability/change
   tsguard fix            auto-format: ultracite fix
   tsguard lint           lint + format check (ultracite check)
   tsguard types          type checking (tsc --noEmit)

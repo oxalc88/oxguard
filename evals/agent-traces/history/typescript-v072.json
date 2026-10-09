@@ -1,0 +1,1000 @@
+{
+  "schema_version": "1",
+  "language": "typescript",
+  "skill_sha256": "f400b2bce4b83d4c0c19615864043a360d64e698bee127d7c9aabec4fb7d8a36",
+  "capture_date": "2026-10-09",
+  "provenance": "Fresh independent Codex agent read the current bundled skill and chose real CLI and offline package-manager actions in isolated fixtures. evals/record-agent-command.cjs recorded argv, process results and source fingerprints. Read-only interpretation uses real native CLI results. CI replays recorded evidence and makes no live model calls. Previous actions were not relabelled.",
+  "agent_tasks": [
+    "typescript_skill_forward"
+  ],
+  "omitted_events": [
+    {
+      "tool": "tsguard",
+      "argv": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "source_before": "1321c4d47be9a21f24111b7380bc55f80add9d50d823b1cddf262290bc8bbd6c",
+      "source_after": "1321c4d47be9a21f24111b7380bc55f80add9d50d823b1cddf262290bc8bbd6c",
+      "tool_output": "dev\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "source_before": "1321c4d47be9a21f24111b7380bc55f80add9d50d823b1cddf262290bc8bbd6c",
+      "source_after": "1321c4d47be9a21f24111b7380bc55f80add9d50d823b1cddf262290bc8bbd6c",
+      "tool_output": "tsguard \u2014 TypeScript quality gate runner\n\nQuality gates (replaces npm scripts):\n  tsguard check          full gate: lint + fta + types + coverage + security\n  tsguard fix            auto-format: ultracite fix\n  tsguard lint           lint + format check (ultracite check)\n  tsguard types          type checking (tsc --noEmit)\n  tsguard complexity     compatibility alias; complexity is enforced by ultracite check\n  tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)\n  tsguard coverage       run tests with coverage (vitest --coverage)\n  tsguard security       security: secretlint + npm/pnpm audit + audit-ci + opengrep SAST\n  tsguard npm-audit      dependency vulnerability scan (npm/pnpm/yarn audit + audit-ci)\n  tsguard secrets        credential scan (secretlint)\n  tsguard dead-code      detect unused exports/deps (knip)\n  tsguard duplicates     detect copy-paste code (jscpd)\n  tsguard criticality    informational: function/method caller ranking\n  tsguard audit          informational: criticality + dead-code + duplicates\n\nEnvironment setup:\n  tsguard setup          npm install, configure AI tool hooks\n  tsguard doctor         verify toolchain (read-only)\n  tsguard hooks          generate AI tool hook configs\n\nFlags:\n  --output <mode>  human (default), agent (bounded), or json (complete result)\n  --root <path>    explicit project root containing package.json\n  --dirs <d1,d2>    override target directories (default: . \u2014 project root)\n  --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-typescript   only run check if stdin context indicates a .ts/.tsx file was edited\n  --max-fta-score <n> FTA score cap per file (default: 60; >60 = Needs Improvement)\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe tsguard through an external tail (tsguard check 2>&1 | tail -50).\n      Use tsguard check --tail 50 or tsguard check --log-file /tmp/tsguard.log --tail 50.\n      In human mode, heavy gates (check, security, coverage) refuse to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter human commands warn on piped stdout but still run.\n      Agent and JSON modes accept piped stdout.\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "1321c4d47be9a21f24111b7380bc55f80add9d50d823b1cddf262290bc8bbd6c",
+      "source_after": "1321c4d47be9a21f24111b7380bc55f80add9d50d823b1cddf262290bc8bbd6c",
+      "summary": "FAIL\ncommand: check\ngate: types; assessment: incomplete; not_run: 4; partial: 0\nfindings: 12\nTS2322 src/index.ts:1 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:2 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:3 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:4 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:5 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:6 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:7 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:8 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:9 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:10 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nomitted: 2 (use --output json)\ndiagnostics: ../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "1321c4d47be9a21f24111b7380bc55f80add9d50d823b1cddf262290bc8bbd6c",
+      "source_after": "1321c4d47be9a21f24111b7380bc55f80add9d50d823b1cddf262290bc8bbd6c",
+      "result": {
+        "schema_version": "1",
+        "status": "fail",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "lint",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "fta",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "types",
+            "status": "failed",
+            "normalization": "complete"
+          },
+          {
+            "name": "coverage",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "dependencies",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "security",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ],
+        "command": "check",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "TS2322:a00069c7d7d7b9d8450b749b66a817d7509bc7d795f7276a22fbce58f6e9cdde",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:0a5cbbe588f9e00c6da97675fc7552e9eb9f718e1ff2642bb57200ec800f52a5",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 2,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:9d737a38730dfe07aba24398ec28179715623c10bc393926d32ab39ac2d335ae",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 3,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:c0282645c9450ffde6a16118ecd0dce0818b6c2f4f975ec247637b43c38b290f",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 4,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:f33d4a2dd77b205cfc9d7993f56fe3fc417882904fe191c47ab5f51998372ec7",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 5,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:35de233c7ca2ec82335b8ed160e433dc7c1b292128a7ded47797c2e0ab56afb4",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 6,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:07f6b1037c889538753796a17c4dc900ee00490abf90f675165d0b21472890da",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 7,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:8322c4373bfde53556dfc9bd4a543ad45bd550d3c076006cfe00bb1314e2220e",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 8,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:97535c40435b15eb43dd6cd0790db0e8ac911f48c873b94e38df95a2b54f2f09",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 9,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:1c883bc23e930be9cb93383959e3d788aab1e8366c9c84accada0841f3e870a7",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 10,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:58cc6590def7a633661e20316c9fcad212cd47ecdc0d2d914a98c4e8ef84e818",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 11,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:2649b0726860ddaa802bfb9ffe9f50c18c54b72aa236187269054375c58e3265",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 12,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "fta.score",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 8.159706499414824,
+            "unit": "score",
+            "threshold": 60
+          }
+        ],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "lint",
+            "channel": "stdout",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "lint",
+            "channel": "stderr",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-002-lint-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "fta",
+            "channel": "stdout",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-003-fta-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "fta",
+            "channel": "stderr",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-004-fta-stderr.log"
+          },
+          {
+            "id": "diagnostic-005",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-005-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-006",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-006-types-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 0,
+      "source_before": "8077a655134992ed117344325c6c878ac5c37f948efa791e97dfda9d773df80f",
+      "source_after": "8077a655134992ed117344325c6c878ac5c37f948efa791e97dfda9d773df80f",
+      "summary": "PASS\ncommand: types\ngate: none; assessment: complete; not_run: 0; partial: 0\nfindings: 0\ndiagnostics: ../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "8077a655134992ed117344325c6c878ac5c37f948efa791e97dfda9d773df80f",
+      "source_after": "8077a655134992ed117344325c6c878ac5c37f948efa791e97dfda9d773df80f",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "lint",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "fta",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "coverage",
+            "status": "error",
+            "normalization": "complete"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "dependencies",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "security",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ],
+        "command": "check",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "tsguard.execution.invalid_configuration:c7ba856930561c1632a5e99b9eb5f1b9007631f8cc46115d06c86e46b4e4895c",
+            "level": "code",
+            "gate": "coverage",
+            "rule": "tsguard.execution.invalid_configuration",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "invalid_configuration",
+            "evidence": "No tests were collected.",
+            "diagnostics": []
+          },
+          {
+            "id": "tsguard.coverage.lines_threshold_failed:9984b3bc12aeb98632d3036dd71c32d8006cb051cc35c026100901c7807847f0",
+            "level": "code",
+            "gate": "coverage",
+            "rule": "tsguard.coverage.lines_threshold_failed",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "observed": 0,
+            "threshold": 80,
+            "evidence": "lines coverage 0% is below 80%.",
+            "diagnostics": [
+              "diagnostic-007",
+              "diagnostic-008"
+            ]
+          },
+          {
+            "id": "tsguard.coverage.statements_threshold_failed:f4bac9be9cb225cebbcc2722edd4f4cc2f1d38a0f5538acd51011e30d7193910",
+            "level": "code",
+            "gate": "coverage",
+            "rule": "tsguard.coverage.statements_threshold_failed",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "observed": 0,
+            "threshold": 80,
+            "evidence": "statements coverage 0% is below 80%.",
+            "diagnostics": [
+              "diagnostic-007",
+              "diagnostic-008"
+            ]
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "coverage.branches",
+            "level": "code",
+            "location": {
+              "file": ""
+            },
+            "value": 100,
+            "unit": "percent",
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.functions",
+            "level": "code",
+            "location": {
+              "file": ""
+            },
+            "value": 100,
+            "unit": "percent",
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.lines",
+            "level": "code",
+            "location": {
+              "file": ""
+            },
+            "value": 0,
+            "unit": "percent",
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.statements",
+            "level": "code",
+            "location": {
+              "file": ""
+            },
+            "value": 0,
+            "unit": "percent",
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.branches",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 100,
+            "unit": "percent"
+          },
+          {
+            "metric": "coverage.functions",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 100,
+            "unit": "percent"
+          },
+          {
+            "metric": "coverage.lines",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 0,
+            "unit": "percent"
+          },
+          {
+            "metric": "coverage.statements",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 0,
+            "unit": "percent"
+          },
+          {
+            "metric": "fta.score",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 8.159706499414824,
+            "unit": "score",
+            "threshold": 60
+          }
+        ],
+        "artifacts": [
+          {
+            "kind": "analyzer-report",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/reports/coverage/coverage-summary.json"
+          },
+          {
+            "kind": "test-report",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/reports/coverage/tests.json"
+          }
+        ],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "lint",
+            "channel": "stdout",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "lint",
+            "channel": "stderr",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-002-lint-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "fta",
+            "channel": "stdout",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-003-fta-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "fta",
+            "channel": "stderr",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-004-fta-stderr.log"
+          },
+          {
+            "id": "diagnostic-005",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-005-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-006",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-006-types-stderr.log"
+          },
+          {
+            "id": "diagnostic-007",
+            "gate": "coverage",
+            "channel": "stdout",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-007-coverage-stdout.log"
+          },
+          {
+            "id": "diagnostic-008",
+            "gate": "coverage",
+            "channel": "stderr",
+            "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-008-coverage-stderr.log"
+          }
+        ]
+      }
+    }
+  ],
+  "repair_events": [
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "0adeb2322851a12c0ef1554599d0f7ec4e1661e863047a605ee2bfb83094621e",
+      "source_after": "0adeb2322851a12c0ef1554599d0f7ec4e1661e863047a605ee2bfb83094621e",
+      "summary": "ERROR\ncommand: types\ngate: types; assessment: incomplete; not_run: 0; partial: 0\nfindings: 1\ntsguard.execution.tool_missing [tool_missing/execution_error]\nAn analyzer or required module is missing.\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "0adeb2322851a12c0ef1554599d0f7ec4e1661e863047a605ee2bfb83094621e",
+      "source_after": "0adeb2322851a12c0ef1554599d0f7ec4e1661e863047a605ee2bfb83094621e",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "types",
+            "status": "error",
+            "normalization": "complete"
+          }
+        ],
+        "command": "types",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "tsguard.execution.tool_missing:18cdf7323caea57a67357060a9447bc6478bc368e800f3074aa14e8a1fecff8e",
+            "level": "code",
+            "gate": "types",
+            "rule": "tsguard.execution.tool_missing",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "tool_missing",
+            "evidence": "An analyzer or required module is missing.",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          }
+        ],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "npm",
+      "argv": [
+        "install",
+        "--offline",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit_code": 0,
+      "source_before": "0adeb2322851a12c0ef1554599d0f7ec4e1661e863047a605ee2bfb83094621e",
+      "source_after": "0adeb2322851a12c0ef1554599d0f7ec4e1661e863047a605ee2bfb83094621e",
+      "tool_output": "\nadded 1 package in 673ms\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "source_before": "0adeb2322851a12c0ef1554599d0f7ec4e1661e863047a605ee2bfb83094621e",
+      "source_after": "0adeb2322851a12c0ef1554599d0f7ec4e1661e863047a605ee2bfb83094621e",
+      "result": {
+        "schema_version": "1",
+        "status": "pass",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "types",
+        "exit_code": 0,
+        "findings": [],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+          }
+        ]
+      }
+    }
+  ],
+  "interpretation": {
+    "advisory": {
+      "schema_version": "1",
+      "status": "advisory",
+      "assessment": "complete",
+      "gates": [
+        {
+          "name": "criticality",
+          "status": "advisory",
+          "normalization": "complete"
+        }
+      ],
+      "command": "criticality",
+      "exit_code": 0,
+      "findings": [
+        {
+          "id": "tsguard.criticality.ranked:cb65b1de589e408c72b5deee8a9f6a519b1e219cfcb6503a60bbbe5291e012d9",
+          "level": "structure",
+          "gate": "criticality",
+          "rule": "tsguard.criticality.ranked",
+          "severity": "info",
+          "status": "advisory",
+          "category": "quality",
+          "location": {
+            "file": "src/core.ts",
+            "line": 1,
+            "column": 1,
+            "symbol": "target"
+          },
+          "observed": 3,
+          "evidence": "target has 3 distinct callers (rank 1).",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        },
+        {
+          "id": "tsguard.criticality.ranked:e47c362317a0c5512516db771b2061530ab1724042880024908fd7ecb9a3a3cb",
+          "level": "structure",
+          "gate": "criticality",
+          "rule": "tsguard.criticality.ranked",
+          "severity": "info",
+          "status": "advisory",
+          "category": "quality",
+          "location": {
+            "file": "src/core.ts",
+            "line": 3,
+            "column": 1,
+            "symbol": "recursive"
+          },
+          "observed": 1,
+          "evidence": "recursive has 1 distinct callers (rank 2).",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/core.ts",
+            "line": 1,
+            "column": 1,
+            "symbol": "target"
+          },
+          "value": 3,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/core.ts",
+            "line": 2,
+            "column": 1,
+            "symbol": "unused"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/core.ts",
+            "line": 3,
+            "column": 1,
+            "symbol": "recursive"
+          },
+          "value": 1,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/use.ts",
+            "line": 2,
+            "column": 1,
+            "symbol": "first"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/use.ts",
+            "line": 3,
+            "column": 20,
+            "symbol": "Box.run"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/use.ts",
+            "line": 4,
+            "column": 23,
+            "symbol": "second"
+          },
+          "value": 0,
+          "unit": "callers"
+        }
+      ],
+      "artifacts": [
+        {
+          "kind": "criticality",
+          "path": "CRITICALITY.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "criticality",
+          "channel": "stdout",
+          "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-001-criticality-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "criticality",
+          "channel": "stderr",
+          "path": "../ts-toolchain/node_modules/.cache/oxguard/diagnostics/diagnostic-002-criticality-stderr.log"
+        }
+      ]
+    },
+    "execution": {
+      "schema_version": "1",
+      "status": "error",
+      "assessment": "incomplete",
+      "gates": [
+        {
+          "name": "types",
+          "status": "error",
+          "normalization": "complete"
+        }
+      ],
+      "command": "types",
+      "exit_code": 1,
+      "findings": [
+        {
+          "id": "tsguard.execution.tool_missing:18cdf7323caea57a67357060a9447bc6478bc368e800f3074aa14e8a1fecff8e",
+          "level": "code",
+          "gate": "types",
+          "rule": "tsguard.execution.tool_missing",
+          "severity": "error",
+          "status": "execution_error",
+          "category": "tool_missing",
+          "evidence": "An analyzer or required module is missing.",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [],
+      "artifacts": [],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "types",
+          "channel": "stdout",
+          "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "types",
+          "channel": "stderr",
+          "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+        }
+      ]
+    },
+    "response": {
+      "advisory": {
+        "semantic_status": "advisory",
+        "exit_code": 0,
+        "source_edit_needed": false,
+        "explanation": "Complete criticality assessment with two informational advisory rankings and no blocking quality findings. target has 3 distinct callers; recursive has 1. Measurements also include four zero-caller functions/methods. Use ranking to plan careful tests before future changes; it does not require source edits.",
+        "limitations": [
+          "Static resolved calls within the selected TypeScript scope; module-level calls excluded. The supplied CRITICALITY.md reports zero unresolved or external calls.",
+          "Distinct callers are counted once even for repeated calls. The report ranks up to 30 functions/methods; JSON includes all measured functions, including zero-caller functions.",
+          "Caller rank is neither a blocking threshold nor proof of runtime impact; no cycle, depth, wrapper, architecture-rule, or baseline/change comparison analysis is available.",
+          "Only criticality was requested; other quality gates were not assessed. Existing analyzers are Level 1; advisory criticality parity is present, but remaining Level 2 and all Level 3 checks are absent."
+        ]
+      },
+      "execution": {
+        "semantic_status": "error",
+        "exit_code": 1,
+        "source_edit_needed": false,
+        "explanation": "The supplied types result has one execution_error finding, tsguard.execution.tool_missing, and an incomplete assessment. It reports no source quality defect. Resolve referenced diagnostics to identify and repair the missing analyzer/module, then rerun types; exit 1 alone does not justify source edits or blocking quality fixes. The separate authorized ts-repair run identified missing typescript/package.json and passed after an offline dependency install.",
+        "limitations": [
+          "The supplied artifact alone does not name the missing module; its referenced diagnostic files provide that evidence.",
+          "Normalization is complete for the execution failure, but the types assessment is incomplete. No type-safety success or absence of source defects can be inferred.",
+          "Only types was requested; lint, FTA, coverage, and security were not assessed. The repaired run does not change the semantic status of this supplied historical artifact."
+        ]
+      }
+    }
+  }
+}

@@ -4,11 +4,15 @@ Delivery: atomic commits in one PR, based on main `94ef5cf`, following the user'
 
 ## Commit checklist
 
-- [ ] Quality baseline: inspect v0.7.2 and PR #5; pin zero-config Biome policy; preserve project lint configs; explicit compiler-backed typescript-eslint; test actual resolution and missing capabilities.
-- [ ] Code smells: compiler AST evidence for pass-through chains and repeated handler/validation bodies; advisory false-positive policy; legitimate abstractions and failure-policy controls.
-- [ ] Structure: module graph, cycles, fan-in/out, SCC dependency depth, coupling and fragmentation evidence; stable module/symbol identities; reuse compiler parse.
-- [ ] Change: explicit inert Git snapshot comparison; multiple-evidence displacement findings; absent baseline remains not evaluated; no baseline code execution.
-- [ ] Evals: installed npm/pnpm tests, adversarial controls, preserved Level 1 checks, Python capability gaps, runtime/resource observations, updated agent guidance.
+- [x] Quality baseline: inspect v0.7.2 and PR #5; pin zero-config Biome policy; preserve project lint configs; explicit compiler-backed typescript-eslint; test actual resolution and missing capabilities.
+- [x] Code smells: compiler AST evidence for pass-through chains and repeated handlers; upstream jscpd for repeated validation; advisory false-positive policy; legitimate abstractions and failure-policy controls.
+- [x] Structure: module graph, cycles, fan-in/out, SCC dependency depth, coupling and fragmentation evidence; deterministic module/symbol identities; reuse compiler parse.
+- [x] Change: explicit inert Git snapshot comparison; multiple-evidence displacement findings; absent baseline remains not evaluated; no baseline code execution.
+- [x] Evals and guidance: installed npm adversarial controls, preserved Level 1 checks, explicit Python capability gaps, resource observations and independently exercised skill.
+- [ ] Complete cross-platform runtime verification in the existing PR matrix, including pnpm.
+- [ ] New PyGuard structural/change parity and broader independent repository evaluation before declaring the entire v0.8 scope complete.
+
+The five planned delivery scopes are retained in one PR, with separate atomic production, evaluation and guidance commits. The final integration fix preserves native fail-fast behavior and replaces Git archive export with exact source blobs. See [implemented scope](../maintainability.md) and [validation evidence](../maintainability-validation.md).
 
 ## Inspected behavior
 

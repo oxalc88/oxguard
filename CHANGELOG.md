@@ -3,6 +3,27 @@
 All notable changes to oxguard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Versioned zero-config Tsguard lint policy and explicit compiler-backed typed
+  lint using pinned ESLint/typescript-eslint, preserving project lint policy.
+- Advisory resolved delegation/handler smells and static module graph
+  measurements, including cycles, fan-in/out, SCC depth and coupling.
+- Explicit inert Git baseline comparisons for supported complexity displacement.
+  Missing baselines remain nonblocking and not evaluated.
+- Installed maintainability regression cases and explicit new Python parity
+  gaps. Existing Level 1 checks and fail-fast behavior remain protected.
+
+### Changed
+
+- `check` includes applicable typed lint, maintainability, duplication and change
+  analysis through the existing schema-1 contract. Updated agent guidance explains
+  advisory evidence and incomplete assessments.
+- npm Node 22.x minimum is 22.13 to match ESLint 10's supported engines;
+  Node 24.x and 26+ remain supported.
+
 ## [0.7.2] — 2026-10-09
 
 ### Fixed

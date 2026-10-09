@@ -39,3 +39,10 @@ default remote rule sets require network access when scans run. Opengrep license
 and source notices are included in the native package's `licenses/` directory.
 
 Source and distribution guide: https://github.com/oxalc88/oxguard
+
+The unreleased maintainability candidate adds zero-config typed lint and advisory
+smell/module analysis to `check`. Focused commands are `typed-lint`,
+`maintainability`, `smells`, `structure`, and `change --baseline <Git ref>`.
+Project lint configurations remain authoritative. Missing optional baselines are
+not evaluated and do not fail the command. Scope and limits:
+https://github.com/oxalc88/oxguard/blob/main/docs/maintainability.md

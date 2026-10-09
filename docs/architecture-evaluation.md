@@ -30,6 +30,8 @@ The Python corpus retains 15 baseline behavior passes and passes 20 parity cases
 
 ## Executive assessment
 
+**v0.8 candidate implementation update (2026-10-09):** Tsguard now adds an explicit zero-config quality baseline, compiler-backed typed lint, advisory delegation/handler findings, a static module graph with SCC depth and coupling measurements, and inert Git source comparisons for supported complexity-displacement scenarios. The existing normalized contract and Level 1 fail-fast gates remain. New PyGuard maintainability parity and broader change metrics remain gaps; full release readiness is not claimed. See [scope and boundaries](maintainability.md) and [validation](maintainability-validation.md). The executive assessment below describes the original evaluated revision.
+
 Tsguard is a useful **Level 1 code-quality gate** with a strong npm delivery path, but it is not yet an agent-native analysis engine. The Go CLI orchestrates deterministic analyzers well, but its public result contract is still human CLI text. There is no common finding model, no machine-readable output, no Level 2 graph model, and no Level 3 baseline/change model.
 
 The npm launcher is now the preferred installation path for TypeScript projects because it gives an agent one project-local dependency and a tested native launcher without requiring `tsguard setup`, a global binary, or analyzer-by-analyzer installation.

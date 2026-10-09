@@ -3,7 +3,8 @@ name: tsguard
 description: >-
   Run Tsguard quality checks for TypeScript projects and act on its normalized
   agent or JSON results. Use for type errors, lint, FTA scores, coverage,
-  security, advisory criticality, or requests to run or interpret Tsguard.
+  security, maintainability, structural dependencies, baseline comparisons,
+  advisory criticality, or requests to run or interpret Tsguard.
 ---
 
 # Tsguard
@@ -22,9 +23,12 @@ For a pnpm project, use `pnpm exec tsguard check --output agent`. Verify local i
 
 Use the command the user requested. Otherwise default to `check`:
 
-- `check`: blocking, fail-fast lint → FTA → types → coverage → security.
+- `check`: blocking, fail-fast lint → FTA → types → zero-config typed lint → coverage → security, then advisory maintainability, duplication and baseline comparison. Later analyses remain not_run after an earlier blocking failure.
 - `lint`, `types`, `fta`, `coverage`, `security`, `npm-audit`, `secrets`: individual gates.
 - `criticality`: advisory function/method caller ranking and `CRITICALITY.md`.
+- `typed-lint`: explicit compiler-backed unsafe operations and unnecessary-condition checks. The zero-config check runs it automatically; project lint policy remains in control when a lint config exists. A disabled strictNullChecks option makes unnecessary-condition coverage incomplete.
+- `maintainability`, `smells`, `structure`: advisory compiler facts for unchanged forwarding chains, repeated catch policy, silent constant fallbacks, runtime module cycles, coupling and dependency depth. Graph artifacts contain all selected facts, not runtime impact guarantees.
+- `change --baseline <Git ref>`: advisory baseline comparison using inert source files. Missing or incomplete inputs leave change not_run; absence of a baseline does not fail the command. Retain --baseline when retrieving JSON.
 - `audit`: advisory criticality → dead-code → duplicates; exit 0 even on findings.
 - `fix`: source formatting/lint mutation; run when source changes are authorized.
 
@@ -58,7 +62,15 @@ FTA reports file scores and the configured cap; a cap failure exposes only the f
 
 ## Use criticality as advisory context
 
-Read `criticality.in_degree` measurements and `CRITICALITY.md`. The report ranks up to 30 functions/methods by distinct callers; JSON has all measured functions, including zero-caller functions. Repeated calls from one caller count once. Use the rank to identify functions that need careful tests before changes, not as a blocking threshold or proof of runtime impact. Static unresolved and external calls are disclosed in the report. No cycle, depth, wrapper, architecture-rule or baseline/change comparison analysis exists yet.
+Read `criticality.in_degree` measurements and `CRITICALITY.md`. The report ranks up to 30 functions/methods by distinct callers; JSON has all measured functions, including zero-caller functions. Repeated calls from one caller count once. Use the rank to identify functions that need careful tests before changes, not as a blocking threshold or proof of runtime impact. Static unresolved and external calls are disclosed in the report. Criticality alone does not evaluate module cycles or change quality; retrieve the maintainability/change results for those questions.
+
+## Interpret maintainability evidence
+
+Treat LONG_DELEGATION_CHAIN, FRAGMENTED_DELEGATION, REPEATED_ERROR_HANDLER, SILENT_EXCEPTION_FALLBACK and HIGH_MODULE_COUPLING as review cues, not instructions to flatten every abstraction. Verify the reported call path or repeated catch bodies. Preserve dependency injection, stable APIs, intentional best-effort policies and necessary domain validation. Do not add unsafe logging or change failure propagation just to remove an advisory.
+
+Read module.fan_in, module.fan_out and module.dependency_depth with the graph artifact. Depth measures edges between strongly connected components; type-only imports are separate. Missing local and nonliteral dynamic imports make graph assessment partial. External references and unresolved calls remain disclosed limitations; this is a static, scoped graph.
+
+Do not claim a maintainability improvement from smaller files or individual FTA scores. Read POSSIBLE_COMPLEXITY_DISPLACEMENT evidence against the resolved baseline SHA: decreased maximum per-file branches, unreduced total branches and increased structural cost support review, not a proof of equivalent behavior. Function branch counts are observations, not cognitive/FTA scores. Historical FTA and duplicate comparisons, runtime dispatch and rename tracking are not evaluated by change.
 
 ## Drill down and report
 
@@ -74,4 +86,4 @@ Read `assessment` and `gates` in JSON. `assessment: complete` means every reques
 
 Read global coverage thresholds and per-file measurements directly; per-file measurements do not add per-file blocking thresholds. Native test failures are quality findings; no-test collection and missing or malformed reports are execution problems. Native analyzer reports are listed in `artifacts` and refreshed for each run; use those reports for additional upstream fields. Secretlint findings retain rules and positions while omitting secret values.
 
-Native dependency advisories are informational; `tsguard.dependencies.policy_failed` records audit-ci's blocking decision without guessing which individual advisory caused it. The CLI invokes audit-ci with `--moderate` and does not pass `--config`; do not claim a project's allowlist file was loaded automatically. Use `related` locations for duplicate pairs. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. Existing analyzers remain Level 1; advisory criticality parity is present, but remaining Level 2 and all Level 3 checks are absent.
+Native dependency advisories are informational; `tsguard.dependencies.policy_failed` records audit-ci's blocking decision without guessing which individual advisory caused it. The CLI invokes audit-ci with `--moderate` and does not pass `--config`; do not claim a project's allowlist file was loaded automatically. Use `related` locations for duplicate pairs. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. PyGuard retains existing Level 1 and criticality capabilities; do not claim Python parity for the new TypeScript structural or change analyses.

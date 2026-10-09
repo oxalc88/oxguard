@@ -62,6 +62,8 @@ copies to the project's `tools/analysis/`; these are not executed during checks.
 
 ### `tsguard` — TypeScript quality gate
 
+The v0.8 candidate adds a versioned zero-config quality baseline, explicit typed lint, advisory AST/module analysis and inert Git baseline comparisons. See [maintainability behavior, limits and parity](docs/maintainability.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
+
 `tsguard/` is the CLI for TypeScript projects. Runs:
 
 | Gate | Tool | What it catches |
