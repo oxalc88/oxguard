@@ -94,6 +94,8 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const manifest = JSON.parse(fs.readFileSync(path.join(packages, 'tsguard/package.json')));
   assert.equal(Object.keys(manifest.optionalDependencies).length, 5);
   assert.equal(manifest.scripts, undefined);
+  assert.equal(manifest.dependencies.eslint, undefined);
+  assert.equal(manifest.dependencies['typescript-eslint'], undefined);
   for (const version of Object.values(manifest.dependencies)) assert.match(version, /^\d+\.\d+\.\d+$/);
   for (const platform of platforms) {
     const native = JSON.parse(fs.readFileSync(path.join(packages, `tsguard-${platform}/package.json`)));
@@ -288,7 +290,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const completeCheck = structured(['check']);
   assert.ok(['pass', 'advisory'].includes(completeCheck.status));
   assert.equal(completeCheck.assessment, 'incomplete'); // optional baseline is absent
-  assert.deepEqual(completeCheck.gates.map(g => g.name), ['lint', 'fta', 'types', 'typed-lint', 'coverage', 'secrets', 'dependencies', 'security', 'maintainability', 'duplicates', 'change']);
+  assert.deepEqual(completeCheck.gates.map(g => g.name), ['lint', 'fta', 'types', 'coverage', 'secrets', 'dependencies', 'security', 'maintainability', 'duplicates', 'change']);
   assert.ok(completeCheck.gates.filter(g => g.name !== 'change').every(g => g.normalization === 'complete' && ['passed', 'advisory'].includes(g.status)));
   assert.equal(completeCheck.gates.find(g => g.name === 'change').status, 'not_run');
   assert.equal(completeCheck.measurements.filter(m => m.metric.startsWith('coverage.') && m.location.file === '').length, 4);
@@ -356,6 +358,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const maintainability = require('../evals/maintainability.cjs').evaluate({ execute, structured, root: consumer });
   const maintainabilityParity = require('../evals/maintainability-parity.cjs').assess(maintainability);
   assert.equal(maintainabilityParity.tsguard_capabilities_passed, true);
+  assert.equal(maintainabilityParity.tsguard_scope_ready, true);
   assert.equal(maintainabilityParity.maintainability_parity_ready, false);
   t.diagnostic(`Installed maintainability evals: ${JSON.stringify(maintainability)}`);
   if (process.env.OXGUARD_EVAL_REPORT_DIR) {

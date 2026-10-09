@@ -23,10 +23,9 @@ For a pnpm project, use `pnpm exec tsguard check --output agent`. Verify local i
 
 Use the command the user requested. Otherwise default to `check`:
 
-- `check`: blocking, fail-fast lint → FTA → types → zero-config typed lint → coverage → security, then advisory maintainability, duplication and baseline comparison. Later analyses remain not_run after an earlier blocking failure.
+- `check`: blocking, fail-fast lint → FTA → types → coverage → security, then advisory maintainability, duplication and baseline comparison. Later analyses remain not_run after an earlier blocking failure.
 - `lint`, `types`, `fta`, `coverage`, `security`, `npm-audit`, `secrets`: individual gates.
 - `criticality`: advisory function/method caller ranking and `CRITICALITY.md`.
-- `typed-lint`: explicit compiler-backed unsafe operations and unnecessary-condition checks. The zero-config check runs it automatically; project lint policy remains in control when a lint config exists. A disabled strictNullChecks option makes unnecessary-condition coverage incomplete.
 - `maintainability`, `smells`, `structure`: advisory compiler facts for unchanged forwarding chains, repeated catch policy, silent constant fallbacks, runtime module cycles, coupling and dependency depth. Graph artifacts contain all selected facts, not runtime impact guarantees.
 - `change --baseline <Git ref>`: advisory baseline comparison using inert source files. Missing or incomplete inputs leave change not_run; absence of a baseline does not fail the command. Retain --baseline when retrieving JSON.
 - `audit`: advisory criticality → dead-code → duplicates; exit 0 even on findings.
@@ -57,6 +56,8 @@ execution or dependencies; do not treat them as source defects.
 `lock_failure`, `interrupted`, `unclassified_failure`: use the referenced diagnostics to identify the cause before making changes.
 
 Exit 1 alone does not mean “fix source.” `audit` and `criticality` can have `status: error` with exit 0. A passed gate does not prove that later gates ran: `check` stops at the first blocking failure. Fix authorized issues, rerun the failed gate, then rerun `check` to reach the remaining gates.
+
+Use Ultracite/Biome for the default lint policy. No package-owned ESLint or separate typed-lint gate runs. TypeScript compilation does not establish compiler-aware unsafe-operation lint coverage; that capability is deferred. Project-wide unused-code detection uses Knip in audit; duplicate detection uses jscpd in check and audit, with advisory findings.
 
 FTA reports file scores and the configured cap; a cap failure exposes only the first failing file because the analyzer exits before producing JSON. Do not invent per-function scores, later failing files or unreported component measurements. Biome and Opengrep preserve native rule IDs; TypeScript preserves TS codes. Unsupported tool details produce a stable gate-level fallback, whose cause must be checked in diagnostics.
 

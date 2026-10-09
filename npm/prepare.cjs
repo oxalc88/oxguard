@@ -29,7 +29,7 @@ function prepare(tag, binaries, output, selected = platforms) {
   }
   const main = path.join(output, 'tsguard');
   writePackage(main, {
-    ...common, name: '@oxguard/tsguard', engines: { node: '^22.13.0 || ^24.0.0 || >=26.0.0' },
+    ...common, name: '@oxguard/tsguard', engines: { node: '^22.12.0 || ^24.0.0 || >=26.0.0' },
     bin: { tsguard: 'bin/tsguard.cjs' }, files: ['bin', 'config'],
     dependencies: require('./toolchain.json'),
     optionalDependencies: Object.fromEntries(platforms.map(p => [`@oxguard/tsguard-${p}`, version])),

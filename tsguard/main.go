@@ -20,7 +20,6 @@ Quality gates (replaces npm scripts):
   tsguard fix            auto-format: ultracite fix
   tsguard lint           lint + format check (ultracite check)
   tsguard types          type checking (tsc --noEmit)
-  tsguard typed-lint     type-aware unsafe operations and unnecessary conditions
   tsguard maintainability AST evidence for delegation and repeated error policy
   tsguard smells         focused maintainability diagnosis
   tsguard structure      runtime module graph, cycles, coupling and depth
@@ -156,7 +155,7 @@ func runCLI(cmd string, args []string) int {
 var analysisCommands = map[string]bool{
 	"check": true, "fix": true, "lint": true, "types": true, "complexity": true,
 	"fta": true, "coverage": true, "security": true, "npm-audit": true,
-	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true, "typed-lint": true, "maintainability": true, "smells": true, "structure": true, "change": true,
+	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true, "maintainability": true, "smells": true, "structure": true, "change": true,
 }
 
 func dispatchResult(cmd string, cfg config, root string, result *RunResult) int {
@@ -180,7 +179,6 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		switch cmd {
 		case "check":
 			result.Plan("lint", "fta", "types")
-			result.Plan("typed-lint")
 			result.Plan("coverage", "secrets", "dependencies", "security", "maintainability", "duplicates", "change")
 		case "security":
 			result.Plan("secrets", "dependencies", "security")
@@ -207,8 +205,6 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		return runLint(r)
 	case "types":
 		return runTypes(r)
-	case "typed-lint":
-		return runTypedLint(r)
 	case "maintainability", "smells", "structure":
 		return runMaintainability(r, cmd)
 	case "change":

@@ -32,8 +32,6 @@ var requiredNpmDevDeps = []string{
 	"secretlint",
 	"@secretlint/secretlint-rule-preset-recommend",
 	"audit-ci",
-	"eslint",
-	"typescript-eslint",
 }
 
 // Opengrep is pinned by upstream asset hash and stored in a user-owned cache

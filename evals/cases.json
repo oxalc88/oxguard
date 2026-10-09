@@ -538,11 +538,6 @@
         ],
         "additional_gates": [
           {
-            "name": "typed-lint",
-            "status": "not_run",
-            "normalization": "not_run"
-          },
-          {
             "name": "maintainability",
             "status": "not_run",
             "normalization": "not_run"

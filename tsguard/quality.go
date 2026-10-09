@@ -11,9 +11,6 @@ import (
 //go:embed analysis/project.cjs
 var compilerProject string
 
-//go:embed analysis/typed-lint.cjs
-var typedLintAnalyzer string
-
 const qualityBaselineVersion = 1
 
 // Pin measurable quality policy independently of upstream preset changes.
@@ -29,10 +26,6 @@ func qualityBaselineRules() map[string]any {
 
 func hasLintConfig(root string) bool {
 	return hasProjectConfig(root, "biome.json", "biome.jsonc", ".biome.json", ".biome.jsonc", "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs", "eslint.config.ts", "eslint.config.mts", "eslint.config.cts", ".eslintrc", ".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs", ".eslintrc.yml", ".eslintrc.yaml", ".oxlintrc.json", "oxlint.config.ts")
-}
-
-func runTypedLint(r *Runner) int {
-	return r.runOwnedAnalysis("typed-lint", typedLintAnalyzer, false, map[string]any{"excludeTests": r.ftaExcludeTests})
 }
 
 func (r *Runner) runOwnedAnalysis(gate, source string, advisory bool, extra map[string]any) int {

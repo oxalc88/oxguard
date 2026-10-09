@@ -39,22 +39,13 @@ function evaluate({ execute, structured, root }) {
       assert.equal(fs.existsSync(path.join(root, 'biome.json')), false);
       assert.equal(fs.existsSync(path.join(root, 'tsconfig.json')), false);
     });
-    run('typed.unsafe_assignment', () => {
-      const result = structured(args('typed-lint', unsafe), 1);
-      assert.ok(rules(result).includes('@typescript-eslint/no-unsafe-assignment'));
-      assert.equal(result.assessment, 'complete');
-    });
-    run('typed.unsafe_assertion', () => {
-      const dir=source('unsafe-assertion',{'source.ts':'export const value = "text" as unknown as number;\n'});
-      assert.ok(rules(structured(args('typed-lint',dir),1)).includes('@typescript-eslint/no-unsafe-type-assertion'));
-    });
-    run('typed.strict_null_checks_disabled', () => {
-      fs.writeFileSync(path.join(root, 'tsconfig.json'), '{"compilerOptions":{"strict":false}}');
-      try {
-        const result = structured(args('typed-lint', unsafe), 1);
-        assert.equal(result.assessment, 'incomplete');
-        assert.ok(result.findings.some(f => f.rule.endsWith('not_evaluated') && /strictNullChecks/.test(f.evidence)));
-      } finally { fs.rmSync(path.join(root, 'tsconfig.json')); }
+    run('baseline.single_linter', () => {
+      const removed = structured(args('typed-lint', unsafe), 3);
+      assert.equal(removed.status, 'error');
+      assert.equal(removed.findings[0].category, 'invalid_configuration');
+      // Compilation of JSON.parse into number is not proof of safe assignment.
+      const result = structured(args('types', unsafe));
+      assert.equal(result.status, 'pass');
     });
     const emptyCatch = source('empty-catch', { 'source.ts': 'export function swallow() { try { JSON.parse("bad"); } catch {} }\n' });
     run('baseline.empty_catch', () => {
@@ -71,7 +62,7 @@ function evaluate({ execute, structured, root }) {
         assert.equal(fs.readFileSync(path.join(root, 'biome.json'), 'utf8'), custom);
       } finally { fs.rmSync(path.join(root, 'biome.json')); }
     });
-    run('baseline.ESLint_project_policy', () => {
+    run('baseline.external_policy_preserved', () => {
       const custom = 'export default [{ files: ["**/*.js"], rules: { "no-debugger": "error" } }];\n';
       fs.writeFileSync(path.join(root,'eslint.config.mjs'),custom);
       const dir=source('eslint-policy',{'source.js':'debugger;\n'});

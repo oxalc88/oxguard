@@ -1,14 +1,78 @@
 {
   "version": 1,
-  "scope": "New maintainability capabilities; separate from the retained Level 1 parity matrix",
+  "scope": "Tsguard v0.8 Biome maintainability scope; new Python capabilities are deferred independently",
   "capabilities": [
-    {"id":"quality.zero_config_exception_handling","tsguard":"baseline.empty_catch","pyguard":null,"python_candidate":"Ruff S110/B012 with explicit project-policy resolution"},
-    {"id":"quality.unsafe_operations","tsguard":"typed.unsafe_assignment","pyguard":null,"python_candidate":"mypy with explicit Any and unsafe-operation coverage; different language semantics"},
-    {"id":"maintainability.delegation","tsguard":"smells.resolved_chain","pyguard":null,"python_candidate":"Python ast with resolved local callable identities"},
-    {"id":"maintainability.failure_policies","tsguard":"smells.failure_policy_controls","pyguard":null,"python_candidate":"Ruff plus Python ast for short identical handlers"},
-    {"id":"structure.runtime_graph","tsguard":"structure.runtime_cycle","pyguard":null,"python_candidate":"Extend existing pyan3/NetworkX infrastructure with module imports and SCCs"},
-    {"id":"structure.false_positive_controls","tsguard":"structure.type_only_cycle_control","pyguard":null,"python_candidate":"Python-specific TYPE_CHECKING and deferred-import controls"},
-    {"id":"change.complexity_displacement","tsguard":"change.artificial_split_and_inert_baseline","pyguard":null,"python_candidate":"Inert Git sources, ast/Radon facts and baseline comparison"},
-    {"id":"change.false_positive_controls","tsguard":"change.real_simplification_control","pyguard":null,"python_candidate":"Python-specific equivalent-behavior refactor fixtures"}
+    {
+      "id": "quality.zero_config_exception_handling",
+      "tsguard": "baseline.empty_catch",
+      "pyguard": null,
+      "python_candidate": "Ruff S110/B012 with explicit project-policy resolution"
+    },
+    {
+      "id": "maintainability.delegation",
+      "tsguard": "smells.resolved_chain",
+      "pyguard": null,
+      "python_candidate": "Python ast with resolved local callable identities"
+    },
+    {
+      "id": "maintainability.failure_policies",
+      "tsguard": "smells.failure_policy_controls",
+      "pyguard": null,
+      "python_candidate": "Ruff plus Python ast for short identical handlers"
+    },
+    {
+      "id": "structure.runtime_graph",
+      "tsguard": "structure.runtime_cycle",
+      "pyguard": null,
+      "python_candidate": "Extend existing pyan3/NetworkX infrastructure with module imports and SCCs"
+    },
+    {
+      "id": "structure.false_positive_controls",
+      "tsguard": "structure.type_only_cycle_control",
+      "pyguard": null,
+      "python_candidate": "Python-specific TYPE_CHECKING and deferred-import controls"
+    },
+    {
+      "id": "change.complexity_displacement",
+      "tsguard": "change.artificial_split_and_inert_baseline",
+      "pyguard": null,
+      "python_candidate": "Inert Git sources, ast/Radon facts and baseline comparison"
+    },
+    {
+      "id": "change.false_positive_controls",
+      "tsguard": "change.real_simplification_control",
+      "pyguard": null,
+      "python_candidate": "Python-specific equivalent-behavior refactor fixtures"
+    }
+  ],
+  "deferred_tsguard_capabilities": [
+    {
+      "id": "quality.compiler_unsafe_operations",
+      "status": "not_implemented",
+      "reason": "Compiler-aware unsafe-operation and unnecessary-condition lint is deferred to keep the default Ultracite/Biome path free of an ESLint engine. TypeScript compilation does not provide these lint checks."
+    }
+  ],
+  "required_tsguard_cases": [
+    "baseline.no_config",
+    "baseline.single_linter",
+    "baseline.empty_catch",
+    "baseline.project_overrides_preserved",
+    "baseline.external_policy_preserved",
+    "smells.resolved_chain",
+    "contract.deterministic_and_bounded",
+    "smells.equivalent_simplification_control",
+    "smells.legitimate_DI_validation_and_boundary",
+    "smells.failure_policy_controls",
+    "smells.repeated_handlers",
+    "duplicates.repeated_validation",
+    "structure.runtime_cycle",
+    "structure.type_only_cycle_control",
+    "structure.unresolved_is_partial",
+    "structure.scope_and_generated_exclusions",
+    "change.absent_baseline",
+    "change.artificial_split_and_inert_baseline",
+    "change.real_simplification_control",
+    "change.unavailable_ref",
+    "change.nested_project_prefix"
   ]
 }
