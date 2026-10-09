@@ -24,6 +24,7 @@ Quality gates (replaces npm scripts):
   tsguard maintainability AST evidence for delegation and repeated error policy
   tsguard smells         focused maintainability diagnosis
   tsguard structure      runtime module graph, cycles, coupling and depth
+  tsguard change         advisory Git baseline versus current maintainability
   tsguard complexity     compatibility alias; complexity is enforced by ultracite check
   tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)
   tsguard coverage       run tests with coverage (vitest --coverage)
@@ -43,6 +44,7 @@ Environment setup:
 Flags:
   --output <mode>  human (default), agent (bounded), or json (complete result)
   --root <path>    explicit project root containing package.json
+  --baseline <ref> explicit Git revision for source-only change comparison
   --dirs <d1,d2>    override target directories (default: . — project root)
   --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)
   --timeout <s>     per-tool timeout in seconds (default: 300)
@@ -154,7 +156,7 @@ func runCLI(cmd string, args []string) int {
 var analysisCommands = map[string]bool{
 	"check": true, "fix": true, "lint": true, "types": true, "complexity": true,
 	"fta": true, "coverage": true, "security": true, "npm-audit": true,
-	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true, "typed-lint": true, "maintainability": true, "smells": true, "structure": true,
+	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true, "typed-lint": true, "maintainability": true, "smells": true, "structure": true, "change": true,
 }
 
 func dispatchResult(cmd string, cfg config, root string, result *RunResult) int {
@@ -177,9 +179,11 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 	if cfg.output != "human" {
 		switch cmd {
 		case "check":
-			result.Plan("maintainability")
+			result.Plan("maintainability", "change")
 			result.Plan("lint", "fta", "types", "coverage", "secrets", "dependencies", "security")
-			if !hasLintConfig(root) { result.Plan("typed-lint") }
+			if !hasLintConfig(root) {
+				result.Plan("typed-lint")
+			}
 		case "security":
 			result.Plan("secrets", "dependencies", "security")
 		case "audit":
@@ -194,7 +198,7 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 			result.Plan(cmd)
 		}
 	}
-	r := &Runner{outputMode: cfg.output, result: result, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs, ftaExcludeTests: cfg.ftaExcludeTests, ftaExclude: cfg.ftaExclude}
+	r := &Runner{outputMode: cfg.output, result: result, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, pkgManager: cfg.pkgManager, dirs: cfg.dirs, excludeDirs: cfg.excludeDirs, ftaExcludeTests: cfg.ftaExcludeTests, ftaExclude: cfg.ftaExclude, baseline: cfg.baseline}
 
 	switch cmd {
 	case "check":
@@ -209,6 +213,8 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		return runTypedLint(r)
 	case "maintainability", "smells", "structure":
 		return runMaintainability(r, cmd)
+	case "change":
+		return runChange(r)
 	case "complexity":
 		return runComplexity(r, cfg.dirs)
 	case "fta":
@@ -258,6 +264,7 @@ var heavyGates = map[string]bool{
 type config struct {
 	output          string
 	root            string
+	baseline        string
 	dirs            []string
 	excludeDirs     []string
 	timeout         int
@@ -299,7 +306,7 @@ func parseFlags(args []string) (config, error) {
 		case "--yes", "-y":
 			cfg.assumeYes = true
 			continue
-		case "--dirs", "--exclude", "--timeout", "--tail", "--log-file", "--max-fta-score", "--root", "--output":
+		case "--dirs", "--exclude", "--timeout", "--tail", "--log-file", "--max-fta-score", "--root", "--output", "--baseline":
 		default:
 			return cfg, fmt.Errorf("unknown argument: %s", flag)
 		}
@@ -325,6 +332,8 @@ func parseFlags(args []string) (config, error) {
 			cfg.logFile = value
 		case "--root":
 			cfg.root = value
+		case "--baseline":
+			cfg.baseline = value
 		case "--output":
 			if value != "human" && value != "agent" && value != "json" {
 				return cfg, fmt.Errorf("invalid output mode %q (use human, agent, or json)", value)

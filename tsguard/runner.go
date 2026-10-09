@@ -26,11 +26,12 @@ type Runner struct {
 	logFile         string // path to append full output (empty = no log file)
 	tailLines       int    // print only the last N lines to stdout (0 = all)
 	pkgManager      string
-	dirs            []string // source directories to scan (default: .)
-	excludeDirs     []string // directories excluded from all security/scan tools
-	ftaExcludeTests bool     // exclude conventional test files from FTA scoring
-	ftaExclude      []string // additional fta-exclude globs from oxguard.toml
-	snapshot *maintainabilitySnapshot // one compiler pass shared by smells, structure and change
+	dirs            []string                 // source directories to scan (default: .)
+	excludeDirs     []string                 // directories excluded from all security/scan tools
+	ftaExcludeTests bool                     // exclude conventional test files from FTA scoring
+	ftaExclude      []string                 // additional fta-exclude globs from oxguard.toml
+	snapshot        *maintainabilitySnapshot // one compiler pass shared by smells, structure and change
+	baseline        string
 }
 
 // Result holds the outcome of a single tool run.

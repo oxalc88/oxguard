@@ -7,8 +7,8 @@ function loadProject(input) {
   const root = process.cwd();
   const project = createRequire(path.join(root, 'package.json'));
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-  const owned = input.runtime ? createRequire(path.join(input.runtime, 'bin/tool.cjs')) : project;
-  const ts = (manifest.dependencies?.typescript || manifest.devDependencies?.typescript ? project : owned)('typescript');
+  const owned = input.runtime ? createRequire(path.join(input.runtime, 'bin/tool.cjs')) : input.compilerRoot ? createRequire(path.join(input.compilerRoot, 'package.json')) : project;
+  const ts = (!input.sourceOnly && (manifest.dependencies?.typescript || manifest.devDependencies?.typescript) ? project : owned)('typescript');
   const relative = file => path.relative(root, file).split(path.sep).join('/');
   const excluded = file => input.exclude.some(dir => {
     const normalized = dir.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/$/, '');
