@@ -159,6 +159,25 @@ function evaluate({ execute, structured, root }) {
       assert.equal(result.assessment, 'complete');
       assert.equal(result.measurements.find(m => m.metric === 'module.count').value, 1);
     });
+    run('structure.function_graph', () => {
+      const dir = source('function-graph', { 'source.ts': 'function target() { return 1; }\nexport function a() { target(); return target(); }\nexport function b() { return target(); }\nexport function recursive() { return recursive(); }\n' });
+      const result = structured(args('structure', dir));
+      assert.equal(result.measurements.find(m => m.metric === 'function.fan_in' && m.location.symbol === 'target').value, 2);
+      assert.equal(result.measurements.find(m => m.metric === 'function.fan_out' && m.location.symbol === 'a').value, 1);
+      assert.equal(result.measurements.find(m => m.metric === 'function.call_depth' && m.location.symbol === 'a').value, 1);
+      assert.equal(result.measurements.find(m => m.metric === 'function.recursive_components').value, 1);
+      assert.equal(result.findings.length, 0);
+    });
+    run('structure.coupling', () => {
+      const files = Object.fromEntries(Array.from({length:8},(_,i) => [`leaf${i}.ts`, `export const value${i} = ${i};\n`]));
+      files['hub.ts'] = Array.from({length:8},(_,i) => `export { value${i} } from "./leaf${i}";`).join('\n');
+      for (let i=0;i<3;i++) files[`caller${i}.ts`] = 'export { value0 } from "./hub";\n';
+      const dir = source('coupling',files);
+      const result = structured(args('structure',dir));
+      assert.equal(result.measurements.find(m=>m.metric==='module.fan_in' && m.location.file.endsWith('/hub.ts')).value,3);
+      assert.equal(result.measurements.find(m=>m.metric==='module.fan_out' && m.location.file.endsWith('/hub.ts')).value,8);
+      assert.ok(rules(result).includes('tsguard.structure.HIGH_MODULE_COUPLING'));
+    });
     run('change.absent_baseline', () => {
       const result = structured(args('change', legitimate));
       assert.equal(result.assessment, 'incomplete');
@@ -193,6 +212,13 @@ function evaluate({ execute, structured, root }) {
       assert.equal(result.measurements.find(m => m.metric === 'change.baseline.total_branches').value, 4);
       assert.equal(result.measurements.find(m => m.metric === 'change.candidate.total_branches').value, 4);
       assert.equal(fs.existsSync(marker), false);
+      assert.ok(result.measurements.some(m=>m.metric==='change.baseline.fta.score'));
+      assert.ok(result.measurements.some(m=>m.metric==='change.candidate.function.cognitive_min'));
+      assert.ok(result.measurements.some(m=>m.metric==='change.baseline.duplicated_tokens'));
+      const artifact = JSON.parse(fs.readFileSync(path.join(comparison,result.artifacts.find(a=>a.kind==='maintainability_change').path),'utf8'));
+      assert.equal(artifact.baseline_sha,sha);
+      assert.ok(artifact.native_metrics.baseline.files.some(f=>f.file==='original.ts'));
+      assert.ok(artifact.native_metrics.candidate.files.some(f=>f.file==='a.ts'));
     });
     run('change.real_simplification_control', () => {
       fs.writeFileSync(path.join(comparison, 'a.ts'), 'export function a(x: number) { return Number(x > 0) + 2 * Number(x > 1); }\n');
@@ -209,6 +235,84 @@ function evaluate({ execute, structured, root }) {
       assert.equal(result.assessment,'complete');
       assert.equal(result.measurements.find(m=>m.metric==='change.baseline.module_count').value,1);
       assert.equal(result.measurements.find(m=>m.metric==='change.candidate.module_count').value,1);
+    });
+    const revision = (name, files) => {
+      const rel = source(name, {'package.json':'{}',...files});
+      const project = path.join(root,rel);
+      const git = argv => {
+        const result = spawnSync('git',argv,{cwd:project,encoding:'utf8',env:{...process.env,GIT_CONFIG_NOSYSTEM:'1'}});
+        assert.equal(result.status,0,result.stderr); return result.stdout.trim();
+      };
+      git(['init','-q']);git(['add','.']);git(['-c','user.name=Eval','-c','user.email=eval@example.invalid','commit','-qm','source baseline']);
+      const sha=git(['rev-parse','HEAD']);
+      return {project,git,sha,compare:baseline=>structured(['change','--root',project,'--dirs','.','--baseline',baseline||sha])};
+    };
+    run('change.native_duplication_and_move_control', () => {
+      const validation='export function validate(value: number) {\n  if (!Number.isFinite(value)) throw new Error("finite");\n  if (value < 0) throw new Error("negative");\n  if (value > 100) throw new Error("large");\n  if (value % 1 !== 0) throw new Error("integer");\n  return value;\n}\n';
+      const fixture=revision('clone-change',{'a.ts':validation});
+      fs.writeFileSync(path.join(fixture.project,'b.ts'),validation);
+      // Historical and current analyzer configs cannot hide selected source.
+      fs.writeFileSync(path.join(fixture.project,'.jscpd.json'),'{"ignore":["**/*"]}');
+      fs.writeFileSync(path.join(fixture.project,'fta.json'),'{"exclude_filenames":["*"]}');
+      let result=fixture.compare();
+      assert.equal(result.assessment,'complete');
+      assert.ok(rules(result).includes('tsguard.change.NEW_DUPLICATION'));
+      assert.equal(result.measurements.find(m=>m.metric==='change.baseline.duplicate_clones').value,0);
+      assert.ok(result.measurements.find(m=>m.metric==='change.candidate.duplicated_tokens').value>=50);
+      fixture.git(['add','.']);fixture.git(['-c','user.name=Eval','-c','user.email=eval@example.invalid','commit','-qm','existing clones']);
+      const duplicatedSHA=fixture.git(['rev-parse','HEAD']);
+      fs.renameSync(path.join(fixture.project,'a.ts'),path.join(fixture.project,'renamed.ts'));
+      result=fixture.compare(duplicatedSHA);
+      assert.equal(result.assessment,'complete');
+      assert.ok(!rules(result).includes('tsguard.change.NEW_DUPLICATION'));
+      const artifact=JSON.parse(fs.readFileSync(path.join(fixture.project,result.artifacts.find(a=>a.kind==='maintainability_change').path),'utf8'));
+      assert.ok(artifact.file_matches.some(m=>m.baseline==='a.ts'&&m.candidate==='renamed.ts'&&m.method==='exact_fingerprint'));
+    });
+    run('change.native_function_complexity_and_move_control', () => {
+      const fixture=revision('function-change',{'a.ts':'export function domain(x: number) { if (x > 0) return 1; return 0; }\n'});
+      fs.writeFileSync(path.join(fixture.project,'a.ts'),'export function domain(x: number) { if (x > 0) { if (x > 1) { if (x > 2) return 3; return 2; } return 1; } return 0; }\n');
+      let result=fixture.compare();
+      assert.equal(result.assessment,'complete');
+      assert.ok(rules(result).includes('tsguard.change.FUNCTION_COMPLEXITY_INCREASE'));
+      fixture.git(['add','a.ts']);fixture.git(['-c','user.name=Eval','-c','user.email=eval@example.invalid','commit','-qm','necessary domain behavior']);
+      const complexSHA=fixture.git(['rev-parse','HEAD']);
+      fs.renameSync(path.join(fixture.project,'a.ts'),path.join(fixture.project,'moved.ts'));
+      result=fixture.compare(complexSHA);
+      assert.equal(result.assessment,'complete');
+      assert.equal(result.findings.length,0);
+      assert.equal(result.measurements.find(m=>m.metric==='change.matched_functions').value,1);
+    });
+    run('change.cognitive_suppression_is_partial', () => {
+      const code='// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: intentional domain work\nexport function domain(x: number) { if (x > 0) { if (x > 1) return 2; return 1; } return 0; }\n';
+      const fixture=revision('cognitive-suppressed',{'source.ts':code});
+      const result=fixture.compare();
+      assert.equal(result.assessment,'incomplete');
+      assert.equal(result.gates.find(g=>g.name==='change').normalization,'partial');
+      assert.ok(result.findings.some(f=>f.rule==='tsguard.change.not_evaluated'));
+      assert.ok(!result.measurements.some(m=>m.metric==='change.candidate.total_cognitive_max'));
+      assert.ok(result.measurements.some(m=>m.metric==='change.candidate.fta.score'));
+    });
+    run('change.large_graph_input_and_generated_scope', () => {
+      const files=Object.fromEntries(Array.from({length:160},(_,i)=>[`source${i}.ts`,`export function function${i}(value: number) { return value + ${i}; }\n`]));
+      files['ignored.generated.ts']='throw new Error("must not run");\n';
+      const fixture=revision('large-change',files);
+      const result=fixture.compare();
+      assert.equal(result.assessment,'complete');
+      assert.equal(result.measurements.find(m=>m.metric==='change.matched_functions').value,160);
+      assert.equal(result.measurements.filter(m=>m.metric==='change.candidate.fta.score').length,160);
+      assert.equal(result.findings.length,0);
+    });
+    run('change.project_compiler_consistency', () => {
+      const fixture=revision('selected-compiler',{'package.json':JSON.stringify({devDependencies:{typescript:'5.9.3'}}),'source.ts':'export function identity(value: number) { return value; }\n',
+        'node_modules/typescript/package.json':'{"name":"typescript","main":"index.cjs"}', 'node_modules/typescript/index.cjs':'throw new Error("historical compiler must not be loaded");\n'});
+      const runtime=process.env.TSGUARD_RUNTIME || fs.realpathSync(path.join(root,'node_modules/@oxguard/tsguard'));
+      const owned=require('node:module').createRequire(path.join(runtime,'package.json'));
+      fs.writeFileSync(path.join(fixture.project,'node_modules/typescript/index.cjs'),`module.exports = { ...require(${JSON.stringify(owned.resolve('typescript'))}), version: "5.9.3-eval-current" };\n`);
+      const result=fixture.compare();
+      assert.equal(result.assessment,'complete');
+      const artifact=JSON.parse(fs.readFileSync(path.join(fixture.project,result.artifacts.find(a=>a.kind==='maintainability_change').path),'utf8'));
+      assert.equal(artifact.baseline_structure.compiler_version,'5.9.3-eval-current');
+      assert.equal(artifact.candidate_structure.compiler_version,'5.9.3-eval-current');
     });
     return { schema_version: '1', suite: 'maintainability.installed', evaluator_sha256: crypto.createHash('sha256').update(fs.readFileSync(__filename)).digest('hex'), environment: {platform:process.platform,arch:process.arch,node:process.version}, cases, passed: cases.length,
       duration_ms: timings.reduce((a,b) => a+b, 0), python_parity: 'not implemented for new Level 2/3 capabilities; existing Level 1 is unchanged' };

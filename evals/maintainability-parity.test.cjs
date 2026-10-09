@@ -10,6 +10,8 @@ test('deferred Python capabilities do not block the selected Tsguard scope', () 
   assert.equal(result.maintainability_parity_ready,false);
   assert.equal(result.tsguard_scope_ready,true);
   assert.equal(result.pyguard_maintainability_ready,false);
+  assert.deepEqual(Object.keys(result.levels),['code','structure','change']);
+  assert.ok(Object.values(result.levels).every(level=>level.implemented&&level.native_evals_passed));
   assert.equal(Object.hasOwn(result,'release_ready'),false);
   assert.equal(result.deferred_tsguard_capabilities[0].status,'not_implemented');
   assert.ok(result.capabilities.every(c=>c.pyguard==='not_evaluated'));

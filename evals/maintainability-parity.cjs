@@ -12,10 +12,13 @@ function assess(report) {
     return { id: capability.id, tsguard: native.outcome, pyguard: 'not_evaluated', python_candidate: capability.python_candidate };
   });
   const tsguardPassed = rows.every(r => r.tsguard === 'pass') && report.cases.every(c => c.outcome === 'pass');
+  const levels = Object.fromEntries(Object.entries(spec.levels).map(([level, ids])=>[level,{
+    implemented:true, evaluated_cases:ids.length, native_evals_passed:ids.every(id=>report.cases.find(c=>c.id===id)?.outcome==='pass'),
+  }]));
   return { schema_version: '1', scope: spec.scope, tsguard_capabilities_passed: tsguardPassed,
     tsguard_scope_ready: tsguardPassed, pyguard_maintainability_ready: false, maintainability_parity_ready: false,
-    deferred_tsguard_capabilities: spec.deferred_tsguard_capabilities, capabilities: rows,
-    limitation: 'Tsguard readiness is assessed for the selected Biome maintainability scope. New Python maintainability capabilities are deferred and do not block that scope. This report does not replace retained Level 1 checks, platform verification or release authorization.' };
+    levels, deferred_tsguard_capabilities: spec.deferred_tsguard_capabilities, capabilities: rows,
+    limitation: 'The planned Tsguard code, structure and change capabilities have native evaluations. New Python maintainability capabilities are deferred and do not block that scope. Provider limits and static-analysis boundaries remain explicit. This report does not replace retained Level 1 checks, platform verification or release authorization.' };
 }
 if (require.main === module) {
   const report = assess(JSON.parse(fs.readFileSync(process.argv[2])));

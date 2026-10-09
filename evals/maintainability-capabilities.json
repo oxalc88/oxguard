@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "scope": "Tsguard v0.8 Biome maintainability scope; new Python capabilities are deferred independently",
+  "scope": "Tsguard v0.8 code, structure and change implementation; Python maintainability parity is deferred independently",
   "capabilities": [
     {
       "id": "quality.zero_config_exception_handling",
@@ -43,6 +43,36 @@
       "tsguard": "change.real_simplification_control",
       "pyguard": null,
       "python_candidate": "Python-specific equivalent-behavior refactor fixtures"
+    },
+    {
+      "id": "structure.function_graph",
+      "tsguard": "structure.function_graph",
+      "pyguard": null,
+      "python_candidate": "Extend existing pyan3 caller graph with fan-out and SCC call depth"
+    },
+    {
+      "id": "structure.coupling",
+      "tsguard": "structure.coupling",
+      "pyguard": null,
+      "python_candidate": "Module fan-in/out and coupling observations"
+    },
+    {
+      "id": "change.native_duplication",
+      "tsguard": "change.native_duplication_and_move_control",
+      "pyguard": null,
+      "python_candidate": "Native clone measurements over inert Python sources"
+    },
+    {
+      "id": "change.function_complexity",
+      "tsguard": "change.native_function_complexity_and_move_control",
+      "pyguard": null,
+      "python_candidate": "Radon function complexity and conservative identity matching"
+    },
+    {
+      "id": "change.truthful_completeness",
+      "tsguard": "change.cognitive_suppression_is_partial",
+      "pyguard": null,
+      "python_candidate": "Explicit unsupported/suppressed measurement controls"
     }
   ],
   "deferred_tsguard_capabilities": [
@@ -73,6 +103,48 @@
     "change.artificial_split_and_inert_baseline",
     "change.real_simplification_control",
     "change.unavailable_ref",
-    "change.nested_project_prefix"
-  ]
+    "change.nested_project_prefix",
+    "structure.function_graph",
+    "structure.coupling",
+    "change.native_duplication_and_move_control",
+    "change.native_function_complexity_and_move_control",
+    "change.cognitive_suppression_is_partial",
+    "change.large_graph_input_and_generated_scope",
+    "change.project_compiler_consistency"
+  ],
+  "levels": {
+    "code": [
+      "baseline.no_config",
+      "baseline.single_linter",
+      "baseline.empty_catch",
+      "baseline.project_overrides_preserved",
+      "baseline.external_policy_preserved",
+      "duplicates.repeated_validation"
+    ],
+    "structure": [
+      "smells.resolved_chain",
+      "smells.equivalent_simplification_control",
+      "smells.legitimate_DI_validation_and_boundary",
+      "smells.failure_policy_controls",
+      "smells.repeated_handlers",
+      "structure.runtime_cycle",
+      "structure.type_only_cycle_control",
+      "structure.unresolved_is_partial",
+      "structure.scope_and_generated_exclusions",
+      "structure.function_graph",
+      "structure.coupling"
+    ],
+    "change": [
+      "change.absent_baseline",
+      "change.artificial_split_and_inert_baseline",
+      "change.real_simplification_control",
+      "change.unavailable_ref",
+      "change.nested_project_prefix",
+      "change.native_duplication_and_move_control",
+      "change.native_function_complexity_and_move_control",
+      "change.cognitive_suppression_is_partial",
+      "change.large_graph_input_and_generated_scope",
+      "change.project_compiler_consistency"
+    ]
+  }
 }
