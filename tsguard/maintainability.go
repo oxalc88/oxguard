@@ -19,16 +19,22 @@ type handlerFact struct {
 	Location    Location `json:"location"`
 	Tokens      int      `json:"tokens"`
 	Fingerprint string   `json:"fingerprint"`
+	Fallback    bool     `json:"fallback"`
 }
 type maintainabilitySnapshot struct {
-	Functions       []functionFact `json:"functions"`
-	Calls           []callEdge     `json:"calls"`
-	Handlers        []handlerFact  `json:"handlers"`
-	UnresolvedCalls int            `json:"unresolved_calls"`
+	Functions         []functionFact `json:"functions"`
+	Calls             []callEdge     `json:"calls"`
+	Handlers          []handlerFact  `json:"handlers"`
+	UnresolvedCalls   int            `json:"unresolved_calls"`
+	Modules           []moduleFact   `json:"modules"`
+	Imports           []moduleEdge   `json:"imports"`
+	ExternalImports   int            `json:"external_imports"`
+	UnresolvedImports int            `json:"unresolved_imports"`
+	TypeImports       int            `json:"type_imports"`
 }
 
 func runMaintainability(r *Runner, gate string) int {
-	return r.runOwnedAnalysis(gate, maintainabilityAnalyzer, true, nil)
+	return r.runOwnedAnalysis(gate, maintainabilityAnalyzer, true, map[string]any{"excludeTests": r.ftaExcludeTests})
 }
 
 func (s *maintainabilitySnapshot) validate() error {
@@ -106,6 +112,9 @@ func (r *Runner) smellFindings(gate string, s *maintainabilitySnapshot, refs []s
 	}
 	handlers := map[string][]handlerFact{}
 	for _, h := range s.Handlers {
+		if h.Fallback {
+			r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.SILENT_EXCEPTION_FALLBACK", Status: "advisory", Severity: "warning", Category: "quality", Location: &h.Location, Evidence: "The catch body returns only a constant or no value; it does not inspect, propagate or record the caught failure.", Remediation: "Verify this is an intentional best-effort policy; preserve valid recovery and make unexpected failures diagnosable.", Diagnostics: refs})
+		}
 		if h.Tokens >= 12 {
 			handlers[h.Fingerprint] = append(handlers[h.Fingerprint], h)
 		}

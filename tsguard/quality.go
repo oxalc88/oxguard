@@ -54,6 +54,7 @@ func (r *Runner) runOwnedAnalysis(gate, source string, advisory bool, extra map[
 	analyzer := *r
 	analyzer.outputMode = "json"
 	res := analyzer.RunTool(toolSpec{gate: gate, adapter: "owned-analysis", advisory: advisory}, gate, node, "-e", compilerProject+"\n"+source, string(data))
+	r.snapshot = analyzer.snapshot
 	failed := !res.ok
 	for _, f := range r.result.Findings {
 		if f.Gate == gate && (f.Status == "execution_error" || f.Status == "blocking") {
@@ -110,7 +111,15 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 		if err := report.Snapshot.validate(); err != nil {
 			return false, err
 		}
-		r.smellFindings(spec.gate, report.Snapshot, refs)
+		if spec.gate != "structure" {
+			r.smellFindings(spec.gate, report.Snapshot, refs)
+		}
+		if spec.gate != "smells" {
+			if err := r.structureFindings(spec.gate, report.Snapshot, refs); err != nil {
+				return false, err
+			}
+		}
+		r.snapshot = report.Snapshot
 	}
 	if report.Partial {
 		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".not_evaluated", Severity: "info", Status: "advisory", Category: "quality", Evidence: report.Limitation, Diagnostics: refs})

@@ -23,6 +23,7 @@ Quality gates (replaces npm scripts):
   tsguard typed-lint     type-aware unsafe operations and unnecessary conditions
   tsguard maintainability AST evidence for delegation and repeated error policy
   tsguard smells         focused maintainability diagnosis
+  tsguard structure      runtime module graph, cycles, coupling and depth
   tsguard complexity     compatibility alias; complexity is enforced by ultracite check
   tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)
   tsguard coverage       run tests with coverage (vitest --coverage)
@@ -153,7 +154,7 @@ func runCLI(cmd string, args []string) int {
 var analysisCommands = map[string]bool{
 	"check": true, "fix": true, "lint": true, "types": true, "complexity": true,
 	"fta": true, "coverage": true, "security": true, "npm-audit": true,
-	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true, "typed-lint": true, "maintainability": true, "smells": true,
+	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true, "typed-lint": true, "maintainability": true, "smells": true, "structure": true,
 }
 
 func dispatchResult(cmd string, cfg config, root string, result *RunResult) int {
@@ -206,7 +207,7 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 		return runTypes(r)
 	case "typed-lint":
 		return runTypedLint(r)
-	case "maintainability", "smells":
+	case "maintainability", "smells", "structure":
 		return runMaintainability(r, cmd)
 	case "complexity":
 		return runComplexity(r, cfg.dirs)

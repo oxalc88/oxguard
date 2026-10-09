@@ -18,6 +18,8 @@ function loadProject(input) {
   const files = new Set();
   function collect(file) {
     if (excluded(file)) return;
+    if (input.excludeTests && (/(?:^|[\\/])(?:__tests__|__mocks__|__fixtures__)(?:[\\/]|$)/.test(file) || /\.(?:test|spec)\.[^.]+$/.test(file))) return;
+    if (/\.(?:min|bundle|generated)\.[^.]+$/.test(file)) return;
     const stat = fs.lstatSync(file);
     if (stat.isSymbolicLink()) return;
     if (stat.isDirectory()) {

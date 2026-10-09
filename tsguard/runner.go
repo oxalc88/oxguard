@@ -30,6 +30,7 @@ type Runner struct {
 	excludeDirs     []string // directories excluded from all security/scan tools
 	ftaExcludeTests bool     // exclude conventional test files from FTA scoring
 	ftaExclude      []string // additional fta-exclude globs from oxguard.toml
+	snapshot *maintainabilitySnapshot // one compiler pass shared by smells, structure and change
 }
 
 // Result holds the outcome of a single tool run.
