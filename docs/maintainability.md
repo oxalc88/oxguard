@@ -15,11 +15,11 @@ Without a lint config, the npm distribution extends pinned Ultracite and applies
 
 Project Biome configuration, disabled rules and flat ESLint/Oxlint configurations remain authoritative. Legacy ESLint names are recognized so fallback Biome does not silently replace them; support still depends on upstream Ultracite/ESLint, and unsupported execution is an error or partial normalization. The flat ESLint path is tested but its native diagnostics are not yet normalized. Project configs are never overwritten.
 
-Zero-config `check` also runs package-owned ESLint/typescript-eslint against an explicit TypeScript compiler program. It checks unsafe assignment, arguments, calls, member access, returns, narrowing assertions and unnecessary assertions/conditions. Existing compiler options are retained; the fallback compiler program is strict and needs no generated project config. `no-unnecessary-condition` is not evaluated when project strictNullChecks is disabled, and that result is partial. A project lint config leaves the owned typed baseline not_run, with a PROJECT_POLICY notice when execution reaches it. `typed-lint` explicitly runs the owned rules for diagnosis. Compilation success alone never establishes typed-lint coverage.
+The default lint engine remains Biome with pinned Ultracite presets. No package-owned ESLint/typescript-eslint dependency or separate typed-lint command is added. `types` still runs the existing TypeScript compiler gate; the maintainability analyzer uses compiler facts for resolved calls and module edges.
 
-ESLint 10.12.0 and typescript-eslint 8.71.1 are pinned package dependencies; standalone setup installs their names through the existing toolchain mechanism. This adds dependencies, not a new service or executable installation hook.
+Compiler-aware unsafe-operation, unsafe narrowing-assertion and unnecessary-condition lint beyond the Biome baseline is deferred. Compilation success does not establish that coverage. The capability report lists this limitation outside the selected Tsguard release scope; it does not convert missing checks into passes.
 
-The npm Node engine minimum on the 22.x line is now 22.13, matching ESLint 10; Node 24.x and 26+ remain supported. Ultracite's pinned ESLint peer requires version 10. This is an explicit patch-version compatibility change from the previous 22.12 declaration.
+Existing explicit project ESLint/Oxlint policy is still respected through the compatibility path. Such projects must supply their own engine. The zero-config package does not install or invoke those engines alongside Biome. Node support remains 22.12+ on the 22.x line, 24.x, or 26+.
 
 ## Advisory rules
 
@@ -38,7 +38,7 @@ The npm Node engine minimum on the 22.x line is now 22.13, matching ESLint 10; N
 
 ## Structure and scope
 
-One compiler pass produces function/call facts, catch fingerprints and module edges for the new smell/structure/change path. Existing criticality reuses the compiler-input helper. Typed lint reuses its compiler program across all selected files; invoking a separate Level 1 typed gate remains a separate process/compiler pass.
+One compiler pass produces function/call facts, catch fingerprints and module edges for the new smell/structure/change path. Existing criticality reuses the compiler-input helper. There is no additional typed-lint process/compiler pass.
 
 Module IDs are root-relative paths. Function IDs contain file, source position and symbol; edge IDs identify their endpoint pair. Findings retain the existing stable schema-1 IDs. IDs are deterministic for the same inputs, not rename-tracking identities across arbitrary refactors.
 
@@ -58,8 +58,8 @@ Historical FTA-score, cognitive-complexity and duplication deltas, rename matchi
 
 ## Evaluation and parity
 
-`evals/maintainability.cjs` runs adversarial cases through the packed installed launcher in the existing npm/pnpm platform matrix. It tests the baseline, project policy, unsafe typed operations, valid DI/boundaries/validation, exact repeated handlers, exception propagation/recording/fallback, runtime/type-only cycles, generated exclusions, deterministic IDs, bounded agent output, artificial splits, real branch reduction, missing refs, nested projects and inert baseline scripts/export attributes. It never runs in an ordinary guard invocation.
+`evals/maintainability.cjs` runs adversarial cases through the packed installed launcher in the existing npm/pnpm platform matrix. It tests the baseline, single-linter policy, preserved project policy, valid DI/boundaries/validation, exact repeated handlers, exception propagation/recording/fallback, runtime/type-only cycles, generated exclusions, deterministic IDs, bounded agent output, artificial splits, real branch reduction, missing refs, nested projects and inert baseline scripts/export attributes. It never runs in an ordinary guard invocation.
 
-The existing 30 TypeScript and 37 Python Level 1 cases remain. Additional not-run gates are explicitly allowed in the historical fail-fast oracle; all original gate states/findings remain exact, and installed tests separately require the new candidate gate list. New Python capabilities are not implemented or scored as passing. `maintainability-capabilities.json` lists appropriate Python providers and explicit gaps; `maintainability-parity.cjs` cannot turn those gaps into release readiness.
+The existing 30 TypeScript and 37 Python Level 1 cases remain. Additional not-run gates are explicitly allowed in the historical fail-fast oracle; all original gate states/findings remain exact, and installed tests separately require the new candidate gate list. New Python capabilities are deferred independently and are not scored as passing. `maintainability-capabilities.json` lists appropriate Python providers and explicit gaps; `maintainability-parity.cjs` cannot turn those gaps into release readiness.
 
-The candidate is not a claim of complete v0.8/PyGuard parity. Complete cross-platform runtime verification, broader independent repositories and Python structural/change parity must be assessed before claiming the entire requested release scope is complete.
+Tsguard v0.8 readiness is assessed for the selected Ultracite/Biome maintainability scope with installed evals, retained Level 1 checks and the existing platform matrix. New Python maintainability parity is a later milestone and does not block that scope. `tsguard_scope_ready` and `pyguard_maintainability_ready` are separate report fields; a passing scope report alone does not replace platform checks or authorize publication. Broader independent repository evaluation remains a useful follow-up, not a new mandatory release ceremony.

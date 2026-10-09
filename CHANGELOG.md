@@ -7,8 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Versioned zero-config Tsguard lint policy and explicit compiler-backed typed
-  lint using pinned ESLint/typescript-eslint, preserving project lint policy.
+- Versioned zero-config Tsguard lint policy using Ultracite/Biome, preserving
+  project lint policy without adding a second package-owned lint engine.
 - Advisory resolved delegation/handler smells and static module graph
   measurements, including cycles, fan-in/out, SCC depth and coupling.
 - Explicit inert Git baseline comparisons for supported complexity displacement.
@@ -18,11 +18,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- `check` includes applicable typed lint, maintainability, duplication and change
+- `check` includes applicable maintainability, duplication and change
   analysis through the existing schema-1 contract. Updated agent guidance explains
   advisory evidence and incomplete assessments.
-- npm Node 22.x minimum is 22.13 to match ESLint 10's supported engines;
-  Node 24.x and 26+ remain supported.
+- Tsguard maintainability readiness is independent of deferred new Python
+  capabilities. Compiler-aware unsafe-operation lint is deferred to retain
+  the Ultracite/Biome default and Node 22.12+ support.
 
 ## [0.7.2] — 2026-10-09
 
