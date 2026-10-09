@@ -344,14 +344,42 @@ func runOpengrep(r *Runner) int {
 	for _, dir := range r.excludeDirs {
 		args = append(args, "--exclude", dir)
 	}
-	// Scan the project's source dirs.
-	args = append(args, ".")
+	// Keep security scans root-wide without asking the scanner to enumerate
+	// node_modules first. Windows pnpm junctions can stall that enumeration
+	// before Opengrep applies its --exclude filters.
+	targets, err := securityRootTargets(r.root)
+	if err != nil {
+		return r.executionFailure("security", "invalid_configuration", err.Error())
+	}
+	args = append(args, targets...)
 
 	res := r.RunTool(toolSpec{gate: "security", adapter: "opengrep"}, "opengrep SAST", args...)
 	if !res.ok {
 		return 1
 	}
 	return 0
+}
+
+func securityRootTargets(root string) ([]string, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot enumerate security scan root: %w", err)
+	}
+	var targets []string
+	for _, entry := range entries {
+		if entry.Name() == "node_modules" || entry.Name() == ".git" {
+			continue
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
+		// Prefix paths so a root entry named --option cannot become a flag.
+		targets = append(targets, "."+string(os.PathSeparator)+entry.Name())
+	}
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("No project files available outside dependency directories")
+	}
+	return targets, nil
 }
 
 // runAudit runs informational analysis: criticality + dead-code + duplicates.

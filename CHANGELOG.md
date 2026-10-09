@@ -12,6 +12,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   The `v0.7.1` attempt failed before publishing any release or npm packages.
 - Standalone Tsguard verifies pinned Opengrep binaries in the OS user cache
   outside the scanned project. Missing or untrusted SAST engines block checks.
+- Root-wide SAST passes explicit project targets without `node_modules` or
+  `.git`, avoiding scanner discovery stalls in Windows pnpm dependency trees.
 - PyGuard executes embedded analysis helpers from private temporary copies
   instead of trusting project-local `tools/analysis` files. Secrets scanning
   receives the requested directory scope.

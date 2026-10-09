@@ -134,6 +134,8 @@ since it discovers and runs unittest tests natively.
 
 The security gate requires **no Python or global installs**. In npm installations,
 tools are owned by `@oxguard/tsguard` and Opengrep ships in its native package.
+Tsguard's secrets and SAST gates scan the project root even when `--dirs` narrows
+other gates, so a restricted analysis scope cannot hide security findings.
 Standalone `tsguard setup` installs project dependencies and a verified SAST engine:
 
 - **Secrets** (`secretlint`): added as a npm devDependency by `tsguard setup` → lives in `node_modules`.

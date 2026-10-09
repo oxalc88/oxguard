@@ -55,7 +55,8 @@ Follow these steps exactly, stopping and reporting if any step fails:
    - tsguard scans from the project root (.) by default. node_modules, dist,
      .next, build, coverage, and AI tool dirs (.claude, .opencode, .kiro, .agents)
      are always excluded. If you need to restrict to specific subdirectories,
-     pass --dirs src,lib. To add more exclusions, pass --exclude extra,dirs.
+     pass --dirs src,lib for non-security gates. Secrets and SAST still scan the
+     project root. To add more exclusions, pass --exclude extra,dirs.
    - A missing or untrusted Opengrep engine blocks the SAST gate. Run
      `tsguard setup` again to repair it, then re-run check. For npm installations,
      reinstall @oxguard/tsguard with optional dependencies if its engine is missing.
@@ -165,7 +166,8 @@ tsguard is already installed on this project. Update to the latest version:
 Behavior notes:
 - tsguard scans from the project root (.) by default. node_modules, dist, .next,
   build, coverage, and AI tool dirs (.claude, .opencode, .kiro, .agents) are always
-  excluded. Pass --dirs src,lib to restrict to specific subdirectories.
+  excluded. Pass --dirs src,lib to restrict non-security gates to subdirectories;
+  secrets and SAST still scan the project root.
 - A missing or untrusted Opengrep engine blocks the security gate. Run
   `tsguard setup` again when network is available to install or repair it.
 
