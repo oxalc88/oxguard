@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // runCheck runs the full quality gate: lint (includes Ultracite/Biome complexity) → fta → types → coverage → security.
@@ -12,8 +13,6 @@ import (
 func runCheck(r *Runner, dirs []string, ftaCap int) int {
 	r.println("tsguard check")
 	r.println("─────────")
-	runMaintainability(r, "maintainability")
-	runChange(r)
 
 	// Remove stale coverage artifacts from previous runs before lint scans the tree.
 	// vitest --coverage writes coverage/ at the end of the run; without this cleanup
@@ -28,7 +27,13 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 		{"fta", func() int { return runFTA(r, dirs, ftaCap) }},
 		{"types", func() int { return runTypes(r) }},
 		{"typed-lint", func() int {
-			if hasLintConfig(r.root) { return 0 }
+			if hasLintConfig(r.root) {
+				if r.result != nil {
+					r.result.Plan("typed-lint")
+					r.result.AddFinding(Finding{Gate: "typed-lint", Rule: "tsguard.typed-lint.PROJECT_POLICY", Severity: "info", Status: "advisory", Category: "quality", Evidence: "Project lint configuration is preserved; owned typed-lint baseline was not evaluated. Run typed-lint explicitly for diagnosis."})
+				}
+				return 0
+			}
 			return runTypedLint(r)
 		}},
 		{"coverage", func() int { return runCoverage(r) }},
@@ -42,7 +47,10 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 		}
 	}
 
-	r.println("\n  All checks passed.")
+	runMaintainability(r, "maintainability")
+	runDuplicates(r, dirs)
+	runChange(r)
+	r.println("\n  All blocking checks passed. Review advisory and not-evaluated results.")
 	return 0
 }
 
@@ -411,6 +419,11 @@ func runDeadCode(r *Runner) int {
 // runDuplicates runs jscpd for copy-paste code detection (informational).
 func runDuplicates(r *Runner, dirs []string) int {
 	args := append(pkgExec(r.pkgManager, "jscpd"), dirs...)
+	ignored := []string{"**/.git/**"}
+	for _, dir := range r.excludeDirs {
+		ignored = append(ignored, "**/"+dir+"/**")
+	}
+	args = append(args, "--ignore", strings.Join(ignored, ","))
 	spec := toolSpec{gate: "duplicates", advisory: true}
 	if r.machine() {
 		report, err := r.reportFile("jscpd", "jscpd-report.json")

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"archive/tar"
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -9,76 +9,98 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// Only compiler-readable source and inert compiler configuration are copied.
-// Archive entries cannot write symlinks, absolute paths, or parent traversals.
-func exportBaseline(reader io.Reader, root string) error {
-	archive := tar.NewReader(reader)
-	var bytesWritten int64
-	files := 0
-	for {
-		header, err := archive.Next()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		name := header.Name
-		cleaned := filepath.FromSlash(name)
-		if filepath.IsAbs(cleaned) || filepath.VolumeName(cleaned) != "" || strings.Contains(name, "\\") || cleaned == ".." || strings.HasPrefix(filepath.Clean(cleaned), ".."+string(filepath.Separator)) {
-			return fmt.Errorf("unsafe baseline archive path")
-		}
-		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA {
-			continue
-		}
-		extension := filepath.Ext(cleaned)
-		source := map[string]bool{".ts": true, ".tsx": true, ".mts": true, ".cts": true, ".js": true, ".jsx": true, ".mjs": true, ".cjs": true}[extension]
-		// Compiler configs can use arbitrary JSON names in an extends chain.
-		if !source && extension != ".json" && extension != ".jsonc" {
-			continue
-		}
-		parts := strings.Split(filepath.ToSlash(cleaned), "/")
-		skip := false
-		for _, part := range parts {
-			if part == "node_modules" || part == ".git" {
-				skip = true
-			}
-		}
-		if skip {
-			continue
-		}
-		if header.Size < 0 || header.Size > 8*1024*1024 {
-			return fmt.Errorf("baseline file exceeds 8 MiB")
-		}
-		bytesWritten += header.Size
-		files++
-		if bytesWritten > 128*1024*1024 || files > 20000 {
-			return fmt.Errorf("baseline source exceeds analysis budget")
-		}
-		destination := filepath.Join(root, cleaned)
-		if err = os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
-			return err
-		}
-		file, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-		if err != nil {
-			return err
-		}
-		_, copyErr := io.CopyN(file, archive, header.Size)
-		closeErr := file.Close()
-		if copyErr != nil {
-			return copyErr
-		}
-		if closeErr != nil {
-			return closeErr
+// Read exact Git blobs, not git archive: export-ignore/export-subst attributes
+// must not hide or transform baseline source. No checkout, hooks or source runs.
+func baselinePath(name string) (string, bool, error) {
+	clean := filepath.FromSlash(name)
+	if name == "" || filepath.IsAbs(clean) || filepath.VolumeName(clean) != "" || strings.Contains(name, "\\") || clean == ".." || strings.HasPrefix(filepath.Clean(clean), ".."+string(filepath.Separator)) {
+		return "", false, fmt.Errorf("unsafe baseline path")
+	}
+	for _, part := range strings.Split(filepath.ToSlash(clean), "/") {
+		if part == "node_modules" || part == ".git" {
+			return clean, false, nil
 		}
 	}
+	switch filepath.Ext(clean) {
+	case ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".json", ".jsonc":
+		return clean, true, nil
+	}
+	return clean, false, nil
 }
 
+type baselineBlob struct{ name, sha string }
+
 func baselineRoot(ctx context.Context, root, sha string) (string, error) {
+	prefixCommand := exec.CommandContext(ctx, "git", "rev-parse", "--show-prefix")
+	prefixCommand.Dir = root
+	prefixBytes, err := prefixCommand.Output()
+	if err != nil {
+		return "", err
+	}
+	prefix := strings.TrimSpace(string(prefixBytes))
+	listing := exec.CommandContext(ctx, "git", "ls-tree", "-r", "--full-tree", "-z", sha)
+	listing.Dir = root
+	stdout, err := listing.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	if err = listing.Start(); err != nil {
+		return "", err
+	}
+	data, readErr := io.ReadAll(io.LimitReader(stdout, 4*1024*1024+1))
+	if readErr != nil || len(data) > 4*1024*1024 {
+		listing.Process.Kill()
+	}
+	waitErr := listing.Wait()
+	if readErr != nil {
+		return "", readErr
+	}
+	if len(data) > 4*1024*1024 {
+		return "", fmt.Errorf("baseline tree exceeds analysis budget")
+	}
+	if waitErr != nil {
+		return "", waitErr
+	}
+	blobs := []baselineBlob{}
+	var requests strings.Builder
+	for _, entry := range bytes.Split(data, []byte{0}) {
+		if len(entry) == 0 {
+			continue
+		}
+		fields := bytes.SplitN(entry, []byte{'\t'}, 2)
+		if len(fields) != 2 {
+			return "", fmt.Errorf("invalid Git tree record")
+		}
+		meta := strings.Fields(string(fields[0]))
+		if len(meta) != 3 {
+			return "", fmt.Errorf("invalid Git tree metadata")
+		}
+		if (meta[0] != "100644" && meta[0] != "100755") || meta[1] != "blob" {
+			continue
+		} // no symlinks/submodules
+		name := string(fields[1])
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		name = strings.TrimPrefix(name, prefix)
+		clean, selected, err := baselinePath(name)
+		if err != nil {
+			return "", err
+		}
+		if !selected {
+			continue
+		}
+		if len(blobs) >= 20000 {
+			return "", fmt.Errorf("baseline source exceeds 20000 files")
+		}
+		blobs = append(blobs, baselineBlob{clean, meta[2]})
+		requests.WriteString(meta[2] + "\n")
+	}
 	temporary, err := os.MkdirTemp("", "tsguard-baseline-")
 	if err != nil {
 		return "", err
@@ -89,27 +111,26 @@ func baselineRoot(ctx context.Context, root, sha string) (string, error) {
 			os.RemoveAll(temporary)
 		}
 	}()
-	cmd := exec.CommandContext(ctx, "git", "archive", "--format=tar", sha)
+	cmd := exec.CommandContext(ctx, "git", "cat-file", "--batch")
 	cmd.Dir = root
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	stdout, err := cmd.StdoutPipe()
+	cmd.Stdin = strings.NewReader(requests.String())
+	stream, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", err
 	}
 	if err = cmd.Start(); err != nil {
 		return "", err
 	}
-	err = exportBaseline(stdout, temporary)
-	if err != nil {
+	copyErr := copyBaselineBlobs(bufio.NewReader(stream), temporary, blobs)
+	if copyErr != nil {
 		cmd.Process.Kill()
 	}
-	waitErr := cmd.Wait()
-	if err != nil {
-		return "", err
+	waitErr = cmd.Wait()
+	if copyErr != nil {
+		return "", copyErr
 	}
 	if waitErr != nil {
-		return "", fmt.Errorf("git archive: %w", waitErr)
+		return "", fmt.Errorf("git cat-file: %w", waitErr)
 	}
 	if _, err = os.Stat(filepath.Join(temporary, "package.json")); os.IsNotExist(err) {
 		if err = os.WriteFile(filepath.Join(temporary, "package.json"), []byte("{}"), 0600); err != nil {
@@ -118,6 +139,49 @@ func baselineRoot(ctx context.Context, root, sha string) (string, error) {
 	}
 	ok = true
 	return temporary, nil
+}
+
+func copyBaselineBlobs(reader *bufio.Reader, root string, blobs []baselineBlob) error {
+	var total int64
+	for _, blob := range blobs {
+		header, err := reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		fields := strings.Fields(header)
+		if len(fields) != 3 || fields[0] != blob.sha || fields[1] != "blob" {
+			return fmt.Errorf("invalid Git blob response")
+		}
+		size, err := strconv.ParseInt(fields[2], 10, 64)
+		if err != nil || size < 0 || size > 8*1024*1024 {
+			return fmt.Errorf("baseline file exceeds analysis budget")
+		}
+		total += size
+		if total > 128*1024*1024 {
+			return fmt.Errorf("baseline source exceeds 128 MiB")
+		}
+		destination := filepath.Join(root, blob.name)
+		if err = os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
+			return err
+		}
+		file, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.CopyN(file, reader, size)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		separator, err := reader.ReadByte()
+		if err != nil || separator != '\n' {
+			return fmt.Errorf("invalid Git blob separator")
+		}
+	}
+	return nil
 }
 
 func (r *Runner) comparisonUnavailable(rule, message string) {
@@ -169,6 +233,7 @@ func runChange(r *Runner) int {
 	}
 	defer os.RemoveAll(root)
 	baseline := *r
+	baseline.outputMode = "json"
 	baseline.root = root
 	baseline.snapshot = nil
 	baseline.result = newRunResult("baseline")

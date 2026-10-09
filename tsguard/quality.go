@@ -32,7 +32,7 @@ func hasLintConfig(root string) bool {
 }
 
 func runTypedLint(r *Runner) int {
-	return r.runOwnedAnalysis("typed-lint", typedLintAnalyzer, false, nil)
+	return r.runOwnedAnalysis("typed-lint", typedLintAnalyzer, false, map[string]any{"excludeTests": r.ftaExcludeTests})
 }
 
 func (r *Runner) runOwnedAnalysis(gate, source string, advisory bool, extra map[string]any) int {
@@ -62,7 +62,16 @@ func (r *Runner) runOwnedAnalysis(gate, source string, advisory bool, extra map[
 		}
 	}
 	if !r.machine() {
-		r.printf("  %s: %d findings (use --output json for complete evidence)\n", gate, len(r.result.Findings))
+		count := 0
+		for _, f := range r.result.Findings {
+			if f.Gate == gate {
+				count++
+				if count <= 10 {
+					r.printf("  [%s] %s: %s\n", f.Status, f.Rule, f.Evidence)
+				}
+			}
+		}
+		r.printf("  %s: %d findings (use --output json for complete evidence)\n", gate, count)
 	}
 	if failed && !advisory {
 		return 1

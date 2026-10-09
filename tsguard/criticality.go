@@ -83,7 +83,7 @@ func runCriticality(r *Runner) int {
 	// neither audit nor this command adds a blocking quality threshold.
 	analyzer := *r
 	analyzer.outputMode = "json" // complete graph decoding also for the human report
-	res := analyzer.RunTool(toolSpec{gate: "criticality", adapter: "criticality", advisory: true}, "criticality", node, "-e", criticalityAnalyzer, string(input))
+	res := analyzer.RunTool(toolSpec{gate: "criticality", adapter: "criticality", advisory: true}, "criticality", node, "-e", compilerProject+"\n"+criticalityAnalyzer, string(input))
 	if !r.machine() {
 		if res.ok && len(r.result.Artifacts) > 0 && r.result.Artifacts[len(r.result.Artifacts)-1].Kind == "criticality" {
 			r.println("  [OK]   criticality (CRITICALITY.md)")

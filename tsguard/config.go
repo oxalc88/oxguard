@@ -17,7 +17,7 @@ var defaultDirs = []string{"."}
 
 // defaultExcludes are always applied to every gate.
 var defaultExcludes = []string{
-	"node_modules", "dist", ".next", "build", "coverage",
+	"node_modules", ".git", "dist", ".next", "build", "coverage",
 	".agents", ".claude", ".opencode", ".kiro", "skills",
 }
 

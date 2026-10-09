@@ -179,11 +179,9 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 	if cfg.output != "human" {
 		switch cmd {
 		case "check":
-			result.Plan("maintainability", "change")
-			result.Plan("lint", "fta", "types", "coverage", "secrets", "dependencies", "security")
-			if !hasLintConfig(root) {
-				result.Plan("typed-lint")
-			}
+			result.Plan("lint", "fta", "types")
+			result.Plan("typed-lint")
+			result.Plan("coverage", "secrets", "dependencies", "security", "maintainability", "duplicates", "change")
 		case "security":
 			result.Plan("secrets", "dependencies", "security")
 		case "audit":

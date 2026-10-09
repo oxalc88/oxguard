@@ -1,34 +1,36 @@
 package main
 
 import (
-	"archive/tar"
-	"bytes"
+	"bufio"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-func TestBaselineArchiveDoesNotWriteEscapesOrLinks(t *testing.T) {
+func TestBaselinePathsAndBlobLimits(t *testing.T) {
 	for _, name := range []string{"../escape.ts", "/escape.ts", `..\escape.ts`} {
-		var b bytes.Buffer
-		w := tar.NewWriter(&b)
-		w.WriteHeader(&tar.Header{Name: name, Mode: 0600, Size: 1})
-		w.Write([]byte("x"))
-		w.Close()
-		if err := exportBaseline(&b, t.TempDir()); err == nil {
-			t.Fatal("unsafe archive accepted", name)
+		if _, _, err := baselinePath(name); err == nil {
+			t.Fatal("unsafe path accepted", name)
 		}
 	}
-	var b bytes.Buffer
-	w := tar.NewWriter(&b)
-	w.WriteHeader(&tar.Header{Name: "linked.ts", Typeflag: tar.TypeSymlink, Linkname: "/tmp/escape"})
-	w.Close()
+	for _, name := range []string{"node_modules/dependency.ts", ".git/config", "data.png"} {
+		if _, selected, err := baselinePath(name); err != nil || selected {
+			t.Fatal("unwanted input selected", name)
+		}
+	}
 	root := t.TempDir()
-	if err := exportBaseline(&b, root); err != nil {
+	reader := bufio.NewReader(strings.NewReader("abc blob 3\nxyz\n"))
+	if err := copyBaselineBlobs(reader, root, []baselineBlob{{"source.ts", "abc"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Lstat(filepath.Join(root, "linked.ts")); !os.IsNotExist(err) {
-		t.Fatal("symlink written")
+	data, err := os.ReadFile(filepath.Join(root, "source.ts"))
+	if err != nil || string(data) != "xyz" {
+		t.Fatal(string(data), err)
+	}
+	reader = bufio.NewReader(strings.NewReader("abc blob 8388609\n"))
+	if err := copyBaselineBlobs(reader, root, []baselineBlob{{"large.ts", "abc"}}); err == nil {
+		t.Fatal("large blob accepted")
 	}
 }
 

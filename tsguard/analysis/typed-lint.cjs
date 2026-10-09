@@ -11,6 +11,7 @@ emitAnalysis(async input => {
     '@typescript-eslint/no-unsafe-member-access': 'error',
     '@typescript-eslint/no-unsafe-return': 'error',
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+    '@typescript-eslint/no-unsafe-type-assertion': 'error',
   };
   // This rule requires strictNullChecks. Never bypass that prerequisite.
   const strictNullChecks = options.strictNullChecks ?? options.strict ?? false;
