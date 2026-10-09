@@ -73,15 +73,33 @@
       "tsguard": "change.cognitive_suppression_is_partial",
       "pyguard": null,
       "python_candidate": "Explicit unsupported/suppressed measurement controls"
-    }
-  ],
-  "deferred_tsguard_capabilities": [
+    },
     {
       "id": "quality.compiler_unsafe_operations",
-      "status": "not_implemented",
-      "reason": "Compiler-aware unsafe-operation and unnecessary-condition lint is deferred to keep the default Ultracite/Biome path free of an ESLint engine. TypeScript compilation does not provide these lint checks."
+      "tsguard": "typed.unsafe_assertion_condition_and_promises",
+      "pyguard": null,
+      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+    },
+    {
+      "id": "quality.discarded_failures",
+      "tsguard": "smells.discarded_settled_rejection",
+      "pyguard": null,
+      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+    },
+    {
+      "id": "quality.complexity_context",
+      "tsguard": "complexity.fta_failure_has_context",
+      "pyguard": null,
+      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+    },
+    {
+      "id": "maintainability.async_delegation",
+      "tsguard": "smells.async_forwarding_and_boundary_controls",
+      "pyguard": null,
+      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
     }
   ],
+  "deferred_tsguard_capabilities": [],
   "required_tsguard_cases": [
     "baseline.no_config",
     "baseline.single_linter",
@@ -110,7 +128,18 @@
     "change.native_function_complexity_and_move_control",
     "change.cognitive_suppression_is_partial",
     "change.large_graph_input_and_generated_scope",
-    "change.project_compiler_consistency"
+    "change.project_compiler_consistency",
+    "typed.unsafe_assertion_condition_and_promises",
+    "typed.valid_guards_and_handled_promises",
+    "typed.unresolved_types_are_partial",
+    "typed.unsupported_config_and_stale_report",
+    "smells.silent_exits_and_promise_recovery_controls",
+    "smells.discarded_settled_rejection",
+    "smells.settled_recorded_and_propagated_controls",
+    "smells.branch_specific_failure_visibility",
+    "smells.async_forwarding_and_boundary_controls",
+    "complexity.function_nesting_and_callback_boundaries",
+    "complexity.fta_failure_has_context"
   ],
   "levels": {
     "code": [
@@ -119,7 +148,17 @@
       "baseline.empty_catch",
       "baseline.project_overrides_preserved",
       "baseline.external_policy_preserved",
-      "duplicates.repeated_validation"
+      "duplicates.repeated_validation",
+      "typed.unsafe_assertion_condition_and_promises",
+      "typed.valid_guards_and_handled_promises",
+      "typed.unresolved_types_are_partial",
+      "typed.unsupported_config_and_stale_report",
+      "smells.silent_exits_and_promise_recovery_controls",
+      "smells.discarded_settled_rejection",
+      "smells.settled_recorded_and_propagated_controls",
+      "smells.branch_specific_failure_visibility",
+      "complexity.function_nesting_and_callback_boundaries",
+      "complexity.fta_failure_has_context"
     ],
     "structure": [
       "smells.resolved_chain",
@@ -132,7 +171,8 @@
       "structure.unresolved_is_partial",
       "structure.scope_and_generated_exclusions",
       "structure.function_graph",
-      "structure.coupling"
+      "structure.coupling",
+      "smells.async_forwarding_and_boundary_controls"
     ],
     "change": [
       "change.absent_baseline",

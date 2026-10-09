@@ -290,7 +290,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const completeCheck = structured(['check']);
   assert.ok(['pass', 'advisory'].includes(completeCheck.status));
   assert.equal(completeCheck.assessment, 'incomplete'); // optional baseline is absent
-  assert.deepEqual(completeCheck.gates.map(g => g.name), ['lint', 'fta', 'types', 'coverage', 'secrets', 'dependencies', 'security', 'maintainability', 'duplicates', 'change']);
+  assert.deepEqual(completeCheck.gates.map(g => g.name), ['lint', 'fta', 'types', 'typed-lint', 'coverage', 'secrets', 'dependencies', 'security', 'maintainability', 'duplicates', 'change']);
   assert.ok(completeCheck.gates.filter(g => g.name !== 'change').every(g => g.normalization === 'complete' && ['passed', 'advisory'].includes(g.status)));
   assert.equal(completeCheck.gates.find(g => g.name === 'change').status, 'not_run');
   assert.equal(completeCheck.measurements.filter(m => m.metric.startsWith('coverage.') && m.location.file === '').length, 4);

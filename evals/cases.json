@@ -551,6 +551,11 @@
             "name": "change",
             "status": "not_run",
             "normalization": "not_run"
+          },
+          {
+            "name": "typed-lint",
+            "status": "not_run",
+            "normalization": "not_run"
           }
         ]
       },

@@ -40,9 +40,10 @@ function evaluate({ execute, structured, root }) {
       assert.equal(fs.existsSync(path.join(root, 'tsconfig.json')), false);
     });
     run('baseline.single_linter', () => {
-      const removed = structured(args('typed-lint', unsafe), 3);
-      assert.equal(removed.status, 'error');
-      assert.equal(removed.findings[0].category, 'invalid_configuration');
+      const typed = structured(args('typed-lint', unsafe), 1);
+      assert.ok(rules(typed).includes('typescript/no-unsafe-assignment'));
+      const artifact = JSON.parse(fs.readFileSync(path.join(root,typed.artifacts.find(a=>a.kind==='typed_lint_native').path)));
+      assert.equal(artifact.native.number_of_rules,5);
       // Compilation of JSON.parse into number is not proof of safe assignment.
       const result = structured(args('types', unsafe));
       assert.equal(result.status, 'pass');
@@ -73,6 +74,7 @@ function evaluate({ execute, structured, root }) {
         assert.equal(fs.readFileSync(path.join(root,'eslint.config.mjs'),'utf8'),custom);
       } finally {fs.rmSync(path.join(root,'eslint.config.mjs'));}
     });
+    require('./review-gaps.cjs').evaluate({source,run,structured,root,args});
     const chain = source('chain', {
       'real.ts': 'export function real(x: number): number { return x * 2; }\n',
       'c.ts': 'import { real } from "./real"; export function c(x: number): number { return real(x); }\n',
@@ -314,7 +316,7 @@ function evaluate({ execute, structured, root }) {
       assert.equal(artifact.baseline_structure.compiler_version,'5.9.3-eval-current');
       assert.equal(artifact.candidate_structure.compiler_version,'5.9.3-eval-current');
     });
-    return { schema_version: '1', suite: 'maintainability.installed', evaluator_sha256: crypto.createHash('sha256').update(fs.readFileSync(__filename)).digest('hex'), environment: {platform:process.platform,arch:process.arch,node:process.version}, cases, passed: cases.length,
+    return { schema_version: '1', suite: 'maintainability.installed', evaluator_sha256: crypto.createHash('sha256').update(fs.readFileSync(__filename)).update(fs.readFileSync(path.join(__dirname,'review-gaps.cjs'))).digest('hex'), environment: {platform:process.platform,arch:process.arch,node:process.version}, cases, passed: cases.length,
       duration_ms: timings.reduce((a,b) => a+b, 0), python_parity: 'not implemented for new Level 2/3 capabilities; existing Level 1 is unchanged' };
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 }

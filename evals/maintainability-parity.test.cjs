@@ -13,7 +13,7 @@ test('deferred Python capabilities do not block the selected Tsguard scope', () 
   assert.deepEqual(Object.keys(result.levels),['code','structure','change']);
   assert.ok(Object.values(result.levels).every(level=>level.implemented&&level.native_evals_passed));
   assert.equal(Object.hasOwn(result,'release_ready'),false);
-  assert.equal(result.deferred_tsguard_capabilities[0].status,'not_implemented');
+  assert.deepEqual(result.deferred_tsguard_capabilities,[]);
   assert.ok(result.capabilities.every(c=>c.pyguard==='not_evaluated'));
 });
 test('a failing native case prevents Tsguard readiness', () => {
