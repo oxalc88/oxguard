@@ -56,9 +56,9 @@ exclude-tests = false          # re-enable complexity gating on test files
 exclude = ["*/fixtures/*"]     # add project-specific patterns (e.g. fixtures, stubs)
 ```
 
-pyguard ships Python helper scripts (in `pyguard/analysis/`) that are invoked at
-runtime. `pyguard setup` deploys them automatically to the consuming project's
-`tools/analysis/` directory.
+pyguard embeds Python helper scripts (from `pyguard/analysis/`) in its binary
+and executes private temporary copies. `pyguard setup` also deploys reference
+copies to the project's `tools/analysis/`; these are not executed during checks.
 
 ### `tsguard` — TypeScript quality gate
 
@@ -134,17 +134,21 @@ since it discovers and runs unittest tests natively.
 
 The security gate requires **no Python or global installs**. In npm installations,
 tools are owned by `@oxguard/tsguard` and Opengrep ships in its native package.
-Standalone `tsguard setup` uses the project's own stores:
+Standalone `tsguard setup` installs project dependencies and a verified SAST engine:
 
 - **Secrets** (`secretlint`): added as a npm devDependency by `tsguard setup` → lives in `node_modules`.
 - **CVEs** (PM-native `audit` + `audit-ci`): also npm devDependencies.
 - **SAST** (Opengrep): `tsguard setup` downloads a self-contained binary
-  (~50 MB) into `node_modules/.cache/oxguard/opengrep` — no `pip`, no `uv`, no global writes.
-  The binary bundles its own runtime (Nuitka-compiled). If the binary is absent when
-  `tsguard check` runs, the gate prints `[SKIP]` and continues — run `tsguard setup` to
-  download it.
+  (~50 MB) into the OS user cache under `oxguard/opengrep/<version>/<os>-<arch>/`,
+  outside the scanned project, and verifies its pinned SHA-256 digest before execution.
+  The binary bundles its own runtime (Nuitka-compiled). A missing or untrusted engine
+  blocks security checks; run `tsguard setup` to install or repair it. npm installations
+  use their package-owned engine; reinstall with optional dependencies if it is missing.
 
 ## Install
+
+Maintainers: see [Publishing oxguard](docs/guides/releases.md) for release tags,
+publication checks and recovery from failed releases.
 
 TypeScript projects can install the complete Go-powered toolchain through npm
 (Node.js 22.12+ on the 22.x line, 24.x, or 26+):

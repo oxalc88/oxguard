@@ -15,7 +15,7 @@ Verify `command -v pyguard`. If missing, explain that execution is blocked and o
 
 Run from the project or pass `--root /absolute/project/path` containing `pyproject.toml`. Preserve requested `--dirs`, timeout and exclusions. Targets are relative to the project root. Most commands default to that root; criticality retains `functions`/`cdk` unless `--dirs` is explicit. Project settings come from `[tool.pyguard]` in `pyproject.toml`. Conventional test-file exclusions affect the owned complexity helpers and Radon; they do not disable Ruff or coverage.
 
-If an owned helper is missing or incompatible, report the execution failure and suggest an explicitly authorized `pyguard setup` to deploy updated `tools/analysis` scripts. Do not overwrite project helpers without authorization.
+Owned Python helpers execute from private temporary copies embedded in the installed binary. Project-local `tools/analysis` files are reference copies; changing or redeploying them does not change runtime helpers. For missing or incompatible bundled helpers, report the execution failure and update or reinstall a compatible PyGuard binary when authorized. Use `pyguard setup` for project dependencies, the secrets baseline and optional reference copies.
 
 ## Run the bounded contract
 

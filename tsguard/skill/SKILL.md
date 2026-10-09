@@ -30,6 +30,8 @@ Use the command the user requested. Otherwise default to `check`:
 
 Keep requested scope and thresholds. Supported flags include `--root`, `--dirs <d1,d2>`, `--exclude <d1,d2>`, `--timeout <seconds>` and `--max-fta-score <n>`. CLI overrides root `oxguard.toml`, then defaults apply. Unknown flags, missing values and invalid output modes are errors. Agent/JSON modes accept captured stdout without `--allow-pipe`. Help, version, doctor, setup and hooks retain human output; do not give them `--output agent/json`.
 
+Opengrep is required for the security gate. A missing or untrusted engine is an execution failure, not a passing or skipped security assessment. npm installations use the package-owned engine; reinstall with optional dependencies if it is missing. Standalone installations verify a pinned SHA-256 digest and use the OS user cache outside the scanned project; authorized `tsguard setup` installs or repairs that engine.
+
 ## Consume findings completely
 
 Use `--output agent` for the first bounded view. It shows the total count and at most ten findings. **If `omitted: N (use --output json)` appears, retrieve JSON with the same command, root, scope and thresholds before claiming that all findings have been reviewed or addressed.** The summary cannot describe omitted findings. A rerun produces a new result, so keep source/configuration unchanged during retrieval.

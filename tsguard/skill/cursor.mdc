@@ -16,3 +16,5 @@ When the summary reports omitted findings or incomplete assessment, retrieve JSO
 - `tsguard setup`    — npm distribution: verify bundled tools and configure hooks; standalone: install deps and download Opengrep; run when setup is authorized
 
 **Config:** scan the project root (`.`) by default. `oxguard.toml` sets dirs, excludes and thresholds; CLI overrides take precedence. Use `--root` for an explicit project and preserve requested scope.
+
+Missing or untrusted Opengrep blocks security checks. Standalone setup installs a pinned, verified engine in the OS user cache outside the project; npm installations use the package-owned engine.

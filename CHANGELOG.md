@@ -3,6 +3,28 @@
 All notable changes to oxguard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.2] — 2026-10-09
+
+### Fixed
+
+- Release validation now reads the requested tag from the dispatch input or
+  pushed ref before propagating the verified tag and commit to downstream jobs.
+  The `v0.7.1` attempt failed before publishing any release or npm packages.
+- Standalone Tsguard verifies pinned Opengrep binaries in the OS user cache
+  outside the scanned project. Missing or untrusted SAST engines block checks.
+- PyGuard executes embedded analysis helpers from private temporary copies
+  instead of trusting project-local `tools/analysis` files. Secrets scanning
+  receives the requested directory scope.
+- Generated agent hooks and skills stay inside the selected project and use
+  trusted command references.
+- Bundled agent skills and installation documentation describe the hardened
+  engine and helper behavior.
+
+### Removed
+
+- Obsolete Kiro hook generators and agent templates. Supported integrations
+  remain documented in the README.
+
 ## [0.5.2] — 2026-06-30
 
 ### Changed

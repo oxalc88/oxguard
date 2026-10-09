@@ -13,6 +13,6 @@ When the summary reports omitted findings or incomplete assessment, retrieve `py
 - `pyguard check`    — full gate: ruff → mypy → radon → types → coverage → security
 - `pyguard fix`      — auto-format (ruff fix)
 - `pyguard security` — Bandit → pip-audit → detect-secrets, fail-fast
-- `pyguard setup`    — install dev deps via uv and deploy updated analysis helpers; run when setup is authorized
+- `pyguard setup`    — install dev deps via uv and deploy reference helper copies; runtime helpers are embedded in the binary; run when setup is authorized
 
 **Defaults:** scan the project root (`.`), with settings from `[tool.pyguard]` in `pyproject.toml`. Criticality alone retains `functions,cdk` unless `--dirs` is explicit. Use `--root` for an explicit project and preserve requested scope.

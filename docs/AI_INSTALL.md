@@ -39,7 +39,8 @@ Follow these steps exactly, stopping and reporting if any step fails:
      tsguard setup --yes
 
    Setup adds any missing devDependencies to package.json, runs npm install,
-   and downloads the Opengrep SAST binary into node_modules/.cache/oxguard/.
+   and downloads the verified Opengrep SAST binary into the OS user cache,
+   outside the scanned project.
    Setup is idempotent — safe to re-run on an existing project.
    Commit the package.json diff afterward.
 
@@ -55,8 +56,9 @@ Follow these steps exactly, stopping and reporting if any step fails:
      .next, build, coverage, and AI tool dirs (.claude, .opencode, .kiro, .agents)
      are always excluded. If you need to restrict to specific subdirectories,
      pass --dirs src,lib. To add more exclusions, pass --exclude extra,dirs.
-   - If the SAST gate prints [SKIP], the Opengrep binary was not downloaded yet —
-     that is not a failure. Run `tsguard setup` again to fetch it, then re-run check.
+   - A missing or untrusted Opengrep engine blocks the SAST gate. Run
+     `tsguard setup` again to repair it, then re-run check. For npm installations,
+     reinstall @oxguard/tsguard with optional dependencies if its engine is missing.
    - You can persist custom dirs/excludes/thresholds in an oxguard.toml file at the
      project root instead of passing CLI flags every time. CLI flags always win.
 
@@ -89,12 +91,13 @@ Follow these steps exactly, stopping and reporting if any step fails:
 
    Setup will:
    - Add missing dev-group packages to pyproject.toml and run uv sync
-   - Deploy analysis helper scripts to tools/analysis/ (commit these — pyguard
-     invokes them at runtime; they must live in the project repo)
+   - Deploy reference analysis helper scripts to tools/analysis/; runtime checks
+     execute private copies embedded in the installed binary instead
    - Create .secrets.baseline
 
    Setup is idempotent — safe to re-run on an existing project.
-   Commit the pyproject.toml diff and the new tools/analysis/ files afterward.
+   Commit the pyproject.toml diff. Commit tools/analysis/ reference copies only
+   if the project maintains them.
 
 4. Run the doctor and show me the full output:
      pyguard doctor
@@ -163,8 +166,8 @@ Behavior notes:
 - tsguard scans from the project root (.) by default. node_modules, dist, .next,
   build, coverage, and AI tool dirs (.claude, .opencode, .kiro, .agents) are always
   excluded. Pass --dirs src,lib to restrict to specific subdirectories.
-- If the SAST gate prints [SKIP] after update, the Opengrep binary download failed
-  (e.g. offline). Run `tsguard setup` again when network is available.
+- A missing or untrusted Opengrep engine blocks the security gate. Run
+  `tsguard setup` again when network is available to install or repair it.
 
 Report the new version and any changes to the doctor output.
 ```
@@ -180,7 +183,8 @@ pyguard is already installed on this project. Update to the latest version:
 2. Re-run setup to sync dev dependencies and redeploy analysis helper scripts:
      pyguard setup --yes
    (setup is idempotent — only adds what is missing, never removes existing config)
-   If setup updates files in tools/analysis/, commit those changes alongside pyproject.toml.
+   Commit pyproject.toml changes. If the project maintains tools/analysis/
+   reference copies, commit their updates too; they are not runtime helpers.
 
 3. Run doctor to confirm everything is healthy:
      pyguard doctor
@@ -203,13 +207,15 @@ Report the new version and any changes to the doctor output.
 
 - **setup is idempotent** — it adds only what's missing. Re-running it on an
   existing project is safe and produces no diff if everything is already in place.
-- **Opengrep SAST binary** — `tsguard setup` downloads a self-contained binary
-  (~50 MB) into `node_modules/.cache/oxguard/opengrep`. No Python, no pip, no
-  global writes. If the binary is absent when `tsguard check` runs, the SAST gate
-  prints `[SKIP]` and continues — run `tsguard setup` to download it.
-- **pyguard's analysis scripts** (`tools/analysis/*.py`) should be committed to
-  your project repo alongside pyproject.toml — they are runtime helpers that
-  pyguard invokes during checks.
+- **Opengrep SAST binary** — standalone `tsguard setup` downloads a self-contained
+  binary (~50 MB) into the OS user cache under
+  `oxguard/opengrep/<version>/<os>-<arch>/`, outside the scanned project. Its pinned
+  SHA-256 digest is verified before execution. A missing or untrusted engine blocks
+  security checks. Run `tsguard setup` to repair standalone installations; reinstall
+  npm installations with optional dependencies to restore the package-owned engine.
+- **pyguard's analysis scripts** execute from private temporary copies embedded
+  in its binary. `tools/analysis/*.py` contains reference copies only; updating
+  those files does not change checks. Update the installed binary for runtime fixes.
 - **AI tool hooks and skills** — `tsguard setup --yes` and `pyguard setup --yes`
   skip the interactive AI tool picker (stdin is not a TTY in agent mode). To deploy
   hook configs and skill files, the user must run `tsguard hooks` / `pyguard hooks`
