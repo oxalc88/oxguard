@@ -218,7 +218,18 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const rules = path.join(consumer, 'node_modules/.cache/oxguard/rules');
   fs.mkdirSync(rules, { recursive: true });
   fs.writeFileSync(path.join(rules, 'test.yaml'), 'rules:\n  - id: tsguard-test-eval\n    languages: [typescript, javascript]\n    message: Avoid eval\n    severity: ERROR\n    pattern: eval($X)\n');
-  assert.match(execute(['check']).stdout, /All checks passed/);
+  try {
+    assert.match(execute(['check']).stdout, /All checks passed/);
+  } catch (error) {
+    if (process.platform === 'win32') {
+      const engine = path.join(nativeDirectory, 'bin', 'opengrep.exe');
+      const diagnostic = spawnSync(engine, ['scan', '--debug', '--disable-version-check', '--jobs', '1', '--config', rules, '--error', '--exclude', 'node_modules', '.'], {
+        cwd: consumer, encoding: 'utf8', timeout: 45000,
+      });
+      console.error(`Opengrep diagnostic (${engine.length} character path): ${engine}\nstatus=${diagnostic.status} error=${diagnostic.error}\n${diagnostic.stdout}\n${diagnostic.stderr}`);
+    }
+    throw error;
+  }
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const unsafe = eval("1+1");\n');
   assert.match(execute(['security'], 1).stdout, /\[FAIL\].*opengrep SAST/);
   assert.equal(fs.readFileSync(path.join(consumer, 'package.json'), 'utf8'), packageBefore);
