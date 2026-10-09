@@ -2,6 +2,8 @@
   "ultracite": "7.12.0",
   "@biomejs/biome": "2.5.14",
   "typescript": "5.9.3",
+  "oxlint": "1.87.0",
+  "oxlint-tsgolint": "7.0.2003",
   "vitest": "5.0.2",
   "@vitest/coverage-v8": "5.0.2",
   "vite": "8.3.1",

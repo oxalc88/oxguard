@@ -26,6 +26,7 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 		{"lint", func() int { return runLint(r) }},
 		{"fta", func() int { return runFTA(r, dirs, ftaCap) }},
 		{"types", func() int { return runTypes(r) }},
+		{"typed-lint", func() int { return runTypedLint(r) }},
 		{"coverage", func() int { return runCoverage(r) }},
 		{"security", func() int { return runSecurity(r, false) }},
 	}

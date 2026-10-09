@@ -36,7 +36,7 @@ function loadProject(input) {
     if (!fs.existsSync(full)) throw Object.assign(new Error(`Missing source scope: ${dir}`), { category: 'invalid_configuration' });
     collect(full);
   }
-  let options = { strict: true, allowJs: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, noEmit: true, jsx: ts.JsxEmit.Preserve };
+  let options = { strict: true, skipLibCheck: true, allowJs: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, noEmit: true, jsx: ts.JsxEmit.Preserve };
   const configFile = path.join(root, 'tsconfig.json').replaceAll('\\', '/');
   if (fs.existsSync(configFile)) {
     const config = ts.readConfigFile(configFile, ts.sys.readFile);
