@@ -195,3 +195,7 @@ do not blindly rerun publication of already published versions.
 
 Nothing has been published by this implementation work. The repository currently
 has no LICENSE file; packaging does not invent a license declaration.
+
+## Native semantic lint
+
+The package pins Oxlint and oxlint-tsgolint for the separate typed-lint gate. Platform binaries resolve through the backend package's own dependency graph, including pnpm isolation; no project or global executable is substituted. Biome owns ordinary syntax/format policy. TypeScript 7 backend limits and native assessment artifacts are documented in [maintainability](../maintainability.md). Missing optional platform engines require reinstalling with optional dependencies.

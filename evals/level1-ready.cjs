@@ -35,8 +35,8 @@ function assess(ts, behavior, python) {
 		level1_agent_contract_ready: ready,
 		shared_capabilities_ready: shared.shared_capabilities_ready,
 		agent_actions: agents,
-		level2_remaining: "not implemented",
-		level3: "not implemented",
+		level2_remaining: "Tsguard static module graph and advisory delegation are implemented; new PyGuard structural parity is not evaluated by this Level 1 report",
+		level3: "Tsguard inert Git source comparisons are implemented; change-quality and new Python parity require the separate maintainability eval report",
 		scope:
 			"Current default Level 1 analyzers and documented adapters; unsupported backends remain explicitly partial. Readiness does not claim complete upstream report reproduction or production precision.",
 	};

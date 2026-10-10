@@ -6,7 +6,7 @@ const path = require('node:path');
 const { createRequire } = require('node:module');
 const { spawnSync } = require('node:child_process');
 const tools = {
-  ultracite: 'ultracite', biome: '@biomejs/biome', tsc: 'typescript',
+  oxlint: 'oxlint', ultracite: 'ultracite', biome: '@biomejs/biome', tsc: 'typescript',
   vitest: 'vitest', fta: 'fta-cli', knip: 'knip', jscpd: 'jscpd',
   secretlint: 'secretlint', 'audit-ci': 'audit-ci',
 };

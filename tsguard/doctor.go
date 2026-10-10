@@ -46,6 +46,7 @@ func runDoctor(root, pm string) int {
 		{"vitest", "vitest"},
 		{lintDoctorTool(), lintDoctorTool()},
 		{"fta", "fta"},
+		{"oxlint", "oxlint"},
 	} {
 		out, _, err := RunSilent(root, pkgExec(pm, tool.cmd, "--version")...)
 		if err != nil {
@@ -80,7 +81,7 @@ func runDoctor(root, pm string) int {
 			fmt.Println("  [FAIL] audit-ci — missing from packaged toolchain")
 			failures++
 		}
-		for _, module := range []string{"@vitest/coverage-v8", "@secretlint/secretlint-rule-preset-recommend", "ultracite/biome/core"} {
+		for _, module := range []string{"@vitest/coverage-v8", "@secretlint/secretlint-rule-preset-recommend", "ultracite/biome/core", "oxlint-tsgolint/package.json"} {
 			if _, err := runtimeModule(root, module); err != nil {
 				fmt.Printf("  [FAIL] %s — missing from packaged toolchain\n", module)
 				failures++

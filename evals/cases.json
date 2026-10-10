@@ -535,6 +535,28 @@
             "status": "not_run",
             "normalization": "not_run"
           }
+        ],
+        "additional_gates": [
+          {
+            "name": "maintainability",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "duplicates",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "change",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "typed-lint",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
         ]
       },
       "detection": true,

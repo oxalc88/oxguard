@@ -1,0 +1,190 @@
+{
+  "version": 1,
+  "scope": "Tsguard v0.8 code, structure and change implementation; Python maintainability parity is deferred independently",
+  "capabilities": [
+    {
+      "id": "quality.zero_config_exception_handling",
+      "tsguard": "baseline.empty_catch",
+      "pyguard": null,
+      "python_candidate": "Ruff S110/B012 with explicit project-policy resolution"
+    },
+    {
+      "id": "maintainability.delegation",
+      "tsguard": "smells.resolved_chain",
+      "pyguard": null,
+      "python_candidate": "Python ast with resolved local callable identities"
+    },
+    {
+      "id": "maintainability.failure_policies",
+      "tsguard": "smells.failure_policy_controls",
+      "pyguard": null,
+      "python_candidate": "Ruff plus Python ast for short identical handlers"
+    },
+    {
+      "id": "structure.runtime_graph",
+      "tsguard": "structure.runtime_cycle",
+      "pyguard": null,
+      "python_candidate": "Extend existing pyan3/NetworkX infrastructure with module imports and SCCs"
+    },
+    {
+      "id": "structure.false_positive_controls",
+      "tsguard": "structure.type_only_cycle_control",
+      "pyguard": null,
+      "python_candidate": "Python-specific TYPE_CHECKING and deferred-import controls"
+    },
+    {
+      "id": "change.complexity_displacement",
+      "tsguard": "change.artificial_split_and_inert_baseline",
+      "pyguard": null,
+      "python_candidate": "Inert Git sources, ast/Radon facts and baseline comparison"
+    },
+    {
+      "id": "change.false_positive_controls",
+      "tsguard": "change.real_simplification_control",
+      "pyguard": null,
+      "python_candidate": "Python-specific equivalent-behavior refactor fixtures"
+    },
+    {
+      "id": "structure.function_graph",
+      "tsguard": "structure.function_graph",
+      "pyguard": null,
+      "python_candidate": "Extend existing pyan3 caller graph with fan-out and SCC call depth"
+    },
+    {
+      "id": "structure.coupling",
+      "tsguard": "structure.coupling",
+      "pyguard": null,
+      "python_candidate": "Module fan-in/out and coupling observations"
+    },
+    {
+      "id": "change.native_duplication",
+      "tsguard": "change.native_duplication_and_move_control",
+      "pyguard": null,
+      "python_candidate": "Native clone measurements over inert Python sources"
+    },
+    {
+      "id": "change.function_complexity",
+      "tsguard": "change.native_function_complexity_and_move_control",
+      "pyguard": null,
+      "python_candidate": "Radon function complexity and conservative identity matching"
+    },
+    {
+      "id": "change.truthful_completeness",
+      "tsguard": "change.cognitive_suppression_is_partial",
+      "pyguard": null,
+      "python_candidate": "Explicit unsupported/suppressed measurement controls"
+    },
+    {
+      "id": "quality.compiler_unsafe_operations",
+      "tsguard": "typed.unsafe_assertion_condition_and_promises",
+      "pyguard": null,
+      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+    },
+    {
+      "id": "quality.discarded_failures",
+      "tsguard": "smells.discarded_settled_rejection",
+      "pyguard": null,
+      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+    },
+    {
+      "id": "quality.complexity_context",
+      "tsguard": "complexity.fta_failure_has_context",
+      "pyguard": null,
+      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+    },
+    {
+      "id": "maintainability.async_delegation",
+      "tsguard": "smells.async_forwarding_and_boundary_controls",
+      "pyguard": null,
+      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+    }
+  ],
+  "deferred_tsguard_capabilities": [],
+  "required_tsguard_cases": [
+    "baseline.no_config",
+    "baseline.single_linter",
+    "baseline.empty_catch",
+    "baseline.project_overrides_preserved",
+    "baseline.external_policy_preserved",
+    "smells.resolved_chain",
+    "contract.deterministic_and_bounded",
+    "smells.equivalent_simplification_control",
+    "smells.legitimate_DI_validation_and_boundary",
+    "smells.failure_policy_controls",
+    "smells.repeated_handlers",
+    "duplicates.repeated_validation",
+    "structure.runtime_cycle",
+    "structure.type_only_cycle_control",
+    "structure.unresolved_is_partial",
+    "structure.scope_and_generated_exclusions",
+    "change.absent_baseline",
+    "change.artificial_split_and_inert_baseline",
+    "change.real_simplification_control",
+    "change.unavailable_ref",
+    "change.nested_project_prefix",
+    "structure.function_graph",
+    "structure.coupling",
+    "change.native_duplication_and_move_control",
+    "change.native_function_complexity_and_move_control",
+    "change.cognitive_suppression_is_partial",
+    "change.large_graph_input_and_generated_scope",
+    "change.project_compiler_consistency",
+    "typed.unsafe_assertion_condition_and_promises",
+    "typed.valid_guards_and_handled_promises",
+    "typed.unresolved_types_are_partial",
+    "typed.unsupported_config_and_stale_report",
+    "smells.silent_exits_and_promise_recovery_controls",
+    "smells.discarded_settled_rejection",
+    "smells.settled_recorded_and_propagated_controls",
+    "smells.branch_specific_failure_visibility",
+    "smells.async_forwarding_and_boundary_controls",
+    "complexity.function_nesting_and_callback_boundaries",
+    "complexity.fta_failure_has_context"
+  ],
+  "levels": {
+    "code": [
+      "baseline.no_config",
+      "baseline.single_linter",
+      "baseline.empty_catch",
+      "baseline.project_overrides_preserved",
+      "baseline.external_policy_preserved",
+      "duplicates.repeated_validation",
+      "typed.unsafe_assertion_condition_and_promises",
+      "typed.valid_guards_and_handled_promises",
+      "typed.unresolved_types_are_partial",
+      "typed.unsupported_config_and_stale_report",
+      "smells.silent_exits_and_promise_recovery_controls",
+      "smells.discarded_settled_rejection",
+      "smells.settled_recorded_and_propagated_controls",
+      "smells.branch_specific_failure_visibility",
+      "complexity.function_nesting_and_callback_boundaries",
+      "complexity.fta_failure_has_context"
+    ],
+    "structure": [
+      "smells.resolved_chain",
+      "smells.equivalent_simplification_control",
+      "smells.legitimate_DI_validation_and_boundary",
+      "smells.failure_policy_controls",
+      "smells.repeated_handlers",
+      "structure.runtime_cycle",
+      "structure.type_only_cycle_control",
+      "structure.unresolved_is_partial",
+      "structure.scope_and_generated_exclusions",
+      "structure.function_graph",
+      "structure.coupling",
+      "smells.async_forwarding_and_boundary_controls"
+    ],
+    "change": [
+      "change.absent_baseline",
+      "change.artificial_split_and_inert_baseline",
+      "change.real_simplification_control",
+      "change.unavailable_ref",
+      "change.nested_project_prefix",
+      "change.native_duplication_and_move_control",
+      "change.native_function_complexity_and_move_control",
+      "change.cognitive_suppression_is_partial",
+      "change.large_graph_input_and_generated_scope",
+      "change.project_compiler_consistency"
+    ]
+  }
+}

@@ -23,6 +23,8 @@ var requiredNpmDevDeps = []string{
 	"ultracite",
 	"@biomejs/biome",
 	"typescript",
+	"oxlint",
+	"oxlint-tsgolint",
 	"vitest",
 	"@vitest/coverage-v8",
 	"fta-cli",
@@ -475,7 +477,7 @@ func detectPackageManager(root string) string {
 func pkgExec(pm string, args ...string) []string {
 	if packagedRuntime() != "" && len(args) > 0 {
 		switch args[0] {
-		case "biome", "tsc", "vitest", "fta", "knip", "jscpd", "secretlint", "audit-ci":
+		case "oxlint", "biome", "tsc", "vitest", "fta", "knip", "jscpd", "secretlint", "audit-ci":
 			return packagedCommand(args[0], args[1:]...)
 		}
 	}

@@ -3,6 +3,38 @@
 All notable changes to oxguard are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Versioned zero-config Tsguard lint policy using Ultracite/Biome, preserving
+  project syntax-lint and formatting policy.
+- Advisory resolved delegation/handler smells and static module graph
+  measurements, including cycles, fan-in/out, SCC depth and coupling.
+- Explicit inert Git baseline comparisons for supported complexity displacement.
+  Missing baselines remain nonblocking and not evaluated.
+- Installed maintainability regression cases and explicit new Python parity
+  gaps. Existing Level 1 checks and fail-fast behavior remain protected.
+- Native `typed-lint` using pinned Oxlint/tsgolint semantic rules only: unsafe
+  assignments/assertions and promise misuse block; unnecessary conditions are
+  advisory. Biome retains syntax lint and formatting. Unsupported TypeScript 7
+  configurations, unresolved types and scope limits remain incomplete.
+- Advisory silent catch exits, literal promise rejection fallbacks and dropped
+  rejected `allSettled` results in supported symbol-resolved `flatMap` paths.
+- Async single-return forwarding modes and per-function branch nesting/source
+  locations; structured FTA failures include first-file complexity context.
+- Review-skill guidance reads the target project's `AGENTS.md` and separates
+  analyzer findings from helper, failure-policy and logging-owner judgments.
+
+### Changed
+
+- `check` includes applicable maintainability, duplication and change
+  analysis through the existing schema-1 contract. Updated agent guidance explains
+  advisory evidence and incomplete assessments.
+- Tsguard maintainability readiness is independent of deferred new Python
+  capabilities. Its blocking order now includes typed lint after TypeScript
+  compilation; native semantic compatibility limits are documented explicitly.
+
 ## [0.7.2] — 2026-10-09
 
 ### Fixed

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // runCheck runs the full quality gate: lint (includes Ultracite/Biome complexity) → fta → types → coverage → security.
@@ -25,6 +26,7 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 		{"lint", func() int { return runLint(r) }},
 		{"fta", func() int { return runFTA(r, dirs, ftaCap) }},
 		{"types", func() int { return runTypes(r) }},
+		{"typed-lint", func() int { return runTypedLint(r) }},
 		{"coverage", func() int { return runCoverage(r) }},
 		{"security", func() int { return runSecurity(r, false) }},
 	}
@@ -36,7 +38,10 @@ func runCheck(r *Runner, dirs []string, ftaCap int) int {
 		}
 	}
 
-	r.println("\n  All checks passed.")
+	runMaintainability(r, "maintainability")
+	runDuplicates(r, dirs)
+	runChange(r)
+	r.println("\n  All blocking checks passed. Review advisory and not-evaluated results.")
 	return 0
 }
 
@@ -118,6 +123,16 @@ func runFTA(r *Runner, dirs []string, scoreCap int) int {
 		}
 		args = append(args, dir)
 		if !r.RunTool(toolSpec{gate: "fta", adapter: "fta", subject: dir, threshold: float64(scoreCap)}, "fta "+dir, args...).ok {
+			if r.machine() {
+				for _, finding := range r.result.Findings {
+					if finding.Rule == "tsguard.fta.score_exceeded" && finding.Location != nil {
+						context := *r
+						context.dirs = []string{finding.Location.File}
+						context.runOwnedAnalysis("complexity-context", maintainabilityAnalyzer, true, map[string]any{"excludeTests": r.ftaExcludeTests})
+						break
+					}
+				}
+			}
 			return 1
 		}
 	}
@@ -405,6 +420,11 @@ func runDeadCode(r *Runner) int {
 // runDuplicates runs jscpd for copy-paste code detection (informational).
 func runDuplicates(r *Runner, dirs []string) int {
 	args := append(pkgExec(r.pkgManager, "jscpd"), dirs...)
+	ignored := []string{"**/.git/**"}
+	for _, dir := range r.excludeDirs {
+		ignored = append(ignored, "**/"+dir+"/**")
+	}
+	args = append(args, "--ignore", strings.Join(ignored, ","))
 	spec := toolSpec{gate: "duplicates", advisory: true}
 	if r.machine() {
 		report, err := r.reportFile("jscpd", "jscpd-report.json")

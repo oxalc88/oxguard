@@ -17,7 +17,7 @@ var defaultDirs = []string{"."}
 
 // defaultExcludes are always applied to every gate.
 var defaultExcludes = []string{
-	"node_modules", "dist", ".next", "build", "coverage",
+	"node_modules", ".git", "dist", ".next", "build", "coverage",
 	".agents", ".claude", ".opencode", ".kiro", "skills",
 }
 
@@ -25,6 +25,7 @@ var defaultExcludes = []string{
 // CLI flags always take precedence over file config; file config takes precedence
 // over built-in defaults. The builder chooses human fallback or structured failure.
 type fileConfig struct {
+	Baseline        string   `toml:"baseline"`
 	Dirs            []string `toml:"dirs"`
 	Exclude         []string `toml:"exclude"`
 	FTAScoreCap     int      `toml:"fta-score-cap"`
@@ -65,6 +66,7 @@ func buildConfig(cli config, root string) (config, error) {
 	}
 
 	cfg := config{
+		baseline:        cli.baseline,
 		output:          cli.output,
 		root:            cli.root,
 		timeout:         300,
@@ -80,6 +82,9 @@ func buildConfig(cli config, root string) (config, error) {
 	}
 
 	// File config: dirs replace default; scalars override default.
+	if cfg.baseline == "" {
+		cfg.baseline = file.Baseline
+	}
 	if len(file.Dirs) > 0 {
 		cfg.dirs = file.Dirs
 	} else {
@@ -182,7 +187,9 @@ func writeFTAConfig(root string, excludeTests bool, extraExclude []string) (stri
 // selected project. Missing targets are left to the analyzer to report.
 func validateScanDirs(root string, dirs []string) error {
 	physicalRoot, err := filepath.EvalSymlinks(root)
-	if err != nil { return fmt.Errorf("resolve project root: %w", err) }
+	if err != nil {
+		return fmt.Errorf("resolve project root: %w", err)
+	}
 	for _, dir := range dirs {
 		if dir == "" || strings.HasPrefix(dir, "-") || filepath.IsAbs(dir) || filepath.VolumeName(dir) != "" {
 			return fmt.Errorf("unsafe scan directory %q", dir)
@@ -197,8 +204,12 @@ func validateScanDirs(root string, dirs []string) error {
 		for _, component := range strings.Split(clean, string(filepath.Separator)) {
 			walk = filepath.Join(walk, component)
 			info, err := os.Lstat(walk)
-			if os.IsNotExist(err) { break }
-			if err != nil { return fmt.Errorf("stat scan directory %q: %w", dir, err) }
+			if os.IsNotExist(err) {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("stat scan directory %q: %w", dir, err)
+			}
 			if info.Mode()&os.ModeSymlink != 0 {
 				return fmt.Errorf("scan directory contains symlink: %q", dir)
 			}

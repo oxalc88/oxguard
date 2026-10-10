@@ -51,6 +51,14 @@ test("source edits during execution repair fail the scenario", () => {
 	trace.repair_events.at(-1).source_before = "modified";
 	assert.equal(score(trace, skill).ready, false);
 });
+
+test("native change evidence and interpretation cannot be replaced by a score-only claim", () => {
+	for (const mutate of [t=>t.change_events=[],t=>t.interpretation.response.change.simplification_proven=true]) {
+		const {trace,skill} = fixture("typescript");
+		mutate(trace);
+		assert.equal(score(trace,skill).ready,false);
+	}
+});
 test("completion rejects missing native cases and passing totals with hidden failures", () => {
 	const { assess } = require("./level1-ready.cjs"),
 		ts = require("./cases.json"),

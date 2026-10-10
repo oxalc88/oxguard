@@ -159,3 +159,9 @@ a depth limit pushes toward explicit, readable data models.
 The same test-file exclusion that applies to the radon gates (`test_*.py`, `*_test.py`,
 `conftest.py`, `tests/`) also applies here — test fixtures and parametrize helpers often
 use complex type annotations by design.
+
+## Tsguard function context
+
+`function.branches` counts compiler branch constructs. `function.max_branch_nesting` measures their maximum structural nesting; callbacks start a new function boundary. `branch_locations` in the maintainability graph identifies the source paths. These are observations, not per-function FTA or cognitive scores. Structured FTA failures attach this context for the first failing file while preserving the native score/cap failure.
+
+Native Level 3 Biome cognitive measurements remain exact above 1 and bounds [0,1] below it. Compare the whole affected graph and native distributions before describing a refactor as simplification. Async forwarding mode records return versus return-await; it does not prove equivalent timing or stack behavior.
