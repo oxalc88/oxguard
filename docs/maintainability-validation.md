@@ -8,7 +8,7 @@ The current review skill was exercised by a fresh independent agent on isolated 
 
 Previous skill evidence is retained under agent-traces/history. The current capture hash matches the skill, and its observer records retain source fingerprints and actual process outcomes.
 
-Installed validation completed on 2026-10-10. npm took 255.119 s for the whole two-test integration suite; pnpm uses the reusable test store and retains the unchanged install timeout. These totals include packaging/installation and are not analyzer benchmarks. Both 39-case reports record the same evaluator hash below and `tsguard_scope_ready: true`; new Python maintainability parity remains false independently.
+Installed validation completed on 2026-10-10. npm took 255.119 s for the whole two-test integration suite; pnpm uses the reusable test store and retains the unchanged install timeout. These totals include packaging/installation and are not analyzer benchmarks. Both 39-case corpus reports record the same evaluator hash below. The installed harness separately assesses each report and asserts `tsguard_scope_ready: true`; new Python maintainability parity remains false independently.
 
 The current evaluator SHA-256 is `29b803430f0b1ed7a328399c4bf9e988e41d4a721f0a956e5d7dabb9e479160f`. Local evidence uses revision label `review-gaps-final-local`; it is not relabelled as a future commit. Native cross-builds cover linux/amd64, linux/arm64, darwin/amd64, darwin/arm64 and windows/amd64.
 
