@@ -13,7 +13,7 @@ npx tsguard change --baseline HEAD --output json
 
 | Level | Implemented behavior | Execution |
 |---|---|---|
-| 1 — Code | Ultracite/Biome lint, formatting and cognitive cap; FTA; TypeScript; coverage; secrets, dependency CVEs and SAST; unused code and duplication | Existing blocking check gates; Knip in audit; jscpd advisory in check/audit |
+| 1 — Code | Ultracite/Biome lint, formatting and cognitive cap; FTA; TypeScript; native typed lint; coverage; secrets, dependency CVEs and SAST; unused code and duplication | Existing blocking check gates; Knip in audit; jscpd advisory in check/audit |
 | 2 — Structure | Resolved function/method and runtime module graphs; caller/callee counts, criticality, fan-in/out, SCC depth/cycles, coupling; forwarding chains, fragmented forwarding modules and handler policies | Advisory maintainability in check; focused smells/structure/criticality commands |
 | 3 — Change | Explicit inert Git baseline; native file FTA/cyclomatic/Halstead distribution, per-function cognitive bounds, clone/token changes, structural/coupling/delegation deltas; conservative file/symbol matching | Advisory change in check when a baseline is available; focused change command |
 
@@ -25,20 +25,25 @@ Without a lint config, the npm distribution extends pinned Ultracite and applies
 
 Project Biome configuration, disabled rules and flat ESLint/Oxlint configurations remain authoritative. Legacy ESLint names are recognized so fallback Biome does not silently replace them; support still depends on upstream Ultracite/ESLint, and unsupported execution is an error or partial normalization. The flat ESLint path is tested but its native diagnostics are not yet normalized. Project configs are never overwritten.
 
-The default lint engine remains Biome with pinned Ultracite presets. No package-owned ESLint/typescript-eslint dependency or separate typed-lint command is added. `types` still runs the existing TypeScript compiler gate; the maintainability analyzer uses compiler facts for resolved calls and module edges.
+Biome with pinned Ultracite presets owns syntax lint and formatting. A separate `typed-lint` gate runs only five upstream compiler-aware rules through pinned Oxlint 1.87.0 / oxlint-tsgolint 7.0.2003, with all syntax categories disabled. No ESLint engine, JS lint plugin or second formatter is added. `types` and structural analysis retain the selected project TypeScript compiler.
 
-Compiler-aware unsafe-operation, unsafe narrowing-assertion and unnecessary-condition lint beyond the Biome baseline is deferred. Compilation success does not establish that coverage. The capability report lists this limitation outside the selected Tsguard release scope; it does not convert missing checks into passes.
+`check` runs lint → FTA → types → typed-lint → coverage → security, then advisory maintainability/duplication/change. Native unsafe assignments, unsafe narrowing assertions, floating promises and misused promises are blocking. Unnecessary conditions are advisory because type assumptions may differ from runtime inputs. Native defaults, including explicit `void` promise opt-out, remain upstream policy; an opt-out does not prove safe error handling.
 
-Existing explicit project ESLint/Oxlint policy is still respected through the compatibility path. Such projects must supply their own engine. The zero-config package does not install or invoke those engines alongside Biome. Node support remains 22.12+ on the 22.x line, 24.x, or 26+.
+The backend uses TypeScript 7 semantics, independently of the project compiler version. It requires strictNullChecks and resolved, compiler-valid declarations. Supported-config fixtures use the current 5.9 project/compiler path without claiming semantic equivalence to TypeScript 7. Removed options such as baseUrl, native type/configuration diagnostics, missing declarations and scopes over the portable 24000-character file-argument budget leave typed lint partial and nonblocking; missing installed engines or malformed reports are execution failures. Select a smaller scope or migrate unsupported native options deliberately. Semantic scope follows the configured directories/exclusions and existing exclude-tests default; selected files and that policy are recorded in the native artifact. No root config is overwritten and no executable Oxlint config is loaded. Native reports record tool versions, selected rules, project compiler and native diagnostics in `node_modules/.cache/oxguard/typed-lint/native.json`; stale reports are removed before each invocation.
+
+Existing explicit project ESLint/Oxlint policy is still respected through the compatibility path. Such projects must supply their own engine. The zero-config package invokes Oxlint only for the separate semantic gate, not a competing syntax/format policy. Node support remains 22.12+ on the 22.x line, 24.x, or 26+.
 
 ## Advisory rules
 
 | Rule | Evidence | False-positive boundary |
 |---|---|---|
-| LONG_DELEGATION_CHAIN | At least three resolved synchronous layers preserve positional arguments and return type | A single boundary is not flagged; methods, async boundaries, generic/default/rest/optional parameters and transformations are excluded |
+| LONG_DELEGATION_CHAIN | At least three resolved single-return sync/async layers preserve positional arguments and return type | A single boundary is not flagged; methods, generic/default/rest/optional parameters and transformations are excluded; async timing/stack boundaries remain review judgments |
 | FRAGMENTED_DELEGATION | The forwarding chain crosses at least three modules whose analyzed functions only forward | File counts alone never produce a finding; constants and other module-level responsibilities still require human review |
 | REPEATED_ERROR_HANDLER | At least three identical catch token sequences of at least 12 tokens | Identifiers/literals are preserved, so different failure policies are not equated; comments are ignored |
-| SILENT_EXCEPTION_FALLBACK | Catch body consists only of a constant/no-value return | Intentional best-effort policies remain valid; review the evidence, do not automatically change propagation or add payload logging |
+| SILENT_EXCEPTION_FALLBACK | Catch body consists only of a literal, bare-value, empty-array or no-value return | Intentional best-effort policies remain valid; review the evidence, do not automatically change propagation or add payload logging |
+| SILENT_EXCEPTION_EXIT | Catch body only continues or breaks | Recorded/propagated recovery is excluded; intentional best-effort policy remains valid |
+| SILENT_PROMISE_REJECTION | Native promise catch callback only returns a literal/empty array | Recorded or transformed recovery is excluded; advisory, not a forced rethrow |
+| DISCARDED_SETTLED_REJECTION | Native allSettled through const aliases into a flatMap block; explicit status guards expose an empty-array rejected path without a reason reference | Bounded path analysis, not arbitrary data flow or a reachability proof; reason references suppress warnings but do not prove recovery |
 | CIRCULAR_DEPENDENCY | A runtime import strongly connected component, including a self-loop | Type-only imports do not create runtime cycles |
 | HIGH_MODULE_COUPLING | At least three in-scope importers and eight in-scope runtime dependencies | Advisory review cue; counts do not establish poor cohesion |
 | POSSIBLE_COMPLEXITY_DISPLACEMENT | Per-file branch concentration or native FTA maximum decreases, total branches do not, edges increase and depth, wrappers or cycles increases | Smaller files alone do not trigger it; branch reduction is a negative control |
@@ -51,11 +56,11 @@ Existing explicit project ESLint/Oxlint policy is still respected through the co
 
 ## Structure and scope
 
-One compiler pass produces function/call facts, catch fingerprints and module edges for the new smell/structure/change path. Existing criticality reuses the compiler-input helper. There is no additional typed-lint process/compiler pass.
+One compiler pass produces function/call facts, catch fingerprints and module edges for the new smell/structure/change path. Existing criticality reuses the compiler-input helper. Typed lint has its own native semantic program plus a compatibility preflight; it is not part of the reusable graph pass.
 
 Module IDs are root-relative paths. Function IDs contain file, source position and symbol; edge IDs identify their endpoint pair. Findings retain the existing stable schema-1 IDs. IDs are deterministic for the same inputs, not rename-tracking identities across arbitrary refactors.
 
-The graph artifact is `node_modules/.cache/oxguard/maintainability-graph.json`. JSON includes fan-in/out, SCC condensation depth, cycle components, branch observations, forwarding depth, external/type-only imports and unresolved references. Module and function call depth are the longest path between SCCs, not an invented depth within a cycle. Distinct function callers/callees and recursive components are measured in regular analysis without another compiler pass. Branch observations are not FTA or cognitive scores.
+The graph artifact is `node_modules/.cache/oxguard/maintainability-graph.json`. JSON includes fan-in/out, SCC condensation depth, cycle components, branch observations, forwarding depth, external/type-only imports and unresolved references. Module and function call depth are the longest path between SCCs, not an invented depth within a cycle. Distinct function callers/callees and recursive components are measured in regular analysis without another compiler pass. Functions also include forwarding_mode, max_branch_nesting and branch_locations. Nested callbacks reset branch nesting at their own boundary. These branch observations are not FTA or cognitive scores. Structured FTA cap failures collect complexity-context for only the first failing file, retaining the original failure and not running later check gates.
 
 Source scopes and directory exclusions apply. Dependency directories, `.git`, declaration files and conventional generated files are excluded; conventional test files/directories follow the existing exclude-tests option. Dynamic nonliteral and missing local imports make graph assessment partial. External and out-of-scope dependencies are boundary counts, not inferred graph edges. CommonJS require, dynamic literal imports, re-exports and compiler path aliases are supported. Runtime dispatch, bundler-only resolution and import assertions beyond static compiler resolution are not proven.
 
@@ -79,8 +84,12 @@ Full runtime call depth, arbitrary semantic rename inference, custom branch-expr
 
 ## Evaluation and parity
 
-`evals/maintainability.cjs` runs adversarial cases through the packed installed launcher in the existing npm/pnpm platform matrix. It tests the baseline, single-linter policy, preserved project policy, valid DI/boundaries/validation, exact repeated handlers, exception propagation/recording/fallback, runtime/type-only cycles, generated exclusions, deterministic IDs, bounded agent output, artificial splits, real branch reduction, missing refs, nested projects and inert baseline scripts/export attributes. It never runs in an ordinary guard invocation.
+`evals/maintainability.cjs` and `evals/review-gaps.cjs` run adversarial cases through the packed installed launcher in the existing npm/pnpm platform matrix. It tests the baseline, Biome syntax policy plus semantic-only native rules, preserved project policy, valid DI/boundaries/validation, exact repeated handlers, exception propagation/recording/fallback, runtime/type-only cycles, generated exclusions, deterministic IDs, bounded agent output, artificial splits, real branch reduction, missing refs, nested projects and inert baseline scripts/export attributes. It never runs in an ordinary guard invocation.
 
 The existing 30 TypeScript and 37 Python Level 1 cases remain. Additional not-run gates are explicitly allowed in the historical fail-fast oracle; all original gate states/findings remain exact, and installed tests separately require the new candidate gate list. New Python capabilities are deferred independently and are not scored as passing. `maintainability-capabilities.json` lists appropriate Python providers and explicit gaps; `maintainability-parity.cjs` cannot turn those gaps into release readiness.
 
 Tsguard v0.8 readiness is assessed for the selected Ultracite/Biome maintainability scope with installed evals, retained Level 1 checks and the existing platform matrix. New Python maintainability parity is a later milestone and does not block that scope. `tsguard_scope_ready` and `pyguard_maintainability_ready` are separate report fields; a passing scope report alone does not replace platform checks or authorize publication. Broader independent repository evaluation remains a useful follow-up, not a new mandatory release ceremony.
+
+## Agent review responsibilities
+
+The bundled Tsguard skill reads the target project's applicable AGENTS.md and referenced policies. It reviews helper purpose, shared policy, recovery visibility, event ownership and whole-workflow complexity. Those judgments cite code/project policy and remain separate from native findings. The skill does not impose a new project architecture document, require every catch to rethrow, or infer duplicate runtime logs from event names alone. Read-only review can run focused smells/maintainability after fail-fast; it cannot turn unexecuted gates into passes.

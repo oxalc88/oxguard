@@ -231,3 +231,7 @@ Report the new version and any changes to the doctor output.
 - **Resuming on a project with partial setup**: the prompt is identical. Setup
   detects what's already present and only adds the gap. Review the diff before
   committing to confirm it only adds what's expected.
+
+### Tsguard review guidance
+
+The v0.8 candidate skill follows the target project's applicable AGENTS.md and referenced policies; keep those rules in that project. Review helper purpose, error recovery, logging ownership and whole-workflow complexity separately from deterministic analyzer findings. The typed-lint gate uses an owned native semantic backend with explicit TypeScript 7 compatibility limits. See [supported maintainability scope](maintainability.md).

@@ -62,7 +62,7 @@ copies to the project's `tools/analysis/`; these are not executed during checks.
 
 ### `tsguard` — TypeScript quality gate
 
-The v0.8 candidate implements three Tsguard levels: **code** (Ultracite/Biome and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
+The v0.8 candidate implements three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
 
 `tsguard/` is the CLI for TypeScript projects. Runs:
 
@@ -71,6 +71,7 @@ The v0.8 candidate implements three Tsguard levels: **code** (Ultracite/Biome an
 | Lint + format + cognitive complexity | ultracite (`ultracite/biome/core`) | Style drift, common JS/TS mistake patterns, excessive cognitive complexity |
 | Maintainability (FTA) | `fta` (from `fta-cli`) | Files too complex to maintain — catches what cyclomatic alone misses |
 | Types | tsc --noEmit | Type errors |
+| Compiler-aware lint | Oxlint/tsgolint, five semantic rules only | Unsafe assignments/assertions and promise misuse; unnecessary conditions are advisory; unsupported native configurations remain incomplete |
 | Coverage | vitest / jest / mocha+c8 / ava+c8 — 80% floor | Untested code paths |
 | Security — static | Opengrep (project-local binary, LGPL) | XSS, `eval()`, path traversal, weak crypto, injection, framework patterns — bandit-class coverage |
 | Security — CVEs | npm/pnpm/yarn audit + audit-ci | Known vulnerabilities in dependencies |
@@ -91,7 +92,8 @@ tsguard change --baseline HEAD~1 --output json  # focused native baseline compar
 tsguard fix          # auto-format (ultracite fix)
 tsguard audit        # informational: criticality + dead code + duplicates
 tsguard security     # security: secretlint + audit/audit-ci + opengrep SAST
-tsguard fta          # FTA score gate only
+tsguard typed-lint   # focused native compiler-aware lint
+tsguard fta          # FTA score gate, with function context on structured failures
 tsguard complexity   # compatibility alias: complexity is enforced by ultracite check
 ```
 

@@ -45,3 +45,10 @@ smell/module analysis to `check`. Focused commands are `maintainability`, `smell
 Project lint configurations remain authoritative. Missing optional baselines are
 not evaluated and do not fail the command. Scope and limits:
 https://github.com/oxalc88/oxguard/blob/main/docs/maintainability.md
+
+`typed-lint` provides a separate semantic-only Oxlint/tsgolint gate after `types`;
+Biome remains the syntax linter and formatter. The native backend uses TypeScript 7
+semantics. Unsupported options, unresolved types and non-strict null checking
+leave assessment incomplete; read JSON and the native artifact rather than
+claiming a pass. The review skill follows the target project's AGENTS.md and
+labels design judgments separately from analyzer findings.

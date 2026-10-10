@@ -16,7 +16,7 @@ The original evaluation below records main at the SHA above. Its historical miss
 | Agent contract | Implemented: complete JSON, bounded agent output, explicit partial/not-run/execution states, stable findings, diagnostic and graph/change artifacts |
 | Python parity | Existing code/contract/criticality retained; new structural/change parity deferred independently |
 
-Level 2/3 findings are advisory. Missing baselines remain optional and not evaluated. Static analysis does not prove behavioral equivalence, full runtime dispatch, arbitrary semantic renames or domain responsibility; single-use functions, recursion and raw file counts are not architecture violations. Compiler-backed unsafe-operation lint beyond the Biome baseline remains a disclosed limitation of the selected lint provider.
+Level 2/3 findings are advisory. Missing baselines remain optional and not evaluated. Static analysis does not prove behavioral equivalence, full runtime dispatch, arbitrary semantic renames or domain responsibility; single-use functions, recursion and raw file counts are not architecture violations. Selected compiler-aware lint now uses a separate native Oxlint/tsgolint backend, with Biome retaining syntax/format policy. TypeScript 7 compatibility, unresolved declarations and bounded failure-flow coverage are explicit limits.
 
 See [current implemented levels and boundaries](maintainability.md), [validation evidence](maintainability-validation.md) and [agent result contract](guides/tsguard-result-contract.md).
 
@@ -28,7 +28,7 @@ The Python corpus retains 15 baseline behavior passes and passes 20 parity cases
 
 ## Executive assessment
 
-**Current v0.8 implementation:** the three planned Tsguard levels are implemented as described in the status table above. Native baseline metrics and regular function graph measurements close the earlier candidate gaps. Python parity is deferred independently. The following executive assessment and detailed sections are the historical evaluation of the recorded main revision.
+**Current v0.8 implementation:** the three planned Tsguard levels are implemented as described in the status table above. Native baseline metrics, regular function graph measurements, selected native typed checks, bounded discarded-failure findings and project-aware skill review close the supported candidate gaps. Python parity is deferred independently. The following executive assessment and detailed sections are the historical evaluation of the recorded main revision.
 
 Tsguard is a useful **Level 1 code-quality gate** with a strong npm delivery path, but it is not yet an agent-native analysis engine. The Go CLI orchestrates deterministic analyzers well, but its public result contract is still human CLI text. There is no common finding model, no machine-readable output, no Level 2 graph model, and no Level 3 baseline/change model.
 

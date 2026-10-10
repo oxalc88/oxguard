@@ -4,7 +4,7 @@ description: >-
   Run Tsguard quality checks for TypeScript projects and act on its normalized
   agent or JSON results. Use for type errors, lint, FTA scores, coverage,
   security, maintainability, structural dependencies, baseline comparisons,
-  advisory criticality, or requests to run or interpret Tsguard.
+  advisory criticality, or requests to run, interpret or review Tsguard results.
 ---
 
 # Tsguard
@@ -23,10 +23,11 @@ For a pnpm project, use `pnpm exec tsguard check --output agent`. Verify local i
 
 Use the command the user requested. Otherwise default to `check`:
 
-- `check`: blocking, fail-fast lint → FTA → types → coverage → security, then advisory maintainability, duplication and baseline comparison. Later analyses remain not_run after an earlier blocking failure.
+- `check`: blocking, fail-fast lint → FTA → types → typed-lint → coverage → security, then advisory maintainability, duplication and baseline comparison. Later analyses remain not_run after an earlier blocking failure.
+- `typed-lint`: upstream native compiler-aware unsafe assignment/assertion and promise rules; unnecessary conditions are advisory. Unsupported TypeScript 7 configurations or unresolved types leave assessment incomplete.
 - `lint`, `types`, `fta`, `coverage`, `security`, `npm-audit`, `secrets`: individual gates.
 - `criticality`: advisory function/method caller ranking and `CRITICALITY.md`.
-- `maintainability`, `smells`, `structure`: advisory compiler facts for unchanged forwarding chains, repeated catch policy, silent constant fallbacks, runtime module cycles, coupling and dependency depth. Graph artifacts contain all selected facts, including distinct function callers/callees and SCC call depth, not runtime impact guarantees.
+- `maintainability`, `smells`, `structure`: advisory compiler facts for single-return sync/async forwarding chains, repeated catch policy, silent catch exits, dropped settled rejections, runtime module cycles, coupling and dependency depth. Graph artifacts contain all selected facts, including distinct function callers/callees and SCC call depth, not runtime impact guarantees.
 - `change --baseline <Git ref>`: advisory structural and native FTA/Biome cognitive/jscpd comparison using inert source files. Missing or incomplete inputs leave change not_run; absence of a baseline does not fail the command. Retain --baseline when retrieving JSON.
 - `audit`: advisory criticality → dead-code → duplicates; exit 0 even on findings.
 - `fix`: source formatting/lint mutation; run when source changes are authorized.
@@ -57,9 +58,9 @@ execution or dependencies; do not treat them as source defects.
 
 Exit 1 alone does not mean “fix source.” `audit` and `criticality` can have `status: error` with exit 0. A passed gate does not prove that later gates ran: `check` stops at the first blocking failure. Fix authorized issues, rerun the failed gate, then rerun `check` to reach the remaining gates.
 
-Use Ultracite/Biome for the default lint policy. No package-owned ESLint or separate typed-lint gate runs. TypeScript compilation does not establish compiler-aware unsafe-operation lint coverage; that capability is deferred. Project-wide unused-code detection uses Knip in audit; duplicate detection uses jscpd in check and audit, with advisory findings.
+Use Ultracite/Biome for the default lint policy. The separate typed-lint gate runs only five selected upstream semantic rules using package-owned Oxlint/tsgolint, with syntax categories disabled. It uses TypeScript 7 semantics; `types` and graph analysis retain the selected project compiler. No ESLint engine or second formatter runs. Do not claim TypeScript 5/6 semantic equivalence or complete coverage when native configuration/type diagnostics, strictNullChecks, unresolved types or scope budgets prevent analysis. Read the typed_lint_native artifact for actual backend versions and diagnostics. Project-wide unused-code detection uses Knip in audit; duplicate detection uses jscpd in check and audit, with advisory findings.
 
-FTA reports file scores and the configured cap; a cap failure exposes only the first failing file because the analyzer exits before producing JSON. Do not invent per-function scores, later failing files or unreported component measurements. Biome and Opengrep preserve native rule IDs; TypeScript preserves TS codes. Unsupported tool details produce a stable gate-level fallback, whose cause must be checked in diagnostics.
+FTA reports file scores and the configured cap; a cap failure exposes only the first failing file because the analyzer exits before producing JSON. On a cap failure, complexity-context adds branch counts, maximum branch nesting and branch source locations for the first failing file. These are compiler observations, not FTA contributions or per-function FTA scores. Do not invent later failing files or unreported component measurements. Biome and Opengrep preserve native rule IDs; TypeScript preserves TS codes. Unsupported tool details produce a stable gate-level fallback, whose cause must be checked in diagnostics.
 
 ## Use criticality as advisory context
 
@@ -67,11 +68,26 @@ Read `criticality.in_degree` measurements and `CRITICALITY.md`. The report ranks
 
 ## Interpret maintainability evidence
 
-Treat LONG_DELEGATION_CHAIN, FRAGMENTED_DELEGATION, REPEATED_ERROR_HANDLER, SILENT_EXCEPTION_FALLBACK and HIGH_MODULE_COUPLING as review cues, not instructions to flatten every abstraction. Verify the reported call path or repeated catch bodies. Preserve dependency injection, stable APIs, intentional best-effort policies and necessary domain validation. Do not add unsafe logging or change failure propagation just to remove an advisory.
+Treat LONG_DELEGATION_CHAIN, FRAGMENTED_DELEGATION, REPEATED_ERROR_HANDLER, SILENT_EXCEPTION_FALLBACK, SILENT_EXCEPTION_EXIT, SILENT_PROMISE_REJECTION, DISCARDED_SETTLED_REJECTION and HIGH_MODULE_COUPLING as review cues, not instructions to flatten every abstraction. Verify the reported call path or repeated catch bodies. Preserve dependency injection, stable APIs, intentional best-effort policies and necessary domain validation. Do not add unsafe logging or change failure propagation just to remove an advisory.
+
+Read function.max_branch_nesting and branch_locations in the graph to locate nested paths. Async forwarding_mode preserves the observed boundary mode; a chain warning does not establish equivalent timing or stack behavior. Discarded-settled findings cover symbol-resolved native allSettled → local aliases → flatMap block callbacks and explicit status guards, not arbitrary promise flows. A reason reference suppresses that path warning but does not prove correct recovery.
 
 Read module.fan_in, module.fan_out, module.dependency_depth, function.fan_in, function.fan_out and function.call_depth with the graph artifact. Repeated calls by one function count once; recursive call components are measured without a quality violation. Depth measures edges between strongly connected components; type-only imports are separate. Missing local and nonliteral dynamic imports make graph assessment partial. External references and unresolved calls remain disclosed limitations; this is a static, scoped graph.
 
 Do not claim a maintainability improvement from smaller files or individual FTA scores. Read POSSIBLE_COMPLEXITY_DISPLACEMENT evidence against the resolved baseline SHA: decreased per-file branch concentration or native FTA maximum, unreduced branch work and increased structural cost support review, not a proof of equivalent behavior. Function branch counts are observations, not cognitive/FTA scores. Read the maintainability_change artifact for both native profiles, analyzer policy and identity matches. FTA distributions and jscpd clone/token deltas use the same pinned tools over isolated graph-selected sources, without project analyzer configs. Biome reports exact cognitive scores above 1; scores at or below 1 are bounds [0,1], not invented exact values. Suppressed measurements have unknown upper bounds and leave the assessment incomplete. Treat FUNCTION_COMPLEXITY_INCREASE and NEW_DUPLICATION as advisory review cues. File/symbol identities match by existing path/name or unique exact source/token fingerprints; ambiguous copies and arbitrary semantic renames stay unmatched. Runtime dispatch and behavioral equivalence are not proven.
+
+## Review code with project context
+
+Read the target project's applicable `AGENTS.md` and referenced architecture/error/observability rules before recommending design changes. Keep project rules in that project; do not create or rewrite them as a prerequisite for Tsguard review.
+
+Separate measured analyzer findings from agent review judgments. Cite source locations and relevant project policy for each judgment; describe missing context instead of presenting an opinion as a blocking Tsguard rule.
+
+- Inspect each helper's transformation, validation, shared policy or interface boundary. Review pass-through layers, but do not count functions or flatten shared domain logic solely to reduce a score.
+- Trace rejected work to a propagated failure, recorded failure, or documented recovery outcome. Inspect catches, `continue`/`break`/early returns and settled-result filters; do not require all catches to rethrow or log sensitive payloads.
+- Check event ownership across callers and callbacks. Report possible duplicate confirmation/error events only when a resolved call path supports them; repeated event names alone do not establish duplicate runtime logging.
+- Compare the whole affected workflow, including helper/callback branches, call depth and native change metrics. Explain whether evidence supports simplification or only movement of complexity. Preserve necessary validation, ordering, retry and time-budget behavior.
+
+Run `maintainability` or `smells` separately when fail-fast leaves those gates not_run and the user requested review. Use `change --baseline` only with a supplied or configured baseline; do not invent one. Review judgments do not change the CLI exit policy or prove runtime reachability.
 
 ## Drill down and report
 

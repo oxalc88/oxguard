@@ -1,4 +1,20 @@
-# Tsguard Biome maintainability validation
+# Tsguard maintainability validation
+
+## Review-gap extension
+
+The current extension adds semantic-only native typed lint, bounded discarded-failure findings, async forwarding and function nesting/context. The focused current-source corpus passes all 39 maintainability cases, and the evaluator/observer/agent/scope-readiness tests pass all 33 cases. Go race tests and vet pass. Fresh packed npm and pnpm distributions on Linux x64 each pass both integration tests, all 30 retained Level 1 cases and all 39 maintainability cases. Their fresh installed manifests/trees have no owned ESLint engine. Current-head platform CI is linked from the PR rather than inferred from older runs. Biome owns syntax/formatting; native semantic analysis adds a separate program and compiler compatibility preflight. No ESLint engine or second formatter is shipped.
+
+The current review skill was exercised by a fresh independent agent on isolated projects. It read project AGENTS.md, distinguished the discarded-settled analyzer advisory from a resolved duplicate-confirmation review judgment, preserved useful domain helpers, retrieved omitted findings before fixes, repaired a declared compiler offline without source edits, and interpreted native cognitive growth despite lower FTA. Scoped full checks recorded the development runtime's missing Vitest configuration as an actual coverage execution failure; they are not passing full checks. The repair fixture's additional default-root FTA scan included installed compiler sources, so it also ran a separate source-scoped check and reported both results distinctly.
+
+Previous skill evidence is retained under agent-traces/history. The current capture hash matches the skill, and its observer records retain source fingerprints and actual process outcomes.
+
+Installed validation completed on 2026-10-10. npm took 255.119 s for the whole two-test integration suite; pnpm uses the reusable test store and retains the unchanged install timeout. These totals include packaging/installation and are not analyzer benchmarks. Both 39-case reports record the same evaluator hash below and `tsguard_scope_ready: true`; new Python maintainability parity remains false independently.
+
+The current evaluator SHA-256 is `29b803430f0b1ed7a328399c4bf9e988e41d4a721f0a956e5d7dabb9e479160f`. Local evidence uses revision label `review-gaps-final-local`; it is not relabelled as a future commit. Native cross-builds cover linux/amd64, linux/arm64, darwin/amd64, darwin/arm64 and windows/amd64.
+
+A single-run synthetic 200-module measurement observed maintainability at 1.055 s and typed lint at 1.285 s, with cumulative peak child RSS 193.3 MiB and 196.1 MiB respectively. These Linux RUSAGE_CHILDREN high-water marks include startup, are cumulative across commands, and are not aggregate memory or a controlled before/after whole-check benchmark.
+
+## Previous 28-case validation (before this extension)
 
 Three-level single-linter local evidence collected on 2026-10-09, based on main `94ef5cfaf2056c53775e2cf39719f4c571e116fe`. Environment: Linux x64, Node 24.19.0, Go 1.26.1, pnpm 10.34.5; Python uses the existing hash-locked eval environment. Tsguard readiness is assessed for the selected Ultracite/Biome scope independently of later Python capabilities. No release is published by this work.
 
@@ -25,7 +41,7 @@ The 28-case corpus additionally checks regular function caller/callee depth and 
 
 The forwarding-chain fixture passes pinned lint, FTA and types while producing LONG_DELEGATION_CHAIN and FRAGMENTED_DELEGATION advisory findings. The direct equivalent `x * 2` implementation produces neither. Other controls cover necessary validation, dependency injection, distinct failure policies, runtime versus type-only cycles, exact inert Git blobs, artificial splitting and reduced branch observations. Passing fixtures do not establish precision across arbitrary production code.
 
-The single-linter control rejects the removed typed-lint command and demonstrates that TypeScript compilation alone does not establish unsafe-operation lint coverage. Project lint policies remain authoritative; a consumer requesting an external engine must supply it. The compatibility fixture preserves that policy and reports incomplete normalization rather than substituting the owned Biome baseline.
+The previous single-linter control rejected the then-removed typed-lint command and demonstrates that TypeScript compilation alone does not establish unsafe-operation lint coverage. Project lint policies remain authoritative; a consumer requesting an external engine must supply it. The compatibility fixture preserves that policy and reports incomplete normalization rather than substituting the owned Biome baseline.
 
 ## Agent guidance
 
@@ -42,10 +58,10 @@ Fresh process measurements include CLI and Node startup. Peak RSS uses Linux `RU
 | Synthetic 200 independent TypeScript modules/functions, no module edges | maintainability | 1.029 s | 184.3 MiB | Complete; 0 findings |
 | Same sources against an identical committed baseline | change | 3.062 s | 184.3 MiB | Complete; 0 findings |
 
-The default check has no ESLint process or extra typed-lint compiler pass. The smell/structure/change path reuses candidate facts and one compiler pass; an explicit baseline requires another pass. Larger independent repositories and controlled whole-check measurements remain useful follow-up evaluation without adding a mandatory release ceremony.
+The previous default check had no ESLint process or extra typed-lint compiler pass. The current extension adds the separate native semantic program/preflight described above. The smell/structure/change path reuses candidate facts and one compiler pass; an explicit baseline requires another pass. Larger independent repositories and controlled whole-check measurements remain useful follow-up evaluation without adding a mandatory release ceremony.
 
 ## Scope and later capabilities
 
 New PyGuard maintainability parity is deferred independently: `pyguard_maintainability_ready: false` and `maintainability_parity_ready: false` do not block Tsguard's selected scope. The report deliberately has no ambiguous global `release_ready` field. Tsguard scope readiness still requires native cases; incomplete, unsupported, duplicate or failing evidence cannot produce a ready result. Platform checks and explicit publication authorization remain separate requirements.
 
-Compiler-aware unsafe-operation/narrowing-assertion/unnecessary-condition lint beyond Biome is deferred to retain the single default lint engine. Historical native FTA/cognitive/duplication deltas and unique exact move matching are implemented. Arbitrary semantic rename tracking, custom branch-expression complexity and runtime/domain responsibility inference remain outside this supported comparison. See [implemented scope](maintainability.md). A branch-count reduction does not establish behavioral equivalence or prove easier maintenance.
+The earlier unsafe-operation lint deferral is superseded by the current semantic-only native extension and its explicit compatibility limits. Historical native FTA/cognitive/duplication deltas and unique exact move matching are implemented. Arbitrary semantic rename tracking, custom branch-expression complexity and runtime/domain responsibility inference remain outside this supported comparison. See [implemented scope](maintainability.md). A branch-count reduction does not establish behavioral equivalence or prove easier maintenance.
