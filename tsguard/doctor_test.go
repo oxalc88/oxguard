@@ -34,11 +34,34 @@ func writeNodeCommand(t *testing.T, path string) {
 	script := "#!/bin/sh\n" +
 		"printf '%s %s\\n' \"$(basename \"$0\")\" \"$*\" >> \"$TSGUARD_LOG\"\n" +
 		"if [ \"$1\" = \"--version\" ]; then\n" +
-		"  printf 'v22.0.0\\n'\n" +
+		"  printf 'v22.18.0\\n'\n" +
 		"fi\n" +
 		"exit 0\n"
 
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake node: %v", err)
+	}
+}
+
+func TestSupportedNodeVersionMatchesPackagedEngine(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		allowed bool
+	}{
+		{"v22.12.0", false},
+		{"v22.17.9", false},
+		{"v22.18.0", true},
+		{"v22.19.0", true},
+		{"v23.1.0", false},
+		{"v24.0.0", true},
+		{"v25.0.0", false},
+		{"v26.0.0", true},
+		{"v27.0.0", true},
+		{"v20.19.0", false},
+		{"invalid", false},
+	} {
+		if got := isSupportedNodeVersion(tc.version); got != tc.allowed {
+			t.Errorf("isSupportedNodeVersion(%q) = %v, want %v", tc.version, got, tc.allowed)
+		}
 	}
 }

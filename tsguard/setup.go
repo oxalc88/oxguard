@@ -18,7 +18,7 @@ func runSetup(root string, cfg config) int {
 	fmt.Println("tsguard setup")
 	fmt.Println("─────────")
 
-	fmt.Println("  [1/4] Node.js (22+)...")
+	fmt.Println("  [1/4] Node.js (22.18+ on 22.x, 24.x, or 26+)...")
 	if !checkNode() {
 		return 2
 	}
@@ -50,7 +50,7 @@ func runSetup(root string, cfg config) int {
 	return 0
 }
 
-// checkNode verifies Node.js >= 22 is available.
+// checkNode validates the Node versions supported by Ultracite 8 and the npm package.
 func checkNode() bool {
 	out, _, err := RunSilent("", "node", "--version")
 	if err != nil {
@@ -59,23 +59,23 @@ func checkNode() bool {
 		return false
 	}
 	version := strings.TrimSpace(out)
-	if isNode22OrNewer(version) {
+	if isSupportedNodeVersion(version) {
 		fmt.Printf("  [OK]   Node.js %s\n", version)
 		return true
 	}
-	fmt.Printf("  [FAIL] Node.js — found %s but need >= 22\n", version)
+	fmt.Printf("  [FAIL] Node.js — found %s but need 22.18+ on 22.x, 24.x, or 26+\n", version)
 	printNodeInstallHint()
 	return false
 }
 
-// isNode22OrNewer parses "vX.Y.Z" and checks major >= 22.
-func isNode22OrNewer(version string) bool {
-	var major int
-	_, err := fmt.Sscanf(version, "v%d", &major)
-	if err != nil {
+// isSupportedNodeVersion matches the npm package engine range.
+func isSupportedNodeVersion(version string) bool {
+	var major, minor, patch int
+	n, err := fmt.Sscanf(version, "v%d.%d.%d", &major, &minor, &patch)
+	if err != nil || n != 3 {
 		return false
 	}
-	return major >= 22
+	return (major == 22 && minor >= 18) || major == 24 || major >= 26
 }
 
 func printNodeInstallHint() {
