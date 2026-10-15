@@ -205,11 +205,19 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   // intentionally declares only Tsguard; never add Vitest to its manifest just
   // to silence the lint policy.
   const testFile = path.join(consumer, 'src/add.test.ts');
-  const validFixture = 'import { add } from "./add";\nglobalThis.test("adds", () => { globalThis.expect(add(1, 2)).toBe(3); });\n';
+  const validFixture = [
+    'import { add } from "./add";',
+    '',
+    'globalThis.test("adds", () => {',
+    '  globalThis.expect(add(1, 2)).toBe(3);',
+    '});',
+    '',
+  ].join('\n');
   fs.writeFileSync(testFile, validFixture);
   const execute = (args, expected = 0) => run(executor, [...execArgs, 'tsguard', ...args, '--allow-pipe', '--timeout', '45', ...(args.includes('--dirs') ? [] : ['--dirs', 'src'])], consumer, expected);
   execute(['doctor']);
   execute(['fix']);
+  assert.equal(fs.readFileSync(testFile, 'utf8'), validFixture, 'clean fixture must already match pinned Biome formatting');
   execute(['lint']);
   // Ultracite 8 must reject imports missing from the consumer manifest.
   // A test-only misuse cannot become a reason to disable the upstream rule.
