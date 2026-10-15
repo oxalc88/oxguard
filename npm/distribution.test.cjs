@@ -201,11 +201,11 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   // Exercise the actual gates with no analyzer listed as a consumer dependency.
   fs.mkdirSync(path.join(consumer, 'src'));
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
-  // The fallback Vitest config exposes test/expect as globals. The consumer
+  // The fallback Vitest config exposes test/expect on globalThis. The consumer
   // intentionally declares only Tsguard; never add Vitest to its manifest just
   // to silence the lint policy.
   const testFile = path.join(consumer, 'src/add.test.ts');
-  const validFixture = 'import { add } from "./add";\ntest("adds", () => { expect(add(1, 2)).toBe(3); });\n';
+  const validFixture = 'import { add } from "./add";\nglobalThis.test("adds", () => { globalThis.expect(add(1, 2)).toBe(3); });\n';
   fs.writeFileSync(testFile, validFixture);
   const execute = (args, expected = 0) => run(executor, [...execArgs, 'tsguard', ...args, '--allow-pipe', '--timeout', '45', ...(args.includes('--dirs') ? [] : ['--dirs', 'src'])], consumer, expected);
   execute(['doctor']);
