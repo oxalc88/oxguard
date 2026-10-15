@@ -94,6 +94,9 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const manifest = JSON.parse(fs.readFileSync(path.join(packages, 'tsguard/package.json')));
   assert.equal(Object.keys(manifest.optionalDependencies).length, 5);
   assert.equal(manifest.scripts, undefined);
+  assert.equal(manifest.engines.node, '^22.18.0 || ^24.0.0 || >=26.0.0');
+  assert.equal(manifest.dependencies.ultracite, '8.0.1');
+  assert.equal(manifest.dependencies['@biomejs/biome'], '2.5.15');
   assert.equal(manifest.dependencies.eslint, undefined);
   assert.equal(manifest.dependencies['typescript-eslint'], undefined);
   for (const version of Object.values(manifest.dependencies)) assert.match(version, /^\d+\.\d+\.\d+$/);
@@ -147,6 +150,8 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const launcher = path.join(installed, 'tsguard/bin/tsguard.cjs');
   const nativeDirectory = path.dirname(createRequire(fs.realpathSync(launcher)).resolve(`@oxguard/tsguard-${host}/package.json`));
   const installedBinary = path.join(nativeDirectory, 'bin', binaryName);
+  // Keep the zero-config preset resolvable from the real installed package.
+  assert.ok(fs.existsSync(createRequire(fs.realpathSync(launcher)).resolve('ultracite/biome/core')));
 
   // One local provider is shared by scored evals and integration checks.
   // It runs in a child process because the native evaluator is synchronous.

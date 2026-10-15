@@ -21,7 +21,7 @@ Python structural/change parity remains a later milestone. These levels describe
 
 ## Quality policy
 
-Without a lint config, the npm distribution extends pinned Ultracite and applies quality baseline version 1. The baseline explicitly pins cognitive complexity at the existing limit of 20, empty blocks, useless catches, unsafe non-null assertions, unreachable code, constant conditions and other established Biome rules. `lint.baseline_version` records its use. This does not claim those rules were previously missing from Ultracite.
+Without a lint config, the npm distribution extends pinned Ultracite 8.0.1 (with Biome 2.5.15) and applies quality baseline version 1. The baseline explicitly pins cognitive complexity at the existing limit of 20, empty blocks, useless catches, unsafe non-null assertions, unreachable code, constant conditions and other established Biome rules. `lint.baseline_version` records its use. This does not claim those rules were previously missing from Ultracite.
 
 Project Biome configuration, disabled rules and flat ESLint/Oxlint configurations remain authoritative. Legacy ESLint names are recognized so fallback Biome does not silently replace them; support still depends on upstream Ultracite/ESLint, and unsupported execution is an error or partial normalization. The flat ESLint path is tested but its native diagnostics are not yet normalized. Project configs are never overwritten.
 
@@ -31,7 +31,7 @@ Biome with pinned Ultracite presets owns syntax lint and formatting. A separate 
 
 The backend uses TypeScript 7 semantics, independently of the project compiler version. It requires strictNullChecks and resolved, compiler-valid declarations. Supported-config fixtures use the current 5.9 project/compiler path without claiming semantic equivalence to TypeScript 7. Removed options such as baseUrl, native type/configuration diagnostics, missing declarations and scopes over the portable 24000-character file-argument budget leave typed lint partial and nonblocking; missing installed engines or malformed reports are execution failures. Select a smaller scope or migrate unsupported native options deliberately. Semantic scope follows the configured directories/exclusions and existing exclude-tests default; selected files and that policy are recorded in the native artifact. No root config is overwritten and no executable Oxlint config is loaded. Native reports record tool versions, selected rules, project compiler and native diagnostics in `node_modules/.cache/oxguard/typed-lint/native.json`; stale reports are removed before each invocation.
 
-Existing explicit project ESLint/Oxlint policy is still respected through the compatibility path. Such projects must supply their own engine. The zero-config package invokes Oxlint only for the separate semantic gate, not a competing syntax/format policy. Node support remains 22.12+ on the 22.x line, 24.x, or 26+.
+Existing explicit project ESLint/Oxlint policy is still respected through the compatibility path. Such projects must supply their own engine. The zero-config package invokes Oxlint only for the separate semantic gate, not a competing syntax/format policy. Node support requires 22.18+ on the 22.x line, 24.x, or 26+ (Ultracite 8).
 
 ## Advisory rules
 

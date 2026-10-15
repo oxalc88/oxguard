@@ -28,6 +28,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Upgrade the pinned npm lint toolchain to Ultracite 8.0.1 and Biome 2.5.15.
+  Preserve the existing Biome preset, project-selected lint configurations,
+  cognitive complexity limit of 20, schema-1 output and advisory behavior.
+  Raise supported Node.js 22.x to 22.18+ as required by Ultracite 8;
+  keep Node.js 24.x and 26+ support. Add package and runtime compatibility tests.
+  This does not resolve the transitive `fast-glob → micromatch → braces`
+  vulnerability (CVE-2026-93687); dependency acceptance remains blocked until
+  that path is removed or an approved mitigation is documented.
 - `check` includes applicable maintainability, duplication and change
   analysis through the existing schema-1 contract. Updated agent guidance explains
   advisory evidence and incomplete assessments.
