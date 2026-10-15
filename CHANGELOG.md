@@ -28,6 +28,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Upgrade paired Vitest and coverage-v8 from 5.0.2 to 5.0.4; correct the
+  packed-consumer test fixture to use the bundled Vitest globals without
+  declaring the analyzer as a project dependency. Exercise the new Ultracite
+  undeclared-dependency rule explicitly rather than disabling it.
 - Upgrade the pinned npm lint toolchain to Ultracite 8.0.1 and Biome 2.5.15.
   Preserve the existing Biome preset, project-selected lint configurations,
   cognitive complexity limit of 20, schema-1 output and advisory behavior.

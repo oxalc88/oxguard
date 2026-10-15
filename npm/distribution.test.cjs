@@ -97,6 +97,8 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   assert.equal(manifest.engines.node, '^22.18.0 || ^24.0.0 || >=26.0.0');
   assert.equal(manifest.dependencies.ultracite, '8.0.1');
   assert.equal(manifest.dependencies['@biomejs/biome'], '2.5.15');
+  assert.equal(manifest.dependencies.vitest, '5.0.4');
+  assert.equal(manifest.dependencies['@vitest/coverage-v8'], manifest.dependencies.vitest);
   assert.equal(manifest.dependencies.eslint, undefined);
   assert.equal(manifest.dependencies['typescript-eslint'], undefined);
   for (const version of Object.values(manifest.dependencies)) assert.match(version, /^\d+\.\d+\.\d+$/);
@@ -199,10 +201,22 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   // Exercise the actual gates with no analyzer listed as a consumer dependency.
   fs.mkdirSync(path.join(consumer, 'src'));
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
-  fs.writeFileSync(path.join(consumer, 'src/add.test.ts'), 'import { expect, test } from "vitest";\nimport { add } from "./add";\ntest("adds", () => { expect(add(1, 2)).toBe(3); });\n');
+  // The fallback Vitest config exposes test/expect as globals. The consumer
+  // intentionally declares only Tsguard; never add Vitest to its manifest just
+  // to silence the lint policy.
+  const testFile = path.join(consumer, 'src/add.test.ts');
+  const validFixture = 'import { add } from "./add";\ntest("adds", () => { expect(add(1, 2)).toBe(3); });\n';
+  fs.writeFileSync(testFile, validFixture);
   const execute = (args, expected = 0) => run(executor, [...execArgs, 'tsguard', ...args, '--allow-pipe', '--timeout', '45', ...(args.includes('--dirs') ? [] : ['--dirs', 'src'])], consumer, expected);
   execute(['doctor']);
   execute(['fix']);
+  execute(['lint']);
+  // Ultracite 8 must reject imports missing from the consumer manifest.
+  // A test-only misuse cannot become a reason to disable the upstream rule.
+  fs.writeFileSync(testFile, 'import { expect, test } from "vitest";\nimport { add } from "./add";\ntest("adds", () => { expect(add(1, 2)).toBe(3); });\n');
+  const undeclared = execute(['lint'], 1);
+  assert.match(undeclared.stdout + undeclared.stderr, /noUndeclaredDependencies/);
+  fs.writeFileSync(testFile, validFixture);
   execute(['lint']);
   execute(['types']);
   execute(['fta']);
