@@ -39,7 +39,7 @@ func TestCriticalityReportTop30AndCompleteMeasurements(t *testing.T) {
 	data, _ := json.Marshal(graph)
 	result := newRunResult("criticality")
 	r := Runner{root: root, outputMode: "json", result: result}
-	if err := r.normalizeCriticality(bytes.NewReader(data), []string{"diagnostic-001"}); err != nil {
+	if _, err := r.normalizeCriticality(bytes.NewReader(data), []string{"diagnostic-001"}); err != nil {
 		t.Fatal(err)
 	}
 	result.Finish(0)
@@ -71,7 +71,7 @@ func TestCriticalityReportTop30AndCompleteMeasurements(t *testing.T) {
 	}
 	second := newRunResult("criticality")
 	r.result = second
-	if err := r.normalizeCriticality(bytes.NewReader(data), nil); err != nil {
+	if _, err := r.normalizeCriticality(bytes.NewReader(data), nil); err != nil {
 		t.Fatal(err)
 	}
 	second.Finish(0)
@@ -84,12 +84,34 @@ func TestCriticalityReportTop30AndCompleteMeasurements(t *testing.T) {
 
 func TestCriticalityExecutionErrorRemainsAdvisoryExit(t *testing.T) {
 	r := Runner{root: t.TempDir(), outputMode: "json", result: newRunResult("audit")}
-	if err := r.normalizeCriticality(strings.NewReader(`{"error":{"category":"tool_missing","message":"TypeScript missing"}}`), []string{"diagnostic-001"}); err != nil {
+	if _, err := r.normalizeCriticality(strings.NewReader(`{"error":{"category":"tool_missing","message":"TypeScript missing"}}`), []string{"diagnostic-001"}); err != nil {
 		t.Fatal(err)
 	}
 	r.result.Finish(0)
 	if r.result.Status != StatusError || r.result.ExitCode != 0 || r.result.Findings[0].Category != "tool_missing" || len(r.result.Artifacts) != 0 {
 		t.Fatalf("unexpected result: %+v", r.result)
+	}
+}
+
+func TestUnsupportedCriticalityCannotBecomeComplete(t *testing.T) {
+	r := contractRunner(t)
+	complete, err := r.normalizeCriticality(strings.NewReader(`{"partial":true,"limitation":"TypeScript 7 compiler API is unavailable."}`), nil)
+	if err != nil || complete {
+		t.Fatalf("complete=%v error=%v", complete, err)
+	}
+	r.result.RecordGate("criticality", true, complete)
+	r.result.Finish(0)
+	if r.result.Assessment != Incomplete || r.result.Status != StatusAdvisory || len(r.result.Measurements) != 0 || len(r.result.Artifacts) != 0 {
+		t.Fatalf("unsupported analysis was reported as evaluated: %+v", r.result)
+	}
+	for _, payload := range []string{
+		`{"partial":true}`,
+		`{"partial":true,"limitation":"unsupported","nodes":[],"edges":[]}`,
+		`{"partial":true,"limitation":"unsupported","error":{"category":"tool_missing"}}`,
+	} {
+		if _, err := r.normalizeCriticality(strings.NewReader(payload), nil); err == nil {
+			t.Fatalf("accepted contradictory capability report: %s", payload)
+		}
 	}
 }
 

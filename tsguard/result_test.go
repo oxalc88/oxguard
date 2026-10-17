@@ -169,6 +169,7 @@ func TestAdapters(t *testing.T) {
 		{"Absent schema", "opengrep", "{}", "", "tsguard.execution.adapter_failure", "adapter_failure", true},
 		{"TypeScript missing import is quality", "tsc", "src/order.ts(1,1): error TS2307: Cannot find module 'EAI_AGAIN'.\n", "src/order.ts(1,1): error TS2307: Cannot find module 'EAI_AGAIN'.\n", "TS2307", "quality", false},
 		{"TypeScript config", "tsc", "error TS5023: Unknown compiler option.\n", "", "TS5023", "invalid_configuration", false},
+		{"TypeScript native located removed option", "tsc", "tsconfig.json(1,125): error TS5102: Option 'baseUrl' has been removed.\n", "", "TS5102", "invalid_configuration", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := contractRunner(t)

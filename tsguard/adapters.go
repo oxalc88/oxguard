@@ -78,7 +78,7 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 		}
 	case "criticality":
 		if res.ok {
-			adapterErr = r.normalizeCriticality(stdout, refs)
+			complete, adapterErr = r.normalizeCriticality(stdout, refs)
 		}
 	case "tsc":
 		reader := bufio.NewReader(stdout)
@@ -88,7 +88,13 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 			if m := tscDiagnostic.FindStringSubmatch(line); m != nil {
 				row, _ := strconv.Atoi(m[2])
 				col, _ := strconv.Atoi(m[3])
-				add(m[4], "error", "quality", m[5], &Location{File: relativePath(r.root, m[1]), Line: row, Column: col})
+				category := "quality"
+				// Native TypeScript 7 locates removed-option diagnostics in the
+				// config file. Preserve that location without calling it a code defect.
+				if m[4] == "TS5102" {
+					category = "invalid_configuration"
+				}
+				add(m[4], "error", category, m[5], &Location{File: relativePath(r.root, m[1]), Line: row, Column: col})
 			} else if m := tscGlobalDiagnostic.FindStringSubmatch(line); m != nil {
 				add(m[1], "error", "invalid_configuration", m[2], nil)
 			}

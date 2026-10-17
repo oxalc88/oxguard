@@ -123,6 +123,11 @@ registry from test expectations. Set TSGUARD_KEEP_TEST_DIR=1 to retain fixtures
 for debugging; otherwise temporary files are removed.
 An adapter test separately verifies that a declared project compiler wins over
 the bundled compiler, while an undeclared compiler uses the owned version.
+The installed compatibility corpus additionally installs exact stable TypeScript
+5.9.3 and 7.0.2 in isolated projects. It checks real compiler selection, findings,
+configuration inheritance, typed lint and explicit unsupported analysis states.
+`typescript-compatibility.json` joins the existing eval artifact; no extra job or
+production compiler dependency is added. See [the capability boundary](../maintainability.md).
 
 To run the same verification with pnpm installed:
 

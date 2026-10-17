@@ -63,7 +63,11 @@ process.stdout.write(JSON.stringify({ nodes, edges: orderedEdges, unresolved_cal
 
 }
 try { analyze(); } catch (error) {
+  if (error.category === 'unsupported_compiler') {
+    process.stdout.write(JSON.stringify({ partial: true, limitation: error.message }) + '\n');
+  } else {
   const category = error.category || (['MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND'].includes(error.code) ? 'tool_missing' : 'analyzer_failure');
   console.error(error.stack);
   process.stdout.write(JSON.stringify({ error: { category, message: error.message } }) + '\n');
+  }
 }

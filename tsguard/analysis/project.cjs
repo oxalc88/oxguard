@@ -36,6 +36,15 @@ function loadProject(input) {
     if (!fs.existsSync(full)) throw Object.assign(new Error(`Missing source scope: ${dir}`), { category: 'invalid_configuration' });
     collect(full);
   }
+  if (typeof ts.createProgram !== 'function') {
+    const limitation = `TypeScript ${ts.version || 'unknown'} does not expose the stable compiler API required for structural analysis; no older compiler was substituted.`;
+    if (!input.nativeTypedLint || !/^7\.\d+\.\d+$/.test(ts.version || '')) {
+      throw Object.assign(new Error(limitation), { category: 'unsupported_compiler' });
+    }
+    const compilerPackage = compilerProject.resolve('typescript/package.json');
+    const compiler = JSON.parse(fs.readFileSync(compilerPackage, 'utf8'));
+    return { ts, files, relative, owned, root, nativeCompiler: path.resolve(path.dirname(compilerPackage), typeof compiler.bin === 'string' ? compiler.bin : compiler.bin.tsc) };
+  }
   let options = { strict: true, skipLibCheck: true, allowJs: true, target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, noEmit: true, jsx: ts.JsxEmit.Preserve };
   const configFile = path.join(root, 'tsconfig.json').replaceAll('\\', '/');
   if (fs.existsSync(configFile)) {
@@ -60,6 +69,10 @@ async function emitAnalysis(analyze) {
     process.stdout.write(JSON.stringify(await analyze(JSON.parse(payload))) + '\n');
   }
   catch (error) {
+    if (error.category === 'unsupported_compiler') {
+      process.stdout.write(JSON.stringify({ findings: [], measurements: [], partial: true, limitation: error.message }) + '\n');
+      return;
+    }
     const category = error.category || (['MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND'].includes(error.code) ? 'tool_missing' : 'analyzer_failure');
     console.error(error.stack);
     process.stdout.write(JSON.stringify({ error: { category, message: error.message } }) + '\n');

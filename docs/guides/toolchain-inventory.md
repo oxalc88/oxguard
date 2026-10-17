@@ -10,7 +10,7 @@ All 14 product analyzer pins are in `npm/toolchain.json`; npm resolves their tra
 |---|---|---|---|
 | ultracite | 8.0.1 | 8.0.1 | Retain; already latest |
 | @biomejs/biome | 2.5.15 | 2.5.15 | Retain; already latest |
-| typescript | 5.9.3 | 7.0.2 | Defer analyzer change |
+| typescript | 5.9.3 | 7.0.2 | Keep 5.9 fallback; verify project 7 type checking / typed lint only |
 | oxlint | 1.87.0 | 1.88.0 | Stable package updates |
 | oxlint-tsgolint | 7.0.2003 | 7.0.2004 | Stable package updates |
 | vitest | 5.0.4 | 5.0.5 | Update patch group |

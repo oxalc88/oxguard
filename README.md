@@ -178,6 +178,11 @@ in npm mode; standalone installation retains the setup behavior below. See the
 [npm distribution guide](docs/guides/npm-distribution.md) for local tarball tests
 and release configuration.
 
+Declared stable TypeScript 5.9.3 and 7.0.2 project compilers are verified for
+type checking and native typed lint. The bundled fallback remains 5.9.3.
+TypeScript 7 compiler-API analyses report incomplete; full structural/change
+parity is not claimed. See [the compatibility boundary](docs/maintainability.md).
+
 Standalone installation from GitHub Releases remains available:
 
 ```bash

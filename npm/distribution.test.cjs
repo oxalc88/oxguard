@@ -55,7 +55,7 @@ test('packaged adapter preserves a declared project compiler', t => {
   assert.equal(run(process.execPath, [adapter, 'tsc', '--version'], project).stdout.trim(), 'project compiler');
 });
 
-test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: process.env.OXGUARD_EVAL_REPORT_DIR ? 600000 : 360000 }, async t => {
+test(`${manager} packed distribution runs the Go CLI and forwards native process behavior`, { timeout: 600000 }, async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'tsguard-npm-'));
   t.after(() => {
     if (process.env.TSGUARD_KEEP_TEST_DIR) t.diagnostic(`Test artifacts: ${temporary}`);
@@ -152,6 +152,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const launcher = path.join(installed, 'tsguard/bin/tsguard.cjs');
   const nativeDirectory = path.dirname(createRequire(fs.realpathSync(launcher)).resolve(`@oxguard/tsguard-${host}/package.json`));
   const installedBinary = path.join(nativeDirectory, 'bin', binaryName);
+  const compilerRegistry = run('npm', ['config', 'get', 'registry'], consumer).stdout.trim();
   // Keep the zero-config preset resolvable from the real installed package.
   assert.ok(fs.existsSync(createRequire(fs.realpathSync(launcher)).resolve('ultracite/biome/core')));
 
@@ -392,6 +393,11 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     const reportDirectory = path.resolve(process.env.OXGUARD_EVAL_REPORT_DIR);
     fs.mkdirSync(reportDirectory, { recursive: true });
     fs.writeFileSync(path.join(reportDirectory, 'maintainability.json'), JSON.stringify(maintainability, null, 2) + '\n');
+  }
+  const typescriptCompatibility = require('../evals/typescript-compatibility.cjs').evaluate({ run, temporary, launcher, tool: path.join(installed, 'tsguard/bin/tool.cjs'), registry: compilerRegistry, manager });
+  t.diagnostic(`Installed TypeScript compatibility: ${JSON.stringify(typescriptCompatibility)}`);
+  if (process.env.OXGUARD_EVAL_REPORT_DIR) {
+    fs.writeFileSync(path.join(path.resolve(process.env.OXGUARD_EVAL_REPORT_DIR), 'typescript-compatibility.json'), JSON.stringify(typescriptCompatibility, null, 2) + '\n');
   }
   run('go', ['build', '-o', installedBinary, path.join(__dirname, 'testdata/cli.go')], root);
   const contextProcess = spawnSync(process.execPath, [launcher, 'context', '--output', 'json', 'argument with spaces'], {

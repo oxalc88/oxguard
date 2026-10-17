@@ -29,7 +29,9 @@ type callGraph struct {
 		Category string `json:"category"`
 		Message  string `json:"message"`
 	} `json:"error,omitempty"`
-	UnresolvedCalls int `json:"unresolved_calls"`
+	UnresolvedCalls int    `json:"unresolved_calls"`
+	Partial         bool   `json:"partial"`
+	Limitation      string `json:"limitation"`
 }
 type rankedFunction struct {
 	callNode
@@ -85,6 +87,12 @@ func runCriticality(r *Runner) int {
 	analyzer.outputMode = "json" // complete graph decoding also for the human report
 	res := analyzer.RunTool(toolSpec{gate: "criticality", adapter: "criticality", advisory: true}, "criticality", node, "-e", compilerProject+"\n"+criticalityAnalyzer, string(input))
 	if !r.machine() {
+		for _, finding := range r.result.Findings {
+			if finding.Rule == "tsguard.criticality.not_evaluated" {
+				r.println("  [NOT EVALUATED] criticality: " + finding.Evidence)
+				return 0
+			}
+		}
 		if res.ok && len(r.result.Artifacts) > 0 && r.result.Artifacts[len(r.result.Artifacts)-1].Kind == "criticality" {
 			r.println("  [OK]   criticality (CRITICALITY.md)")
 		} else {
@@ -94,26 +102,33 @@ func runCriticality(r *Runner) int {
 	return 0
 }
 
-func (r *Runner) normalizeCriticality(stdout io.Reader, refs []string) error {
+func (r *Runner) normalizeCriticality(stdout io.Reader, refs []string) (bool, error) {
 	var graph callGraph
 	if err := json.NewDecoder(stdout).Decode(&graph); err != nil {
-		return err
+		return false, err
+	}
+	if graph.Partial {
+		if graph.Limitation == "" || graph.Nodes != nil || graph.Edges != nil || graph.Error != nil {
+			return false, fmt.Errorf("invalid unsupported criticality report")
+		}
+		r.result.AddFinding(Finding{Gate: "criticality", Rule: "tsguard.criticality.not_evaluated", Severity: "info", Status: StatusAdvisory, Category: "quality", Evidence: graph.Limitation, Diagnostics: refs})
+		return false, nil
 	}
 	if graph.Error != nil {
 		category := graph.Error.Category
 		if category != "tool_missing" && category != "invalid_configuration" && category != "analyzer_failure" {
-			return fmt.Errorf("unknown analyzer error")
+			return false, fmt.Errorf("unknown analyzer error")
 		}
 		r.result.Execution("criticality", category, graph.Error.Message)
 		r.result.Findings[len(r.result.Findings)-1].Diagnostics = refs
-		return nil
+		return false, nil
 	}
 	if graph.Nodes == nil || graph.Edges == nil || graph.UnresolvedCalls < 0 {
-		return fmt.Errorf("invalid graph envelope")
+		return false, fmt.Errorf("invalid graph envelope")
 	}
 	ranked, err := rankCriticality(graph)
 	if err != nil {
-		return err
+		return false, err
 	}
 	var report strings.Builder
 	report.WriteString("# Criticality Analysis\n\nFunctions ranked by in-degree (distinct callers). High = high risk to change.\n\n")
@@ -139,9 +154,9 @@ func (r *Runner) normalizeCriticality(stdout io.Reader, refs []string) error {
 	}
 	if err := os.WriteFile(filepath.Join(r.root, "CRITICALITY.md"), []byte(report.String()), 0o644); err != nil {
 		r.result.Execution("criticality", "artifact_failure", "Cannot write CRITICALITY.md.")
-		return nil
+		return false, nil
 	}
 	r.result.Artifacts = append(r.result.Artifacts, Artifact{Kind: "criticality", Path: "CRITICALITY.md"})
 	r.printf("  Criticality analysis written to CRITICALITY.md\n")
-	return nil
+	return true, nil
 }

@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Capability-specific stable TypeScript 7.0.2 project support for type checking
+  and native typed lint, alongside TypeScript 5.9.3. Use the selected project
+  compiler CLI for native preflight; preserve the bundled 5.9.3 fallback.
+  Compiler API-dependent TypeScript 7 analyses report not evaluated rather
+  than crashing or silently substituting an older compiler. Installed
+  cross-platform compatibility cases run in the existing distribution job.
 - Versioned zero-config Tsguard lint policy using Ultracite/Biome, preserving
   project syntax-lint and formatting policy.
 - Advisory resolved delegation/handler smells and static module graph

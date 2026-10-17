@@ -1,20 +1,22 @@
 'use strict';
 // Only upstream semantic rules. Biome owns syntax lint and formatting.
 emitAnalysis(input => {
-  const { ts, program, sources, relative, owned, root, options } = loadProject(input);
+  const project = loadProject({ ...input, nativeTypedLint: true });
+  const { ts, program, sources, relative, owned, root, nativeCompiler } = project;
   const fs = require('node:fs');
   const path = require('node:path');
   const { spawnSync } = require('node:child_process');
   const directory = path.join(root, 'node_modules/.cache/oxguard/typed-lint');
   fs.mkdirSync(directory, { recursive: true });
-  const report = { findings: [], measurements: [{metric: 'typed-lint.files', level: 'code', location: {file: '.'}, value: sources.length, unit: 'files'}], partial: false, limitation: '' };
+  const files = program ? sources.map(s => path.resolve(s.fileName)) : [...project.files].sort();
+  const report = { findings: [], measurements: [{metric: 'typed-lint.files', level: 'code', location: {file: '.'}, value: files.length, unit: 'files'}], partial: false, limitation: '' };
   const unsupported = detail => ({ ...report, partial: true, limitation: `Native typed lint was not evaluated: ${detail}` });
   // Unsafe rules need valid types. Do not interpret unresolved imports as any leaks.
-  const errors = program.getOptionsDiagnostics().concat(program.getSemanticDiagnostics()).filter(d => d.category === ts.DiagnosticCategory.Error);
-  if (errors.length) return unsupported('resolve compiler errors and missing declarations with the types gate first.');
-  if (!(options.strict || options.strictNullChecks) || options.strictNullChecks === false) return unsupported('strictNullChecks is required; project compiler options are preserved.');
-  if (!sources.length) return unsupported('the requested scope has no analyzable source files.');
-  const files = sources.map(s => path.resolve(s.fileName));
+  if (program) {
+    const errors = program.getOptionsDiagnostics().concat(program.getSemanticDiagnostics()).filter(d => d.category === ts.DiagnosticCategory.Error);
+    if (errors.length) return unsupported('resolve compiler errors and missing declarations with the types gate first.');
+  }
+  if (!files.length) return unsupported('the requested scope has no analyzable source files.');
   // Keep argv below Windows limits; unsupported scope is visible, never a pass.
   if (files.reduce((total, file) => total + file.length + 3, 0) > 24000) return unsupported('selected file arguments exceed the 24000-character portable invocation budget; select a smaller scope.');
   const selected = new Set(files);
@@ -32,6 +34,25 @@ emitAnalysis(input => {
     compilerOptions: { ...(fs.existsSync(original) ? {} : { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', allowJs: true }), noEmit: true },
     files, include: [], exclude: [],
   }));
+  let options = project.options;
+  if (nativeCompiler) {
+    // Use the stable native CLI, never TypeScript's explicitly unstable APIs or
+    // the bundled older compiler for a TypeScript 7 project.
+    const compile = extra => {
+      const result = spawnSync(process.execPath, [nativeCompiler, '--project', tsconfig, '--pretty', 'false', ...extra], {
+        cwd: root, encoding: 'utf8', timeout: input.timeout * 1000, maxBuffer: 64 * 1024 * 1024,
+      });
+      if (result.error) throw Object.assign(result.error, { category: result.error.code === 'ETIMEDOUT' ? 'timeout' : 'analyzer_failure' });
+      if (result.signal || result.status !== 0 && !/\berror TS\d+:/.test(result.stdout)) throw new Error('Native project compiler failed without TypeScript diagnostics.');
+      return result;
+    };
+    const configResult = compile(['--showConfig']);
+    if (configResult.status !== 0) return unsupported('the project compiler could not resolve its configuration; run the types gate.');
+    options = JSON.parse(configResult.stdout).compilerOptions;
+    if (!options || typeof options !== 'object') throw new Error('Native project compiler returned no compiler options.');
+    if (compile(['--noEmit']).status !== 0) return unsupported('resolve compiler errors and missing declarations with the types gate first.');
+  }
+  if (!(options.strict || options.strictNullChecks) || options.strictNullChecks === false) return unsupported('strictNullChecks is required; project compiler options are preserved.');
   const pkg = owned.resolve('oxlint/package.json');
   const manifest = JSON.parse(fs.readFileSync(pkg, 'utf8'));
   const executable = path.resolve(path.dirname(pkg), manifest.bin.oxlint);
@@ -47,7 +68,7 @@ emitAnalysis(input => {
   const native = JSON.parse(result.stdout);
   fs.writeFileSync(path.join(directory, 'native.json'), JSON.stringify({ oxlint: manifest.version,
     tsgolint: JSON.parse(fs.readFileSync(owned.resolve('oxlint-tsgolint/package.json'), 'utf8')).version,
-    project_compiler: ts.version, compiler_semantics: 'typescript-go / TypeScript 7', selected_files: files.map(relative), exclude_tests: !!input.excludeTests, rules, native }, null, 2));
+    project_compiler: ts.version, project_preflight: nativeCompiler ? 'native-cli' : 'compiler-api', compiler_semantics: 'typescript-go / TypeScript 7', selected_files: files.map(relative), exclude_tests: !!input.excludeTests, rules, native }, null, 2));
   if (!Array.isArray(native.diagnostics) || !Number.isInteger(native.number_of_files) || native.number_of_rules !== Object.keys(rules).length) throw new Error('Unsupported native typed-lint report');
   if (native.number_of_files !== files.length) return unsupported('the native backend did not report every selected file.');
   for (const d of native.diagnostics) {
