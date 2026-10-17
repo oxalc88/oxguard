@@ -90,7 +90,9 @@ jobs:
           python-version: '3.12'
       - name: Repository identity hook regression tests
         shell: bash
-        run: python scripts/test-identity-hooks.py
+        run: |
+          python scripts/test-identity-hooks.py
+          python -m unittest discover -s experiments/test-selection -p "test_*.py"
       - name: Install pinned eval toolchain
         shell: bash
         run: |

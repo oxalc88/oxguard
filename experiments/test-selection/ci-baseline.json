@@ -1,0 +1,84 @@
+{
+  "run_url": "https://github.com/oxalc88/oxguard/actions/runs/38815616310",
+  "runner_seconds": 2155.737,
+  "jobs": [
+    {
+      "id": 116699407370,
+      "name": "PyGuard evals / macos-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 86.245
+    },
+    {
+      "id": 116699407497,
+      "name": "pnpm 10.34.5 / windows-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 268.354
+    },
+    {
+      "id": 116699407498,
+      "name": "PyGuard evals / ubuntu-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 36.623
+    },
+    {
+      "id": 116699407520,
+      "name": "pnpm 10.34.5 / ubuntu-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 139.379
+    },
+    {
+      "id": 116699407566,
+      "name": "pnpm 12.6.0 / ubuntu-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 107.058
+    },
+    {
+      "id": 116699407568,
+      "name": "pnpm 10.34.5 / macos-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 186.232
+    },
+    {
+      "id": 116699407571,
+      "name": "pnpm 12.6.0 / macos-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 149.447
+    },
+    {
+      "id": 116699407596,
+      "name": "npm bundled / macos-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 223.834
+    },
+    {
+      "id": 116699407606,
+      "name": "PyGuard evals / windows-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 113.179
+    },
+    {
+      "id": 116699407648,
+      "name": "npm bundled / ubuntu-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 210.029
+    },
+    {
+      "id": 116699407653,
+      "name": "pnpm 12.6.0 / windows-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 236.633
+    },
+    {
+      "id": 116699407692,
+      "name": "npm bundled / windows-latest",
+      "conclusion": "success",
+      "log_elapsed_seconds": 387.9
+    },
+    {
+      "id": 116701962675,
+      "name": "Report shared capabilities and outstanding gaps",
+      "conclusion": "success",
+      "log_elapsed_seconds": 10.824
+    }
+  ]
+}
