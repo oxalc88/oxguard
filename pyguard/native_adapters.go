@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/oxalc88/oxguard/contract"
 )
 
 // Native report files are recreated for each invocation, so stale output cannot
@@ -77,6 +79,11 @@ func (r *Runner) normalizeNative(spec toolSpec, reader io.Reader, refs []string)
 			r.result.Execution(spec.gate, "analyzer_failure", "Bandit could not evaluate one or more source files.")
 		}
 	case "pip-audit":
+		policy, err := contract.LoadDependencyPolicy(r.root, "pypi")
+		if err != nil {
+			r.result.Execution(spec.gate, "invalid_configuration", "Dependency review policy is invalid or stale: "+err.Error())
+			policy = &contract.DependencyPolicy{}
+		}
 		var data struct {
 			Dependencies []struct {
 				Name, Version string
@@ -113,7 +120,15 @@ func (r *Runner) normalizeNative(spec toolSpec, reader io.Reader, refs []string)
 				if len(v.FixVersions) > 0 {
 					remediation = "Fixed versions: " + strings.Join(v.FixVersions, ", ")
 				}
-				r.result.AddFinding(Finding{Gate: spec.gate, Rule: v.ID, Severity: "error", Status: StatusBlocking, Category: "quality", Location: &Location{Symbol: pkg.Name}, Evidence: pkg.Name + "@" + pkg.Version + ": " + v.Description, Remediation: remediation, Diagnostics: refs})
+				status := StatusBlocking
+				evidence := pkg.Name + "@" + pkg.Version + ": " + v.Description
+				if review := policy.Evidence("pypi", pkg.Name, v.ID); review != "" {
+					status = StatusAdvisory
+					evidence += " " + review
+				} else {
+					evidence += " Exposure unreviewed; development classification alone does not waive policy."
+				}
+				r.result.AddFinding(Finding{Gate: spec.gate, Rule: v.ID, Severity: "error", Status: status, Category: "quality", Location: &Location{Symbol: pkg.Name}, Evidence: evidence, Remediation: remediation, Diagnostics: refs})
 			}
 		}
 	case "deptry":

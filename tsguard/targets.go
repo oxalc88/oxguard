@@ -240,16 +240,13 @@ func runSecurity(r *Runner, initFlag bool) int {
 	if initFlag {
 		return runSecretsInit(r)
 	}
-	if code := runSecretlint(r); code != 0 {
-		return code
+	code := 0
+	for _, check := range []func() int{func() int { return runSecretlint(r) }, func() int { return runNpmAudit(r) }, func() int { return runOpengrep(r) }} {
+		if check() != 0 {
+			code = 1
+		}
 	}
-	if code := runNpmAudit(r); code != 0 {
-		return code
-	}
-	if code := runOpengrep(r); code != 0 {
-		return code
-	}
-	return 0
+	return code
 }
 
 // runSecretlint scans for hardcoded credentials using secretlint (npm-native, no Python).
@@ -310,18 +307,14 @@ func runNpmAudit(r *Runner) int {
 	default:
 		infoArgs = []string{"npm", "audit", "--audit-level=moderate"}
 	}
-	if r.machine() {
-		infoArgs = append(infoArgs, "--json")
-	}
-	r.RunTool(toolSpec{gate: "dependencies", adapter: "dependency-audit", advisory: true}, "dependency audit (info)", infoArgs...)
+	infoArgs = append(infoArgs, "--json")
+	info := r.runDependencyTool(toolSpec{gate: "dependencies", adapter: "dependency-audit", advisory: true}, "dependency audit (info)", infoArgs...)
 
 	// audit-ci — hard gate: threshold enforcement + allowlist via .auditcirc.json.
 	args := pkgExec(r.pkgManager, "audit-ci", "--moderate")
-	if r.machine() {
-		args = append(args, "--output-format", "json", "--report-type", "full")
-	}
-	res := r.RunTool(toolSpec{gate: "dependencies", adapter: "audit-ci"}, "audit-ci", args...)
-	if !res.ok {
+	args = append(args, "--output-format", "json", "--report-type", "full")
+	res := r.runDependencyTool(toolSpec{gate: "dependencies", adapter: "audit-ci"}, "audit-ci", args...)
+	if !res.ok || !info.ok {
 		return 1
 	}
 	return 0

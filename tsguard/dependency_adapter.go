@@ -5,14 +5,23 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/oxalc88/oxguard/contract"
 )
 
-// Native audit advisories are informational. Only audit-ci's native decision
-// blocks, preserving its allowlists and configuration without reimplementing policy.
+// Audit-ci remains the severity-policy gate. Explicit dependency reviews can
+// accept only known development/CI exposure, while preserving full native reports.
 func (r *Runner) normalizeDependencyAudit(spec toolSpec, res Result, reader io.Reader, refs []string) error {
+	policy, err := contract.LoadDependencyPolicy(r.root, "npm")
+	if err != nil {
+		r.result.Execution(spec.gate, "invalid_configuration", "Dependency review policy is invalid or stale: "+err.Error())
+		policy = &contract.DependencyPolicy{}
+	}
 	decoder := json.NewDecoder(reader)
 	valid := false
 	count := 0
+	allReviewed := true
+	var reviewed []string
 	add := func(id, name, severity, title string) {
 		if id == "" {
 			id = "tsguard.dependencies.vulnerable"
@@ -20,8 +29,19 @@ func (r *Runner) normalizeDependencyAudit(spec toolSpec, res Result, reader io.R
 		if severity != "error" && severity != "warning" {
 			severity = "warning"
 		}
+		evidence := policy.Evidence("npm", name, id)
+		if evidence == "" || id == "tsguard.dependencies.vulnerable" {
+			allReviewed = false
+		}
+		detail := name + ": " + title
+		if evidence != "" {
+			detail += " " + evidence
+		} else {
+			detail += " Exposure unreviewed; development classification alone does not waive policy."
+		}
+		reviewed = append(reviewed, detail)
 		if spec.adapter == "dependency-audit" {
-			r.result.AddFinding(Finding{Gate: spec.gate, Rule: id, Severity: severity, Status: StatusAdvisory, Category: "quality", Location: &Location{File: "package.json", Symbol: name}, Evidence: name + ": " + title, Diagnostics: refs})
+			r.result.AddFinding(Finding{Gate: spec.gate, Rule: id, Severity: severity, Status: StatusAdvisory, Category: "quality", Location: &Location{File: "package.json", Symbol: name}, Evidence: detail, Diagnostics: refs})
 		}
 		count++
 	}
@@ -77,9 +97,13 @@ func (r *Runner) normalizeDependencyAudit(spec toolSpec, res Result, reader io.R
 			return fmt.Errorf("unsupported dependency audit report")
 		}
 		for name, v := range report.Vulnerabilities {
+			if len(v.Via) == 0 {
+				allReviewed = false
+			}
 			for _, via := range v.Via {
 				var row struct{ Name, Severity, Title, URL string }
 				if json.Unmarshal(via, &row) != nil {
+					allReviewed = false // indirect/unknown paths cannot be waived
 					continue
 				}
 				add(advisoryID(row.URL), name, row.Severity, row.Title)
@@ -95,6 +119,8 @@ func (r *Runner) normalizeDependencyAudit(spec toolSpec, res Result, reader io.R
 	if spec.adapter == "audit-ci" && !res.ok {
 		if count == 0 {
 			r.result.Execution(spec.gate, "analyzer_failure", "audit-ci failed without a reported vulnerability; inspect diagnostics.")
+		} else if allReviewed {
+			r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard.dependencies.policy_reviewed", Severity: "warning", Status: StatusAdvisory, Category: "quality", Evidence: strings.Join(reviewed, "; "), Diagnostics: refs})
 		} else {
 			r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard.dependencies.policy_failed", Severity: "error", Status: StatusBlocking, Category: "quality", Evidence: "audit-ci rejected the native dependency report under the configured severity and allowlist policy.", Diagnostics: refs})
 		}

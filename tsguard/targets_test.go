@@ -457,13 +457,13 @@ func writeFakeCommand(t *testing.T, path string) {
 
 	script := "#!/bin/sh\n" +
 		"printf '%s %s\\n' \"$(basename \"$0\")\" \"$*\" >> \"$TSGUARD_LOG\"\n" +
+		"case \"$*\" in *audit*) printf '%s\\n' '{\"auditReportVersion\":2,\"vulnerabilities\":{},\"metadata\":{}}';; esac\n" +
 		"exit 0\n"
 
 	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake command %s: %v", path, err)
 	}
 }
-
 
 func readCommandLog(t *testing.T, path string) []string {
 	t.Helper()

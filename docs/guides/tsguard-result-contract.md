@@ -130,3 +130,52 @@ Coverage thresholds remain global; per-file measurements do not introduce per-fi
 Package-manager vulnerability findings remain informational, including allowed advisories. audit-ci alone decides whether the existing severity/allowlist policy blocks. Its full JSON report does not identify which individual advisory policy rejected, so the normalized blocker is `tsguard.dependencies.policy_failed`, not a guessed per-advisory policy decision. Unsupported audit schemas remain partial execution failures.
 
 Scored native evals cover coverage thresholds, failed tests, no-test collection, local Opengrep findings, Secretlint findings and controlled dependency advisories. Structured Vitest enables report generation on test failure so quality findings remain available with coverage evidence. Secretlint uses native `loc.start` with zero-based columns converted to the contract's one-based columns. The CLI currently invokes audit-ci with `--moderate` and does not pass `--config`; automatic loading of project allowlist files is not implemented by this PR. Adapters preserve the policy result actually returned by audit-ci.
+
+
+## Dependency exposure reviews
+
+All security engines run even if another security engine fails. Native audits still
+scan every dependency, and complete reports remain in the diagnostic artifacts.
+A development dependency is not automatically safe: tools can execute in CI and
+can affect shipped artifacts. Unreviewed exposure keeps the existing blocking
+policy (audit-ci severity policy for TypeScript; pip-audit findings for Python).
+
+An optional `.oxguard-dependency-policy.json` accepts a **specific package and
+advisory** only after a review concludes that the product is not exposed and
+explicitly accepts the tooling risk. It is a reviewed risk decision, not automatic
+reachability analysis. Bind it to SHA-256 hashes of the exact manifest and lockfile:
+
+```json
+{
+  "inputs": {
+    "package.json": "<sha256 of current manifest bytes>",
+    "package-lock.json": "<sha256 of current lockfile bytes>"
+  },
+  "reviews": [{
+    "ecosystem": "npm",
+    "package": "affected-build-tool",
+    "advisory": "GHSA-example",
+    "scope": "development_tool",
+    "product_exposure": "not_exposed",
+    "tooling_risk": "accepted",
+    "reason": "Record the advisory's affected operation, product exclusion evidence, CI exposure and accepted risk here."
+  }]
+}
+```
+
+`scope` accepts `development_tool` or `ci`. Unknown exposure, missing reasons,
+invalid input hashes and changed manifests/lockfiles cannot authorize exceptions.
+Malformed or stale policy reports an execution error and retains native findings.
+Do not add a review based only on a package's dev flag. Reassess the decision when
+source, packaging or CI changes could alter exposure; hashes detect dependency
+changes, not behavioral reachability changes. Reviewed findings remain visible as
+advisories with the reason and the original advisory ID. No exceptions are shipped
+with OxGuard.
+
+TypeScript also accepts `pnpm-lock.yaml` or `yarn.lock` input hashes; every
+existing supported lockfile must be bound, so another package manager cannot
+reuse a review of a stale lockfile. A native
+policy failure is advisory only when every reported advisory is covered by a
+matching review. Ambiguous or indirect-only audit paths stay blocking. Existing
+audit-ci thresholds are unchanged; this review file does not create a general
+allowlist or suppress the full package-manager audit.

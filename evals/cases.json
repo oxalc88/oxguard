@@ -956,6 +956,65 @@
         "package.json": "{\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}\n",
         "package-lock.json": "{\"name\": \"oxguard-eval-fixture\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}, \"node_modules/oxguard-eval-dependency\": {\"version\": \"1.0.0\"}}}\n"
       }
+    },
+    {
+      "id": "security.dependency_failure_still_sast",
+      "fixture": "security-contract",
+      "command": "security",
+      "origin": "https://github.com/oxalc88/oxguard/pull/5",
+      "basis": "native_analyzer_contract",
+      "expected": {
+        "status": "fail",
+        "exit_code": 1,
+        "findings": [
+          {
+            "gate": "dependencies",
+            "rule": "tsguard.dependencies.policy_failed",
+            "category": "quality",
+            "status": "blocking"
+          },
+          {
+            "gate": "dependencies",
+            "rule": "GHSA-xxxx-yyyy-zzzz",
+            "category": "quality",
+            "status": "advisory",
+            "file": "package.json"
+          },
+          {
+            "gate": "security",
+            "rule": "node_modules..cache.oxguard.rules.oxguard-eval-no-eval",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/index.ts",
+            "line": 1
+          }
+        ],
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "secrets",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "dependencies",
+            "status": "failed",
+            "normalization": "complete"
+          },
+          {
+            "name": "security",
+            "status": "failed",
+            "normalization": "complete"
+          }
+        ]
+      },
+      "audit_registry": "vulnerable",
+      "files": {
+        "package.json": "{\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}\n",
+        "package-lock.json": "{\"name\": \"oxguard-eval-fixture\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"oxguard-eval-fixture\", \"private\": true, \"version\": \"1.0.0\", \"dependencies\": {\"oxguard-eval-dependency\": \"1.0.0\"}}, \"node_modules/oxguard-eval-dependency\": {\"version\": \"1.0.0\"}}}\n",
+        "src/index.ts": "export const unsafe = eval(\"1+1\");\n"
+      },
+      "local_rules": true
     }
   ]
 }
