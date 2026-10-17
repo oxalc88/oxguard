@@ -1,6 +1,6 @@
 # Maintainability analysis
 
-The v0.8 candidate implements the planned Tsguard code, structure and change levels with measurable maintainability protection to the existing CLI and schema-1 result contract. No extra workflow or agent handoff is required. Existing Level 1 gates still fail fast and retain their thresholds.
+The current implementation provides the planned Tsguard code, structure and change levels with measurable maintainability protection to the existing CLI and schema-1 result contract. No extra workflow or agent handoff is required. Existing Level 1 gates still fail fast and retain their thresholds.
 
 ```sh
 npm install -D @oxguard/tsguard
@@ -88,7 +88,7 @@ Full runtime call depth, arbitrary semantic rename inference, custom branch-expr
 
 The existing 30 TypeScript and 37 Python Level 1 cases remain. Additional not-run gates are explicitly allowed in the historical fail-fast oracle; all original gate states/findings remain exact, and installed tests separately require the new candidate gate list. New Python capabilities are deferred independently and are not scored as passing. `maintainability-capabilities.json` lists appropriate Python providers and explicit gaps; `maintainability-parity.cjs` cannot turn those gaps into release readiness.
 
-Tsguard v0.8 readiness is assessed for the selected Ultracite/Biome maintainability scope with installed evals, retained Level 1 checks and the existing platform matrix. New Python maintainability parity is a later milestone and does not block that scope. `tsguard_scope_ready` and `pyguard_maintainability_ready` are separate report fields; a passing scope report alone does not replace platform checks or authorize publication. Broader independent repository evaluation remains a useful follow-up, not a new mandatory release ceremony.
+Tsguard release readiness is assessed for the selected Ultracite/Biome maintainability scope with installed evals, retained Level 1 checks and the existing platform matrix. New Python maintainability parity is a later milestone and does not block that scope. `tsguard_scope_ready` and `pyguard_maintainability_ready` are separate report fields; a passing scope report alone does not replace platform checks or authorize publication. Broader independent repository evaluation remains a useful follow-up, not a new mandatory release ceremony.
 
 ## Agent review responsibilities
 

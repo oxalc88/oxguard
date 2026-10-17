@@ -1,0 +1,1945 @@
+{
+  "schema_version": "1",
+  "language": "typescript",
+  "skill_sha256": "ba02b6d94f427b7d1546313693c1365ec17b5d7d779fe1be4b66428fb098dee6",
+  "capture_date": "2026-10-17",
+  "provenance": "Fresh independent agent used old skill in isolated fixtures. Same task brief and native toolchain for both versions. Unchanged command observer captured real argv, outputs and source fingerprints. Initial bounded quality and native read/repair records were supplied; subsequent retrieval, edits, offline repair and verification were agent actions. Bundle text fingerprints normalize line endings and terminal whitespace. File-read inventory and routes are agent-reported, not token telemetry. CI replays captures without live model calls.",
+  "additional_verification": null,
+  "agent_tasks": [
+    "router_ts_old"
+  ],
+  "omitted_events": [
+    {
+      "tool": "tsguard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "source_after": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "summary": "FAIL\ncommand: check\ngate: types; assessment: incomplete; not_run: 8; partial: 0\nfindings: 12\nTS2322 src/index.ts:1 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:2 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:3 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:4 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:5 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:6 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:7 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:8 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:9 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:10 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nomitted: 2 (use --output json)\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "source_before": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "source_after": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "tool_output": "dev\n"
+    },
+    {
+      "tool": "npm",
+      "argv": [
+        "exec",
+        "--no",
+        "--",
+        "tsguard",
+        "--version"
+      ],
+      "exit_code": 0,
+      "source_before": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "source_after": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "tool_output": "dev\n",
+      "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "source_before": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "source_after": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "tool_output": "tsguard — TypeScript quality gate runner\n\nQuality gates (replaces npm scripts):\n  tsguard check          full quality gate + advisory maintainability/change\n  tsguard fix            auto-format: ultracite fix\n  tsguard lint           lint + format check (ultracite check)\n  tsguard types          type checking (tsc --noEmit)\n  tsguard typed-lint     native compiler-aware unsafe-operation and promise checks\n  tsguard maintainability AST evidence for delegation and repeated error policy\n  tsguard smells         focused maintainability diagnosis\n  tsguard structure      runtime module graph, cycles, coupling and depth\n  tsguard change         advisory Git baseline versus current maintainability\n  tsguard complexity     compatibility alias; complexity is enforced by ultracite check\n  tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)\n  tsguard coverage       run tests with coverage (vitest --coverage)\n  tsguard security       security: secretlint + npm/pnpm audit + audit-ci + opengrep SAST\n  tsguard npm-audit      dependency vulnerability scan (npm/pnpm/yarn audit + audit-ci)\n  tsguard secrets        credential scan (secretlint)\n  tsguard dead-code      detect unused exports/deps (knip)\n  tsguard duplicates     detect copy-paste code (jscpd)\n  tsguard criticality    informational: function/method caller ranking\n  tsguard audit          informational: criticality + dead-code + duplicates\n\nEnvironment setup:\n  tsguard setup          npm install, configure AI tool hooks\n  tsguard doctor         verify toolchain (read-only)\n  tsguard hooks          generate AI tool hook configs\n\nFlags:\n  --output <mode>  human (default), agent (bounded), or json (complete result)\n  --root <path>    explicit project root containing package.json\n  --baseline <ref> explicit Git revision for source-only change comparison\n  --dirs <d1,d2>    override target directories (default: . — project root)\n  --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-typescript   only run check if stdin context indicates a .ts/.tsx file was edited\n  --max-fta-score <n> FTA score cap per file (default: 60; >60 = Needs Improvement)\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe tsguard through an external tail (tsguard check 2>&1 | tail -50).\n      Use tsguard check --tail 50 or tsguard check --log-file /tmp/tsguard.log --tail 50.\n      In human mode, heavy gates (check, security, coverage) refuse to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter human commands warn on piped stdout but still run.\n      Agent and JSON modes accept piped stdout.\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "source_after": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
+      "result": {
+        "schema_version": "1",
+        "status": "fail",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "lint",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "fta",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "types",
+            "status": "failed",
+            "normalization": "complete"
+          },
+          {
+            "name": "typed-lint",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "coverage",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "dependencies",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "security",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "maintainability",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "duplicates",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "change",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ],
+        "command": "check",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "TS2322:a00069c7d7d7b9d8450b749b66a817d7509bc7d795f7276a22fbce58f6e9cdde",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:0a5cbbe588f9e00c6da97675fc7552e9eb9f718e1ff2642bb57200ec800f52a5",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 2,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:9d737a38730dfe07aba24398ec28179715623c10bc393926d32ab39ac2d335ae",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 3,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:c0282645c9450ffde6a16118ecd0dce0818b6c2f4f975ec247637b43c38b290f",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 4,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:f33d4a2dd77b205cfc9d7993f56fe3fc417882904fe191c47ab5f51998372ec7",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 5,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:35de233c7ca2ec82335b8ed160e433dc7c1b292128a7ded47797c2e0ab56afb4",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 6,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:07f6b1037c889538753796a17c4dc900ee00490abf90f675165d0b21472890da",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 7,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:8322c4373bfde53556dfc9bd4a543ad45bd550d3c076006cfe00bb1314e2220e",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 8,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:97535c40435b15eb43dd6cd0790db0e8ac911f48c873b94e38df95a2b54f2f09",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 9,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:1c883bc23e930be9cb93383959e3d788aab1e8366c9c84accada0841f3e870a7",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 10,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:58cc6590def7a633661e20316c9fcad212cd47ecdc0d2d914a98c4e8ef84e818",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 11,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          },
+          {
+            "id": "TS2322:2649b0726860ddaa802bfb9ffe9f50c18c54b72aa236187269054375c58e3265",
+            "level": "code",
+            "gate": "types",
+            "rule": "TS2322",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 12,
+              "column": 14
+            },
+            "evidence": "Type 'string' is not assignable to type 'number'.",
+            "diagnostics": [
+              "diagnostic-005",
+              "diagnostic-006"
+            ]
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "fta.score",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 9.922897245213235,
+            "unit": "score",
+            "threshold": 60
+          }
+        ],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "lint",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "lint",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-lint-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "fta",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-003-fta-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "fta",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-004-fta-stderr.log"
+          },
+          {
+            "id": "diagnostic-005",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-005-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-006",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-006-types-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 0,
+      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
+      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
+      "summary": "PASS\ncommand: types\ngate: none; assessment: complete; not_run: 0; partial: 0\nfindings: 0\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 1,
+      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
+      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
+      "summary": "ERROR\ncommand: check\ngate: coverage; assessment: incomplete; not_run: 6; partial: 0\nfindings: 3\ntsguard.execution.invalid_configuration [invalid_configuration/execution_error]\nNo tests were collected.\ntsguard.coverage.lines_threshold_failed [quality/blocking]\nlines coverage 0% is below 80%.\ntsguard.coverage.statements_threshold_failed [quality/blocking]\nstatements coverage 0% is below 80%.\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
+      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "lint",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "fta",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "typed-lint",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "coverage",
+            "status": "error",
+            "normalization": "complete"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "dependencies",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "security",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "maintainability",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "duplicates",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "change",
+            "status": "not_run",
+            "normalization": "not_run"
+          }
+        ],
+        "command": "check",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "tsguard.execution.invalid_configuration:c7ba856930561c1632a5e99b9eb5f1b9007631f8cc46115d06c86e46b4e4895c",
+            "level": "code",
+            "gate": "coverage",
+            "rule": "tsguard.execution.invalid_configuration",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "invalid_configuration",
+            "evidence": "No tests were collected.",
+            "diagnostics": []
+          },
+          {
+            "id": "tsguard.coverage.lines_threshold_failed:9984b3bc12aeb98632d3036dd71c32d8006cb051cc35c026100901c7807847f0",
+            "level": "code",
+            "gate": "coverage",
+            "rule": "tsguard.coverage.lines_threshold_failed",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "observed": 0,
+            "threshold": 80,
+            "evidence": "lines coverage 0% is below 80%.",
+            "diagnostics": [
+              "diagnostic-009",
+              "diagnostic-010"
+            ]
+          },
+          {
+            "id": "tsguard.coverage.statements_threshold_failed:f4bac9be9cb225cebbcc2722edd4f4cc2f1d38a0f5538acd51011e30d7193910",
+            "level": "code",
+            "gate": "coverage",
+            "rule": "tsguard.coverage.statements_threshold_failed",
+            "severity": "error",
+            "status": "blocking",
+            "category": "quality",
+            "observed": 0,
+            "threshold": 80,
+            "evidence": "statements coverage 0% is below 80%.",
+            "diagnostics": [
+              "diagnostic-009",
+              "diagnostic-010"
+            ]
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "coverage.branches",
+            "level": "code",
+            "location": {
+              "file": ""
+            },
+            "value": 100,
+            "unit": "percent",
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.functions",
+            "level": "code",
+            "location": {
+              "file": ""
+            },
+            "value": 100,
+            "unit": "percent",
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.lines",
+            "level": "code",
+            "location": {
+              "file": ""
+            },
+            "value": 0,
+            "unit": "percent",
+            "threshold": 80
+          },
+          {
+            "metric": "coverage.statements",
+            "level": "code",
+            "location": {
+              "file": ""
+            },
+            "value": 0,
+            "unit": "percent",
+            "threshold": 80
+          },
+          {
+            "metric": "typed-lint.files",
+            "level": "code",
+            "location": {
+              "file": "."
+            },
+            "value": 1,
+            "unit": "files"
+          },
+          {
+            "metric": "coverage.branches",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 100,
+            "unit": "percent"
+          },
+          {
+            "metric": "coverage.functions",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 100,
+            "unit": "percent"
+          },
+          {
+            "metric": "coverage.lines",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 0,
+            "unit": "percent"
+          },
+          {
+            "metric": "coverage.statements",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 0,
+            "unit": "percent"
+          },
+          {
+            "metric": "fta.score",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 9.922897245213235,
+            "unit": "score",
+            "threshold": 60
+          }
+        ],
+        "artifacts": [
+          {
+            "kind": "typed_lint_native",
+            "path": "node_modules/.cache/oxguard/typed-lint/native.json"
+          },
+          {
+            "kind": "analyzer-report",
+            "path": "node_modules/.cache/oxguard/reports/coverage/coverage-summary.json"
+          },
+          {
+            "kind": "test-report",
+            "path": "node_modules/.cache/oxguard/reports/coverage/tests.json"
+          }
+        ],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "lint",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "lint",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-lint-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "fta",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-003-fta-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "fta",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-004-fta-stderr.log"
+          },
+          {
+            "id": "diagnostic-005",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-005-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-006",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-006-types-stderr.log"
+          },
+          {
+            "id": "diagnostic-007",
+            "gate": "typed-lint",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-007-typed-lint-stdout.log"
+          },
+          {
+            "id": "diagnostic-008",
+            "gate": "typed-lint",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-008-typed-lint-stderr.log"
+          },
+          {
+            "id": "diagnostic-009",
+            "gate": "coverage",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-009-coverage-stdout.log"
+          },
+          {
+            "id": "diagnostic-010",
+            "gate": "coverage",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-010-coverage-stderr.log"
+          }
+        ]
+      }
+    }
+  ],
+  "repair_events": [
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "source_after": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "types",
+            "status": "error",
+            "normalization": "complete"
+          }
+        ],
+        "command": "types",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "tsguard.execution.tool_missing:18cdf7323caea57a67357060a9447bc6478bc368e800f3074aa14e8a1fecff8e",
+            "level": "code",
+            "gate": "types",
+            "rule": "tsguard.execution.tool_missing",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "tool_missing",
+            "evidence": "An analyzer or required module is missing.",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          }
+        ],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "npm",
+      "argv": [
+        "install",
+        "--offline",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
+      ],
+      "exit_code": 0,
+      "source_before": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "source_after": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "tool_output": "\nadded 1 package in 465ms\n",
+      "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "source_before": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "source_after": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "result": {
+        "schema_version": "1",
+        "status": "pass",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "types",
+        "exit_code": 0,
+        "findings": [],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+          }
+        ]
+      }
+    }
+  ],
+  "interpretation": {
+    "advisory": {
+      "schema_version": "1",
+      "status": "advisory",
+      "assessment": "complete",
+      "gates": [
+        {
+          "name": "criticality",
+          "status": "advisory",
+          "normalization": "complete"
+        }
+      ],
+      "command": "criticality",
+      "exit_code": 0,
+      "findings": [
+        {
+          "id": "tsguard.criticality.ranked:7c0b44cf7be52bb88a608701854da70eedb177e792b586b03070335b74202497",
+          "level": "structure",
+          "gate": "criticality",
+          "rule": "tsguard.criticality.ranked",
+          "severity": "info",
+          "status": "advisory",
+          "category": "quality",
+          "location": {
+            "file": "src/index.ts",
+            "line": 1,
+            "column": 1,
+            "symbol": "target"
+          },
+          "observed": 3,
+          "evidence": "target has 3 distinct callers (rank 1).",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.ts",
+            "line": 1,
+            "column": 1,
+            "symbol": "target"
+          },
+          "value": 3,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.ts",
+            "line": 2,
+            "column": 1,
+            "symbol": "a"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.ts",
+            "line": 3,
+            "column": 1,
+            "symbol": "b"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.ts",
+            "line": 4,
+            "column": 1,
+            "symbol": "c"
+          },
+          "value": 0,
+          "unit": "callers"
+        }
+      ],
+      "artifacts": [
+        {
+          "kind": "criticality",
+          "path": "CRITICALITY.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "criticality",
+          "channel": "stdout",
+          "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-criticality-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "criticality",
+          "channel": "stderr",
+          "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-criticality-stderr.log"
+        }
+      ]
+    },
+    "execution": {
+      "schema_version": "1",
+      "status": "error",
+      "assessment": "incomplete",
+      "gates": [
+        {
+          "name": "types",
+          "status": "error",
+          "normalization": "complete"
+        }
+      ],
+      "command": "types",
+      "exit_code": 1,
+      "findings": [
+        {
+          "id": "tsguard.execution.tool_missing:18cdf7323caea57a67357060a9447bc6478bc368e800f3074aa14e8a1fecff8e",
+          "level": "code",
+          "gate": "types",
+          "rule": "tsguard.execution.tool_missing",
+          "severity": "error",
+          "status": "execution_error",
+          "category": "tool_missing",
+          "evidence": "An analyzer or required module is missing.",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [],
+      "artifacts": [],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "types",
+          "channel": "stdout",
+          "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "types",
+          "channel": "stderr",
+          "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+        }
+      ]
+    },
+    "response": {
+      "advisory": {
+        "semantic_status": "advisory",
+        "exit_code": 0,
+        "source_edit_needed": false,
+        "explanation": "Supplied read-input.json is schema 1, complete criticality evidence with one informational advisory: target at src/index.ts:1 has 3 distinct callers (rank 1). Measurements also include a, b and c with zero callers. Read CRITICALITY.md; did not rerun the supplied record.",
+        "limitations": [
+          "Static scoped distinct callers, not call frequency or runtime impact.",
+          "Criticality is advisory; it does not establish module cycles, change quality, or a need to flatten code."
+        ]
+      },
+      "execution": {
+        "semantic_status": "error",
+        "exit_code": 1,
+        "source_edit_needed": false,
+        "explanation": "Original repair-input.json is incomplete types execution evidence with one tool_missing execution_error, not a source typing defect. Referenced stderr identifies missing typescript/package.json. Interpreted the original without rerunning it; a separate post-repair verification passed.",
+        "limitations": [
+          "Original assessment is incomplete and cannot establish type safety.",
+          "Post-repair types pass covers only the requested isolated analysis, not full check."
+        ]
+      },
+      "change": {
+        "semantic_status": "advisory",
+        "exit_code": 0,
+        "simplification_proven": false,
+        "explanation": "Ran tsguard change --baseline HEAD --dirs src, then the same JSON invocation; assessment complete, one FUNCTION_COMPLEXITY_INCREASE advisory. Baseline resolved to f7d9b16ae8e1ad633d75fcf2ebbc05049c9980a5. maintainability_change artifact matches decision by path_or_symbol: baseline cognitive complexity is bounded [0,1], candidate is 3; branches 0 to 2, cyclomatic 1 to 3, FTA 5.5831 to 25.7473. Evidence shows increased measured complexity rather than established simplification.",
+        "limitations": [
+          "Advisory metrics do not prove behavioral equivalence or runtime reachability.",
+          "Pinned source-only analyzers operate on graph-selected src without project analyzer configs."
+        ]
+      },
+      "dependency_review": {
+        "may_waive": false,
+        "explanation": "A devDependency alone is not safe. Without an evidence-backed exposure review and valid policy, retain native blocking policy and advisory visibility. Acceptance requires explicit package/advisory development_tool or ci scope, product_exposure not_exposed, tooling_risk accepted, reason, and hashes of manifest plus every existing supported lockfile."
+      },
+      "verification_reuse": {
+        "reuse_allowed": false,
+        "explanation": "The changed lockfile invalidates dependency identity. Matching source/tests/config is insufficient; dependencies, toolchain, environment and scope must also match. Run applicable invalidated checks; unrelated still-valid evidence need not be repeated."
+      },
+      "unknown_status": {
+        "valid_evidence": false,
+        "explanation": "Schema 1 with unknown status unexpected is invalid evidence even with exit_code 0 and no findings. Preserve original diagnostics and investigate contract failure; do not infer success."
+      },
+      "quality_summary": "Retrieved full pre-fix check JSON with --dirs src and reviewed all 12 TS2322 findings including 2 omitted by the supplied summary. Changed all 12 string initializers to numeric literals while retaining number-typed exports. Isolated types passed (exit 0, complete, 0 findings). Requested check --dirs src rerun: error, exit 1, incomplete, 3 findings: no tests collected execution error plus 0% lines/statements below 80%. lint, fta, types and typed-lint passed; secrets, dependencies, security, maintainability, duplicates and change not_run. No tools installed or tests added in quality.",
+      "repair_summary": "Read original record and missing-module diagnostic; restored declared TypeScript 5.9.3 using npm install --offline --ignore-scripts --no-audit --no-fund (exit 0). Source unchanged. Fresh tsguard types --dirs src --output json passed: semantic pass, exit 0, complete, 0 findings.",
+      "skill_reads": [
+        "SKILL.md"
+      ],
+      "routes": {
+        "quality": null,
+        "repair": null,
+        "security": null,
+        "review": null
+      }
+    }
+  },
+  "change_events": [
+    {
+      "tool": "tsguard",
+      "argv": [
+        "change",
+        "--baseline",
+        "HEAD",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
+      ],
+      "exit_code": 0,
+      "source_before": "d0aeba073b8a2c3cbe864a614d14bf7dcf2edb127901a0fb50821e6d8e710ec1",
+      "source_after": "d0aeba073b8a2c3cbe864a614d14bf7dcf2edb127901a0fb50821e6d8e710ec1",
+      "summary": "ADVISORY\ncommand: change\ngate: change; assessment: complete; not_run: 0; partial: 0\nfindings: 1\ntsguard.change.FUNCTION_COMPLEXITY_INCREASE src/index.ts:1 [quality/advisory]\nMatched by path_or_symbol against f7d9b16ae8e1ad633d75fcf2ebbc05049c9980a5: native Biome cognitive complexity increased beyond baseline upper bound 1 to at least 3.\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-maintainability-stdout.log (paths in --output json)\n"
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "change",
+        "--baseline",
+        "HEAD",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "source_before": "d0aeba073b8a2c3cbe864a614d14bf7dcf2edb127901a0fb50821e6d8e710ec1",
+      "source_after": "d0aeba073b8a2c3cbe864a614d14bf7dcf2edb127901a0fb50821e6d8e710ec1",
+      "result": {
+        "schema_version": "1",
+        "status": "advisory",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "change",
+            "status": "advisory",
+            "normalization": "complete"
+          },
+          {
+            "name": "maintainability",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "change",
+        "exit_code": 0,
+        "findings": [
+          {
+            "id": "tsguard.change.FUNCTION_COMPLEXITY_INCREASE:577412b7cf44eebbcb2cc069107f5472b41129c1899ee5fe6014b7463a6471d6",
+            "level": "change",
+            "gate": "change",
+            "rule": "tsguard.change.FUNCTION_COMPLEXITY_INCREASE",
+            "severity": "warning",
+            "status": "advisory",
+            "category": "quality",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "related": [
+              {
+                "file": "src/index.ts",
+                "line": 1,
+                "column": 1,
+                "symbol": "decision"
+              }
+            ],
+            "evidence": "Matched by path_or_symbol against f7d9b16ae8e1ad633d75fcf2ebbc05049c9980a5: native Biome cognitive complexity increased beyond baseline upper bound 1 to at least 3.",
+            "remediation": "Review the added paths and required domain behavior; an increase alone is not a blocking violation.",
+            "diagnostics": []
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "calls.unresolved",
+            "level": "structure",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "calls"
+          },
+          {
+            "metric": "change.baseline.coupling_hotspots",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.dependency_depth",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.duplicate_clones",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "clones"
+          },
+          {
+            "metric": "change.baseline.duplicated_lines",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "lines"
+          },
+          {
+            "metric": "change.baseline.duplicated_tokens",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "tokens"
+          },
+          {
+            "metric": "change.baseline.duplication_percentage",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "percent"
+          },
+          {
+            "metric": "change.baseline.function_call_depth",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.function_recursive_components",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.max_file_branches",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.max_fta_score",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 5.583128210518055,
+            "unit": "score"
+          },
+          {
+            "metric": "change.baseline.max_function_branches",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.max_module_fan_in",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.max_module_fan_out",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.module_count",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 1,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.module_cycles",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.module_edges",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.p50_fta_score",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 5.583128210518055,
+            "unit": "score"
+          },
+          {
+            "metric": "change.baseline.p90_fta_score",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 5.583128210518055,
+            "unit": "score"
+          },
+          {
+            "metric": "change.baseline.total_branches",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.baseline.total_cognitive_max",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 1,
+            "unit": "complexity"
+          },
+          {
+            "metric": "change.baseline.total_cognitive_min",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "complexity"
+          },
+          {
+            "metric": "change.baseline.total_cyclomatic",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 1,
+            "unit": "paths"
+          },
+          {
+            "metric": "change.baseline.total_halstead_volume",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 18.094737505048094,
+            "unit": "volume"
+          },
+          {
+            "metric": "change.baseline.wrappers",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.coupling_hotspots",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.dependency_depth",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.duplicate_clones",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "clones"
+          },
+          {
+            "metric": "change.candidate.duplicated_lines",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "lines"
+          },
+          {
+            "metric": "change.candidate.duplicated_tokens",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "tokens"
+          },
+          {
+            "metric": "change.candidate.duplication_percentage",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "percent"
+          },
+          {
+            "metric": "change.candidate.function_call_depth",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.function_recursive_components",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.max_file_branches",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 2,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.max_fta_score",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 25.74731360590968,
+            "unit": "score"
+          },
+          {
+            "metric": "change.candidate.max_function_branches",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 2,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.max_module_fan_in",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.max_module_fan_out",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.module_count",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 1,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.module_cycles",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.module_edges",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.p50_fta_score",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 25.74731360590968,
+            "unit": "score"
+          },
+          {
+            "metric": "change.candidate.p90_fta_score",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 25.74731360590968,
+            "unit": "score"
+          },
+          {
+            "metric": "change.candidate.total_branches",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 2,
+            "unit": "count"
+          },
+          {
+            "metric": "change.candidate.total_cognitive_max",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 3,
+            "unit": "complexity"
+          },
+          {
+            "metric": "change.candidate.total_cognitive_min",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 3,
+            "unit": "complexity"
+          },
+          {
+            "metric": "change.candidate.total_cyclomatic",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 3,
+            "unit": "paths"
+          },
+          {
+            "metric": "change.candidate.total_halstead_volume",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 85.11011351724513,
+            "unit": "volume"
+          },
+          {
+            "metric": "change.candidate.wrappers",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "count"
+          },
+          {
+            "metric": "change.matched_files",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 1,
+            "unit": "files"
+          },
+          {
+            "metric": "change.matched_functions",
+            "level": "change",
+            "location": {
+              "file": "."
+            },
+            "value": 1,
+            "unit": "functions"
+          },
+          {
+            "metric": "function.recursive_components",
+            "level": "structure",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "components"
+          },
+          {
+            "metric": "module.count",
+            "level": "structure",
+            "location": {
+              "file": "."
+            },
+            "value": 1,
+            "unit": "modules"
+          },
+          {
+            "metric": "module.cycles",
+            "level": "structure",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "components"
+          },
+          {
+            "metric": "module.edges",
+            "level": "structure",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "edges"
+          },
+          {
+            "metric": "module.external_imports",
+            "level": "structure",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "references"
+          },
+          {
+            "metric": "module.type_imports",
+            "level": "structure",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "references"
+          },
+          {
+            "metric": "module.unresolved_imports",
+            "level": "structure",
+            "location": {
+              "file": "."
+            },
+            "value": 0,
+            "unit": "references"
+          },
+          {
+            "metric": "change.baseline.file.cyclomatic",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 1,
+            "unit": "paths"
+          },
+          {
+            "metric": "change.baseline.file.halstead_volume",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 18.094737505048094,
+            "unit": "volume"
+          },
+          {
+            "metric": "change.baseline.fta.score",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 5.583128210518055,
+            "unit": "score"
+          },
+          {
+            "metric": "change.baseline.function.cognitive_max",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 1,
+            "unit": "complexity"
+          },
+          {
+            "metric": "change.baseline.function.cognitive_min",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 0,
+            "unit": "complexity"
+          },
+          {
+            "metric": "change.candidate.file.cyclomatic",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 3,
+            "unit": "paths"
+          },
+          {
+            "metric": "change.candidate.file.halstead_volume",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 85.11011351724513,
+            "unit": "volume"
+          },
+          {
+            "metric": "change.candidate.fta.score",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 25.74731360590968,
+            "unit": "score"
+          },
+          {
+            "metric": "change.candidate.function.cognitive_max",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 3,
+            "unit": "complexity"
+          },
+          {
+            "metric": "change.candidate.function.cognitive_min",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 3,
+            "unit": "complexity"
+          },
+          {
+            "metric": "change.delta.file.cyclomatic",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 2,
+            "unit": "paths"
+          },
+          {
+            "metric": "change.delta.fta.score",
+            "level": "change",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 20.164185395391627,
+            "unit": "score"
+          },
+          {
+            "metric": "criticality.in_degree",
+            "level": "structure",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 0,
+            "unit": "callers"
+          },
+          {
+            "metric": "delegation.depth",
+            "level": "structure",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 0,
+            "unit": "layers"
+          },
+          {
+            "metric": "function.branches",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 2,
+            "unit": "branches"
+          },
+          {
+            "metric": "function.call_depth",
+            "level": "structure",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 0,
+            "unit": "edges"
+          },
+          {
+            "metric": "function.fan_in",
+            "level": "structure",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 0,
+            "unit": "callers"
+          },
+          {
+            "metric": "function.fan_out",
+            "level": "structure",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 0,
+            "unit": "callees"
+          },
+          {
+            "metric": "function.max_branch_nesting",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts",
+              "line": 1,
+              "column": 1,
+              "symbol": "decision"
+            },
+            "value": 2,
+            "unit": "levels"
+          },
+          {
+            "metric": "module.dependency_depth",
+            "level": "structure",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 0,
+            "unit": "edges"
+          },
+          {
+            "metric": "module.fan_in",
+            "level": "structure",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 0,
+            "unit": "modules"
+          },
+          {
+            "metric": "module.fan_out",
+            "level": "structure",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 0,
+            "unit": "modules"
+          }
+        ],
+        "artifacts": [
+          {
+            "kind": "maintainability_graph",
+            "path": "node_modules/.cache/oxguard/maintainability-graph.json"
+          },
+          {
+            "kind": "maintainability_change",
+            "path": "node_modules/.cache/oxguard/maintainability-change.json"
+          }
+        ],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "maintainability",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-maintainability-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "maintainability",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-maintainability-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "change",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-003-change-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "change",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-004-change-stderr.log"
+          }
+        ]
+      }
+    }
+  ],
+  "skill_snapshot": "---\nname: tsguard\ndescription: >-\n  Run Tsguard quality checks for TypeScript projects and act on its normalized\n  agent or JSON results. Use for type errors, lint, FTA scores, coverage,\n  security, maintainability, structural dependencies, baseline comparisons,\n  advisory criticality, or requests to run, interpret or review Tsguard results.\n---\n\n# Tsguard\n\nDelegate analysis to Tsguard. Use normalized findings to select work; use raw analyzer diagnostics only when a finding needs more evidence.\n\n## Invoke the installed CLI\n\nWork from the project containing `package.json`, or supply `--root <project>`. Prefer the project-local npm distribution:\n\n```sh\nnpx --no-install tsguard check --output agent\n```\n\nFor a pnpm project, use `pnpm exec tsguard check --output agent`. Verify local installation with the same executor and `tsguard --version`; check that `--help` advertises `--output` and `--root` before relying on this contract. If the package is missing, use the project's package manager to install `@oxguard/tsguard` as a dev dependency when installation is authorized. Do not silently fetch a CLI with plain `npx`. Do not run `setup` or install a global binary as part of routine analysis.\n\nUse the command the user requested. Otherwise default to `check`:\n\n- `check`: blocking, fail-fast lint → FTA → types → typed-lint → coverage → security, then advisory maintainability, duplication and baseline comparison. Later analyses remain not_run after an earlier blocking failure.\n- `typed-lint`: upstream native compiler-aware unsafe assignment/assertion and promise rules; unnecessary conditions are advisory. Unsupported TypeScript 7 configurations or unresolved types leave assessment incomplete.\n- `lint`, `types`, `fta`, `coverage`, `security`, `npm-audit`, `secrets`: individual gates.\n- `criticality`: advisory function/method caller ranking and `CRITICALITY.md`.\n- `maintainability`, `smells`, `structure`: advisory compiler facts for single-return sync/async forwarding chains, repeated catch policy, silent catch exits, dropped settled rejections, runtime module cycles, coupling and dependency depth. Graph artifacts contain all selected facts, including distinct function callers/callees and SCC call depth, not runtime impact guarantees.\n- `change --baseline <Git ref>`: advisory structural and native FTA/Biome cognitive/jscpd comparison using inert source files. Missing or incomplete inputs leave change not_run; absence of a baseline does not fail the command. Retain --baseline when retrieving JSON.\n- `audit`: advisory criticality → dead-code → duplicates; exit 0 even on findings.\n- `fix`: source formatting/lint mutation; run when source changes are authorized.\n\nKeep requested scope and thresholds. Supported flags include `--root`, `--dirs <d1,d2>`, `--exclude <d1,d2>`, `--timeout <seconds>` and `--max-fta-score <n>`. CLI overrides root `oxguard.toml`, then defaults apply. Unknown flags, missing values and invalid output modes are errors. Agent/JSON modes accept captured stdout without `--allow-pipe`. Help, version, doctor, setup and hooks retain human output; do not give them `--output agent/json`.\n\nOpengrep is required for the security gate. A missing or untrusted engine is an execution failure, not a passing or skipped security assessment. npm installations use the package-owned engine; reinstall with optional dependencies if it is missing. Standalone installations verify a pinned SHA-256 digest and use the OS user cache outside the scanned project; authorized `tsguard setup` installs or repairs that engine.\n\n`security` completes SAST, dependency auditing and secret detection even when one fails. The outer `check` still stops at a failing gate. Inspect every security sub-gate and its diagnostics; a dependency failure does not establish that SAST or secret detection failed or passed.\n\nKeep the bundled stable TypeScript 5.9.3 fallback and the project's declared compiler. Do not upgrade a project to TypeScript 7 or infer full support from the native typed-lint backend's TypeScript 7 semantics. Full project TypeScript 7 support is not part of this release.\n\n## Reuse verified evidence\n\nRead available results and CI summaries before repeating equivalent checks. Reuse evidence only when source, tests, configuration, dependencies, toolchain, environment and requested scope still match. Changed or unverified inputs require the applicable checks; run missing or invalidated checks rather than repeating unrelated green checks or reviews. Request JSON only when the available record lacks required detail.\n\nFor OxGuard's own releases, use the existing trusted exact-commit main-run evidence mechanism. Distribution checks remain fresh because npm transitives are unlocked; release artifacts still need smoke checks. The test-selection prototype is shadow-only and does not authorize skipping mandatory tests. Do not invent a separate verification cache or claim measured CI savings without observed reuse.\n\n## Consume findings completely\n\nUse `--output agent` for the first bounded view. It shows the total count and at most ten findings. **If `omitted: N (use --output json)` appears, retrieve JSON with the same command, root, scope and thresholds before claiming that all findings have been reviewed or addressed.** The summary cannot describe omitted findings. A rerun produces a new result, so keep source/configuration unchanged during retrieval.\n\n```sh\nnpx --no-install tsguard check --output json\n```\n\nParse JSON as data. Require `schema_version: \"1\"`. Use `status`, `exit_code`, `findings`, `measurements`, `artifacts` and `diagnostics`. Process the complete `findings` array, grouping work by rule and location; summarize groups without pasting the full JSON into context. Preserve the total count and any unresolved groups. Finding fields include stable `id`, `rule`, `gate`, `level`, `severity`, `status`, `category`, optional `location`, numeric `observed` / `threshold`, `evidence`, and diagnostic IDs. Do not reconstruct these fields from prose.\n\nTreat unknown statuses, contradictory gate/finding states and malformed reports as invalid evidence, never as advisory success. Schema-1 statuses remain readable strings; do not depend on internal numeric constants. Keep the original result and diagnostics when investigating a contract failure.\n\nDistinguish `blocking`, `advisory`, and `execution_error` findings. Read the semantic run status as well as the real process code:\n\n- `quality`: inspect the reported rule/location; use evidence to guide fixes.\n- `tool_missing`, `startup_failure`, `dependency_failure`, `timeout`: resolve\nexecution or dependencies; do not treat them as source defects.\n- `invalid_configuration`: correct flags, project root or configuration.\n- `lock_contention`: report the active lock; do not delete it or retry blindly.\n- `adapter_failure`, `analyzer_failure`, `diagnostics_failure`, `artifact_failure`,\n`lock_failure`, `interrupted`, `unclassified_failure`: use the referenced diagnostics to identify the cause before making changes.\n\nExit 1 alone does not mean “fix source.” `audit` and `criticality` can have `status: error` with exit 0. A passed gate does not prove that later gates ran: `check` stops at the first blocking failure. Fix authorized issues, rerun the failed gate, then rerun `check` to reach the remaining gates.\n\nUse Ultracite/Biome for the default lint policy. The separate typed-lint gate runs only five selected upstream semantic rules using package-owned Oxlint/tsgolint, with syntax categories disabled. It uses TypeScript 7 semantics; `types` and graph analysis retain the selected project compiler. No ESLint engine or second formatter runs. Do not claim TypeScript 5/6 semantic equivalence or complete coverage when native configuration/type diagnostics, strictNullChecks, unresolved types or scope budgets prevent analysis. Read the typed_lint_native artifact for actual backend versions and diagnostics. Project-wide unused-code detection uses Knip in audit; duplicate detection uses jscpd in check and audit, with advisory findings.\n\nFTA reports file scores and the configured cap; a cap failure exposes only the first failing file because the analyzer exits before producing JSON. On a cap failure, complexity-context adds branch counts, maximum branch nesting and branch source locations for the first failing file. These are compiler observations, not FTA contributions or per-function FTA scores. Do not invent later failing files or unreported component measurements. Biome and Opengrep preserve native rule IDs; TypeScript preserves TS codes. Unsupported tool details produce a stable gate-level fallback, whose cause must be checked in diagnostics.\n\n## Use criticality as advisory context\n\nRead `criticality.in_degree` measurements and `CRITICALITY.md`. The report ranks up to 30 functions/methods by distinct callers; JSON has all measured functions, including zero-caller functions. Repeated calls from one caller count once. Use the rank to identify functions that need careful tests before changes, not as a blocking threshold or proof of runtime impact. Static unresolved and external calls are disclosed in the report. Criticality alone does not evaluate module cycles or change quality; retrieve the maintainability/change results for those questions.\n\n## Interpret maintainability evidence\n\nTreat LONG_DELEGATION_CHAIN, FRAGMENTED_DELEGATION, REPEATED_ERROR_HANDLER, SILENT_EXCEPTION_FALLBACK, SILENT_EXCEPTION_EXIT, SILENT_PROMISE_REJECTION, DISCARDED_SETTLED_REJECTION and HIGH_MODULE_COUPLING as review cues, not instructions to flatten every abstraction. Verify the reported call path or repeated catch bodies. Preserve dependency injection, stable APIs, intentional best-effort policies and necessary domain validation. Do not add unsafe logging or change failure propagation just to remove an advisory.\n\nRead function.max_branch_nesting and branch_locations in the graph to locate nested paths. Async forwarding_mode preserves the observed boundary mode; a chain warning does not establish equivalent timing or stack behavior. Discarded-settled findings cover symbol-resolved native allSettled → local aliases → flatMap block callbacks and explicit status guards, not arbitrary promise flows. A reason reference suppresses that path warning but does not prove correct recovery.\n\nRead module.fan_in, module.fan_out, module.dependency_depth, function.fan_in, function.fan_out and function.call_depth with the graph artifact. Repeated calls by one function count once; recursive call components are measured without a quality violation. Depth measures edges between strongly connected components; type-only imports are separate. Missing local and nonliteral dynamic imports make graph assessment partial. External references and unresolved calls remain disclosed limitations; this is a static, scoped graph.\n\nDo not claim a maintainability improvement from smaller files or individual FTA scores. Read POSSIBLE_COMPLEXITY_DISPLACEMENT evidence against the resolved baseline SHA: decreased per-file branch concentration or native FTA maximum, unreduced branch work and increased structural cost support review, not a proof of equivalent behavior. Function branch counts are observations, not cognitive/FTA scores. Read the maintainability_change artifact for both native profiles, analyzer policy and identity matches. FTA distributions and jscpd clone/token deltas use the same pinned tools over isolated graph-selected sources, without project analyzer configs. Biome reports exact cognitive scores above 1; scores at or below 1 are bounds [0,1], not invented exact values. Suppressed measurements have unknown upper bounds and leave the assessment incomplete. Treat FUNCTION_COMPLEXITY_INCREASE and NEW_DUPLICATION as advisory review cues. File/symbol identities match by existing path/name or unique exact source/token fingerprints; ambiguous copies and arbitrary semantic renames stay unmatched. Runtime dispatch and behavioral equivalence are not proven.\n\n## Review code with project context\n\nRead the target project's applicable `AGENTS.md` and referenced architecture/error/observability rules before recommending design changes. Keep project rules in that project; do not create or rewrite them as a prerequisite for Tsguard review.\n\nSeparate measured analyzer findings from agent review judgments. Cite source locations and relevant project policy for each judgment; describe missing context instead of presenting an opinion as a blocking Tsguard rule.\n\n- Inspect each helper's transformation, validation, shared policy or interface boundary. Review pass-through layers, but do not count functions or flatten shared domain logic solely to reduce a score.\n- Trace rejected work to a propagated failure, recorded failure, or documented recovery outcome. Inspect catches, `continue`/`break`/early returns and settled-result filters; do not require all catches to rethrow or log sensitive payloads.\n- Check event ownership across callers and callbacks. Report possible duplicate confirmation/error events only when a resolved call path supports them; repeated event names alone do not establish duplicate runtime logging.\n- Compare the whole affected workflow, including helper/callback branches, call depth and native change metrics. Explain whether evidence supports simplification or only movement of complexity. Preserve necessary validation, ordering, retry and time-budget behavior.\n\nRun `maintainability` or `smells` separately when fail-fast leaves those gates not_run and the user requested review. Use `change --baseline` only with a supplied or configured baseline; do not invent one. Review judgments do not change the CLI exit policy or prove runtime reachability.\n\n## Drill down and report\n\nResolve finding diagnostic IDs through the JSON `diagnostics` array. Read only the relevant stdout/stderr file when evidence is insufficient. Structured modes save complete streams under `node_modules/.cache/oxguard/diagnostics/`; a later run can overwrite them. `--log-file` is optional additional logging; `--tail` limits human display only. Do not create a temp log and read every analyzer log for the normal path.\n\nIf the user supplied an existing JSON result or log, interpret that artifact without rerunning unless asked. Label legacy prose as unnormalized and do not invent stable IDs or counts that it does not establish. Launcher errors before Go starts retain stderr/exit output; do not expect JSON for those failures.\n\nReport command/scope, semantic status, real exit code, total findings, blocking versus advisory work, execution problems and the next concrete action. State any omitted or unreviewed findings and gates that have not run. After fixes, verify the complete result before claiming success.\n\n## Verify assessment completeness\n\nRead `assessment` and `gates` in JSON. `assessment: complete` means every requested gate ran with supported normalization; it does not mean findings passed. Each gate has `status` (`passed`, `advisory`, `failed`, `error` or `not_run`) and `normalization` (`complete`, `partial` or `not_run`). The agent summary includes incomplete assessment, not-run and partial counts. Retrieve JSON with the same invocation when any count is nonzero to name the affected gates. Do not claim a complete assessment from a partial adapter, execution error, or fail-fast result. Use the relevant isolated gate to investigate, then rerun the full requested command after authorized fixes.\n\nRead global coverage thresholds and per-file measurements directly; per-file measurements do not add per-file blocking thresholds. Native test failures are quality findings; no-test collection and missing or malformed reports are execution problems. Native analyzer reports are listed in `artifacts` and refreshed for each run; use those reports for additional upstream fields. Secretlint findings retain rules and positions while omitting secret values.\n\nNative dependency advisories are informational; `tsguard.dependencies.policy_failed` records audit-ci's blocking decision without guessing which individual advisory caused it. The CLI invokes audit-ci with `--moderate` and does not pass `--config`; do not claim a project's allowlist file was loaded automatically. Use `related` locations for duplicate pairs. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. PyGuard retains existing Level 1 and criticality capabilities; do not claim Python parity for the new TypeScript structural or change analyses.\n\n## Handle reviewed dependency exposure\n\nKeep runtime/product exposure separate from development-tool and CI risk. A devDependency alone is not safe. Without a valid review, retain the native blocking policy and full advisory visibility.\n\nUse `.oxguard-dependency-policy.json` only for an explicit package/advisory review with `scope` of `development_tool` or `ci`, `product_exposure: not_exposed`, `tooling_risk: accepted` and an evidence-backed reason. Bind `inputs` to SHA-256 hashes of the manifest and every existing supported lockfile. Malformed, missing, stale or ambiguous evidence cannot waive a failure. Do not create acceptance entries or suppress advisories merely to make checks green.\n\nInspect the native report and normalized findings together. Accepted reviews remain visible advisories. Reassess source, packaging and CI changes that can alter exposure: dependency hashes do not prove reachability. The result-contract guide contains the policy format; do not infer an automatic exception from package classification.\n"
+}

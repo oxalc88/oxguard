@@ -27,6 +27,20 @@ def unpack(archive, destination):
             package.extractall(destination, filter="data")
 
 
+def check_documentation(directory, tag, guide=None):
+    if (directory / "VERSION").read_text(encoding="utf-8").strip() != tag:
+        raise ValueError("Release documentation version does not match tag")
+    if guide and not (directory / "docs" / guide).is_file():
+        raise ValueError("Release documentation guide is missing")
+    files = [directory / "README.md", *(directory / "docs").rglob("*.md")]
+    for file in files:
+        text = file.read_text(encoding="utf-8")
+        if f"OxGuard version: {tag}" not in text.splitlines():
+            raise ValueError(f"Documentation version missing or mismatched: {file.name}")
+        if any(f"https://github.com/oxalc88/oxguard/{kind}/main/" in text for kind in ("blob", "tree")):
+            raise ValueError(f"Release documentation links to main: {file.name}")
+
+
 def archive_smoke(tool, tag, target_os, arch, directory):
     name = f"{tool}-{tag}-{target_os}-{arch}"
     extension = "zip" if target_os == "windows" else "tar.gz"
@@ -37,6 +51,7 @@ def archive_smoke(tool, tag, target_os, arch, directory):
     with tempfile.TemporaryDirectory(prefix="oxguard-release-") as temporary:
         destination = Path(temporary)
         unpack(archive, destination)
+        check_documentation(destination / name, tag, f"guides/{tool}-result-contract.md")
         binary = destination / name / (tool + (".exe" if target_os == "windows" else ""))
         metadata = run(["go", "version", "-m", str(binary)])
         settings = dict(line.strip().split(None, 1)[1].split("=", 1)
@@ -70,6 +85,7 @@ def npm_smoke(tag, directory):
             manifest = json.loads((package / "package.json").read_text())
             if manifest["name"] != f"@oxguard/{name}" or manifest["version"] != version or manifest.get("scripts"):
                 raise ValueError("Release npm manifest does not match tag/name or contains scripts")
+            check_documentation(package, tag, "guides/tsguard-result-contract.md" if name == "tsguard" else None)
             scope.mkdir(parents=True, exist_ok=True)
             package.rename(scope / name)
         launcher = scope / "tsguard/bin/tsguard.cjs"

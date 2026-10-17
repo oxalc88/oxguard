@@ -3,17 +3,22 @@ const test = require("node:test"),
 	assert = require("node:assert/strict"),
 	fs = require("node:fs"),
 	path = require("node:path");
-const { score, evaluate } = require("./agent-actions.cjs");
+const {
+	score,
+	evaluate,
+	readSkillBundle,
+	compareSkills,
+} = require("./agent-actions.cjs");
 function fixture(language = "python") {
 	const trace = JSON.parse(
 		fs.readFileSync(path.join(__dirname, "agent-traces", language + ".json")),
 	);
-	const skill = fs.readFileSync(
+	const skill = readSkillBundle(
 		path.join(
 			__dirname,
 			"..",
 			language === "python" ? "pyguard" : "tsguard",
-			"skill/SKILL.md",
+			"skill",
 		),
 	);
 	return { trace, skill };
@@ -52,11 +57,28 @@ test("source edits during execution repair fail the scenario", () => {
 	assert.equal(score(trace, skill).ready, false);
 });
 
+test("skills cannot waive unreviewed advisories, reuse changed locks or accept unknown statuses", () => {
+	for (const language of ["python", "typescript"]) {
+		for (const [key, decision] of [
+			["dependency_review", "may_waive"],
+			["verification_reuse", "reuse_allowed"],
+			["unknown_status", "valid_evidence"],
+		]) {
+			const { trace, skill } = fixture(language);
+			trace.interpretation.response[key][decision] = true;
+			assert.equal(score(trace, skill).ready, false);
+		}
+	}
+});
+
 test("native change evidence and interpretation cannot be replaced by a score-only claim", () => {
-	for (const mutate of [t=>t.change_events=[],t=>t.interpretation.response.change.simplification_proven=true]) {
-		const {trace,skill} = fixture("typescript");
+	for (const mutate of [
+		(t) => (t.change_events = []),
+		(t) => (t.interpretation.response.change.simplification_proven = true),
+	]) {
+		const { trace, skill } = fixture("typescript");
 		mutate(trace);
-		assert.equal(score(trace,skill).ready,false);
+		assert.equal(score(trace, skill).ready, false);
 	}
 });
 test("completion rejects missing native cases and passing totals with hidden failures", () => {
@@ -91,4 +113,57 @@ test("completion rejects missing native cases and passing totals with hidden fai
 	r = reports();
 	r[2].cases.at(-1).outcome = "fail";
 	assert.equal(assess(...r).level1_agent_contract_ready, false);
+});
+
+test("router evidence must include the selected task guides", () => {
+	for (const task of ["quality", "repair", "security", "review"]) {
+		const { trace, skill } = fixture();
+		trace.interpretation.response.routes[task] = "workflows/wrong.md";
+		assert.equal(score(trace, skill).ready, false);
+	}
+});
+
+test("a changed task guide invalidates the whole bundle capture", () => {
+	const os = require("node:os");
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "oxguard-skill-hash-"));
+	try {
+		fs.cpSync(path.join(__dirname, "../pyguard/skill"), root, {
+			recursive: true,
+		});
+		const { trace } = fixture();
+		for (const relative of ["workflows/check.md", "workflows/fix.md"]) {
+			const target = path.join(root, relative),
+				original = fs.readFileSync(target);
+			fs.appendFileSync(target, "\nchanged");
+			assert.equal(score(trace, readSkillBundle(root)).ready, false);
+			fs.writeFileSync(target, original);
+		}
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("old and split skills preserve action correctness; focused tasks load less text", () => {
+	const comparison = compareSkills();
+	assert.equal(comparison.ready, true);
+	for (const result of comparison.results) {
+		assert.ok(result.text_size.current_entry < result.text_size.baseline_entry);
+		assert.ok(result.text_size.current_total <= 700);
+		assert.ok(
+			result.text_size.focused_review_words < result.text_size.baseline_entry,
+		);
+		assert.ok(result.text_size.current_check < result.text_size.baseline_entry);
+	}
+});
+
+test("focused review cannot claim success after loading unrelated workflows", () => {
+	const { trace, skill } = fixture();
+	trace.focused_review.response.skill_reads.push("workflows/security.md");
+	assert.equal(score(trace, skill).ready, false);
+});
+
+test("router metadata cannot disable routing checks", () => {
+	const { trace, skill } = fixture();
+	delete trace.skill_layout;
+	assert.equal(score(trace, skill).ready, false);
 });

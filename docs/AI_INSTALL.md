@@ -140,9 +140,15 @@ pyguard setup --yes
 To redeploy updated skill files to your AI tools (e.g. after a version bump ships new SKILL.md content):
 
 ```bash
-tsguard hooks   # interactive — re-select your tools to overwrite stale skill files
+tsguard hooks   # interactive — re-select tools and review existing-file warnings
 pyguard hooks
 ```
+
+Claude skill copies are refreshed from the embedded canonical skill. Existing
+Codex `AGENTS.md` and customized hook files are protected from replacement;
+merge updated skill guidance into those project files deliberately when the
+command reports an existing-file warning. Do not assume every instruction
+file was overwritten successfully.
 
 **AI agent prompt for updating tsguard:**
 
@@ -205,6 +211,27 @@ Report the new version and any changes to the doctor output.
 
 ---
 
+## Match documentation to the installed version
+
+Run `tsguard --version` or `pyguard --version`. Read repository documentation at
+that same Git tag for release-specific behavior. The `main` branch can describe
+unreleased changes; historical plans keep their original version names.
+
+A release tag supplies the binary, npm package, documentation and skill versions.
+Release archives include a stamped README, the documentation snapshot and a
+`VERSION` file. The main npm package includes the stamped docs; every npm package
+has a versioned README and `VERSION`. Documentation links point to that Git tag.
+Source Markdown stays version-neutral; packaging does not commit generated labels.
+
+After installing a newer binary, run `tsguard hooks` or `pyguard hooks`. Every
+installed skill guide displays the binary version, its `VERSION` file matches,
+and its detailed documentation link points to that tag. Running hooks again after
+another upgrade replaces the owned bundle with that binary's matching version.
+A development binary displays `dev` and keeps documentation links on `main`.
+Existing project instructions remain protected; merge the new skill pointer when
+an existing-file warning requires it. Release smoke checks reject mismatched or
+missing documentation version metadata before publication.
+
 ## Notes for the agent
 
 - **setup is idempotent** — it adds only what's missing. Re-running it on an
@@ -234,4 +261,26 @@ Report the new version and any changes to the doctor output.
 
 ### Tsguard review guidance
 
-The v0.8 candidate skill follows the target project's applicable AGENTS.md and referenced policies; keep those rules in that project. Review helper purpose, error recovery, logging ownership and whole-workflow complexity separately from deterministic analyzer findings. The typed-lint gate uses an owned native semantic backend with explicit TypeScript 7 compatibility limits. See [supported maintainability scope](maintainability.md).
+The bundled skill follows the target project's applicable AGENTS.md and referenced policies; keep those rules in that project. Review helper purpose, error recovery, logging ownership and whole-workflow complexity separately from deterministic analyzer findings. The typed-lint gate uses an owned native semantic backend with explicit TypeScript 7 compatibility limits. See [supported maintainability scope](maintainability.md).
+
+Cursor selection installs its execution hook only. Separate Cursor `.mdc` rules
+are no longer bundled or generated; use the canonical `tsguard/skill/SKILL.md`
+or `pyguard/skill/SKILL.md` for instructions. Existing project Cursor rules are
+left in place and can be removed after checking for local changes.
+
+### Task-based skill bundles
+
+Each canonical skill now has a short `SKILL.md` entry that selects one of four
+workflows: run checks, fix findings, review security, or review maintainability.
+The complete installed language bundle stays below 700 words. Read only relevant
+workflows; detailed formats remain in the linked project result-contract guide. Python does not gain TypeScript structural/change checks.
+
+Selecting Claude deploys the complete bundle to `.claude/skills/<guard>/`.
+Selecting Codex or Copilot deploys it to `.agents/skills/<guard>/`; their project
+instructions point to that entry. All workflow paths are bundled in the
+binary and resolve inside the installed skill. Re-running hooks refreshes these
+owned files. Existing project `AGENTS.md` and customized hook configurations remain
+protected: merge the displayed instruction pointer deliberately if replacement is
+refused. Copilot preserves an existing marked instruction block; update an older
+block deliberately. Neither integration requires downloading guides at runtime.
+Cursor execution hooks and existing project rules keep their current behavior.

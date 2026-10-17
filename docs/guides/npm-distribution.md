@@ -199,3 +199,19 @@ has no LICENSE file; packaging does not invent a license declaration.
 ## Native semantic lint
 
 The package pins Oxlint and oxlint-tsgolint for the separate typed-lint gate. Platform binaries resolve through the backend package's own dependency graph, including pnpm isolation; no project or global executable is substituted. Biome owns ordinary syntax/format policy. TypeScript 7 backend limits and native assessment artifacts are documented in [maintainability](../maintainability.md). Missing optional platform engines require reinstalling with optional dependencies.
+
+## Documentation and skill versions
+
+`npm/prepare.cjs` uses its release-tag argument to stamp generated READMEs,
+documentation and `VERSION` files. The main package includes the tagged `docs/`
+snapshot; native packages retain their versioned README and marker. Source files
+are not rewritten. Standalone archives package the same tagged documentation via
+`scripts/package-release-docs.py` before checksums and archive smoke checks.
+
+The binary uses its existing linker-injected version when `hooks` deploys skills.
+Each guide receives a visible version label; the bundle receives `VERSION`, and
+its detailed documentation link switches from `main` to the release tag. Repeating
+hooks after a CLI upgrade refreshes these owned files while preserving project
+instruction protection. Both complete installed language bundles stay under the
+700-word budget, including generated labels and metadata. `dev` builds keep
+`main` links and identify themselves as development versions.

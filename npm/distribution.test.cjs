@@ -155,6 +155,36 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   // Keep the zero-config preset resolvable from the real installed package.
   assert.ok(fs.existsSync(createRequire(fs.realpathSync(launcher)).resolve('ultracite/biome/core')));
 
+  const configured = spawnSync(process.execPath, [launcher, 'hooks'], {
+    cwd: consumer, input: '1,2,4\n', encoding: 'utf8', timeout: 30000,
+  });
+  assert.equal(configured.status, 0, configured.stdout + configured.stderr);
+  for (const target of ['.claude/skills/tsguard', '.agents/skills/tsguard']) {
+    for (const folder of ['', 'workflows']) {
+      const source = path.join(root, 'tsguard/skill', folder);
+      const files = folder ? fs.readdirSync(source) : ['SKILL.md'];
+      for (const file of files) {
+        const actual = fs.readFileSync(path.join(consumer, target, folder, file), 'utf8');
+        assert.ok(actual.includes(`OxGuard version: v${version}`));
+        const unstamped = actual.replace(`\nOxGuard version: v${version}\n`, '')
+          .replaceAll(`https://github.com/oxalc88/oxguard/blob/v${version}/`, 'https://github.com/oxalc88/oxguard/blob/main/').trim();
+        assert.equal(unstamped, fs.readFileSync(path.join(source, file), 'utf8').replace(/\r\n/g, '\n').trim());
+      }
+    }
+  }
+  for (const target of ['.claude/skills/tsguard', '.agents/skills/tsguard']) {
+    assert.equal(fs.readFileSync(path.join(consumer, target, 'VERSION'), 'utf8'), `v${version}\n`);
+  }
+  for (const target of [path.dirname(path.dirname(launcher)), nativeDirectory]) {
+    assert.equal(fs.readFileSync(path.join(target, 'VERSION'), 'utf8'), `v${version}\n`);
+    assert.ok(fs.readFileSync(path.join(target, 'README.md'), 'utf8').includes(`OxGuard version: v${version}`));
+  }
+  const packagedGuide = fs.readFileSync(path.join(installed, 'tsguard/docs/guides/tsguard-result-contract.md'), 'utf8');
+  assert.ok(packagedGuide.includes(`OxGuard version: v${version}`));
+  assert.ok(!packagedGuide.includes('https://github.com/oxalc88/oxguard/blob/main/'));
+  assert.match(fs.readFileSync(path.join(consumer, 'AGENTS.md'), 'utf8'), /\.agents\/skills\/tsguard\/SKILL\.md/);
+  assert.match(fs.readFileSync(path.join(consumer, '.github/copilot-instructions.md'), 'utf8'), /\.agents\/skills\/tsguard\/SKILL\.md/);
+
   // One local provider is shared by scored evals and integration checks.
   // It runs in a child process because the native evaluator is synchronous.
   const auditRegistry = spawn(process.execPath, [path.join(__dirname, 'testdata/audit-registry.cjs')], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });

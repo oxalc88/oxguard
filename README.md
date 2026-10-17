@@ -62,7 +62,7 @@ copies to the project's `tools/analysis/`; these are not executed during checks.
 
 ### `tsguard` — TypeScript quality gate
 
-The v0.8 candidate implements three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
+The current implementation provides three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
 
 `tsguard/` is the CLI for TypeScript projects. Runs:
 
@@ -217,10 +217,10 @@ your agent understands how to interpret gate output):
 
 | AI tool | Hook written | Skill / instructions written |
 |---|---|---|
-| Claude Code | `.claude/settings.local.json` | `.claude/skills/tsguard/SKILL.md` |
-| GitHub Copilot | `.github/hooks/tsguard-check.json` + `.vscode/tasks.json` | `.github/copilot-instructions.md` |
-| Cursor | `.cursor/hooks.json` | `.cursor/rules/tsguard.mdc` |
-| OpenAI Codex CLI | `.codex/hooks.json` | `AGENTS.md` |
+| Claude Code | `.claude/settings.local.json` | `.claude/skills/tsguard/` (entry and workflows) |
+| GitHub Copilot | `.github/hooks/tsguard-check.json` + `.vscode/tasks.json` | `.github/copilot-instructions.md` → `.agents/skills/tsguard/` |
+| Cursor | `.cursor/hooks.json` | No separate Cursor rules; use the canonical skill |
+| OpenAI Codex CLI | `.codex/hooks.json` | `AGENTS.md` → `.agents/skills/tsguard/` |
 | OpenCode | `.opencode/plugins/tsguard/index.ts` + `opencode.json` | (plugin is the skill) |
 
 *(pyguard writes the same set with `pyguard` names in each path.)*
