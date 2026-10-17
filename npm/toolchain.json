@@ -10,7 +10,7 @@
   "fta-cli": "3.0.1",
   "knip": "6.38.0",
   "jscpd": "5.3.2",
-  "secretlint": "13.0.6",
-  "@secretlint/secretlint-rule-preset-recommend": "13.0.6",
+  "secretlint": "13.0.7",
+  "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
   "audit-ci": "7.1.0"
 }
