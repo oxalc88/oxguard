@@ -25,7 +25,7 @@ Without a lint config, the npm distribution extends pinned Ultracite 8.0.1 (with
 
 Project Biome configuration, disabled rules and flat ESLint/Oxlint configurations remain authoritative. Legacy ESLint names are recognized so fallback Biome does not silently replace them; support still depends on upstream Ultracite/ESLint, and unsupported execution is an error or partial normalization. The flat ESLint path is tested but its native diagnostics are not yet normalized. Project configs are never overwritten.
 
-Biome with pinned Ultracite presets owns syntax lint and formatting. A separate `typed-lint` gate runs only five upstream compiler-aware rules through pinned Oxlint 1.87.0 / oxlint-tsgolint 7.0.2003, with all syntax categories disabled. No ESLint engine, JS lint plugin or second formatter is added. `types` and structural analysis retain the selected project TypeScript compiler.
+Biome with pinned Ultracite presets owns syntax lint and formatting. A separate `typed-lint` gate runs only five upstream compiler-aware rules through pinned Oxlint 1.88.0 / oxlint-tsgolint 7.0.2004, with all syntax categories disabled. No ESLint engine, JS lint plugin or second formatter is added. `types` and structural analysis retain the selected project TypeScript compiler.
 
 `check` runs lint → FTA → types → typed-lint → coverage → security, then advisory maintainability/duplication/change. Native unsafe assignments, unsafe narrowing assertions, floating promises and misused promises are blocking. Unnecessary conditions are advisory because type assumptions may differ from runtime inputs. Native defaults, including explicit `void` promise opt-out, remain upstream policy; an opt-out does not prove safe error handling.
 
