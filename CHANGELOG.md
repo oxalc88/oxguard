@@ -28,6 +28,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Update Secretlint and its recommended preset 13.0.6 → 13.0.7; Oxlint
+  1.87.0 → 1.88.0 with oxlint-tsgolint 7.0.2003 → 7.0.2004; FTA
+  3.0.1 → 3.1.0; Knip 6.38.0 → 6.41.0; and jscpd 5.3.2 → 5.4.1.
+  Preserve Node support, analyzer policy and existing quality thresholds.
 - Upgrade paired Vitest and coverage-v8 from 5.0.2 to 5.0.4; correct the
   packed-consumer test fixture to use the bundled Vitest globals through
   `globalThis` without declaring Vitest as a project dependency. Keep the

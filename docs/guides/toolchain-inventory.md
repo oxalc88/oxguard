@@ -1,6 +1,6 @@
-# Toolchain inventory and compatible patch update
+# Toolchain inventory and verified updates
 
-Observed against main `043fbc3` on 2026-10-17 UTC. Registry metadata is evidence of available versions, not proof of analyzer compatibility. No quality thresholds or required checks changed.
+Follow-up observed against main `de16790` on 2026-10-17 UTC. Registry metadata is evidence of available versions, not proof of analyzer compatibility. No quality thresholds or required checks changed.
 
 ## npm and native runtime
 
@@ -11,23 +11,25 @@ All 14 product analyzer pins are in `npm/toolchain.json`; npm resolves their tra
 | ultracite | 8.0.1 | 8.0.1 | Retain; already latest |
 | @biomejs/biome | 2.5.15 | 2.5.15 | Retain; already latest |
 | typescript | 5.9.3 | 7.0.2 | Defer analyzer change |
-| oxlint | 1.87.0 | 1.88.0 | Defer analyzer change |
-| oxlint-tsgolint | 7.0.2003 | 7.0.2004 | Defer analyzer change |
+| oxlint | 1.87.0 | 1.88.0 | Stable package updates |
+| oxlint-tsgolint | 7.0.2003 | 7.0.2004 | Stable package updates |
 | vitest | 5.0.4 | 5.0.5 | Update patch group |
 | @vitest/coverage-v8 | 5.0.4 | 5.0.5 | Update patch group |
 | vite | 8.3.1 | 8.3.4 | Update patch group |
-| fta-cli | 3.0.1 | 3.1.0 | Defer analyzer change |
-| knip | 6.38.0 | 6.41.0 | Defer analyzer change |
-| jscpd | 5.3.2 | 5.4.1 | Defer analyzer change |
-| secretlint | 13.0.6 | 13.0.7 | Defer analyzer change |
-| @secretlint/secretlint-rule-preset-recommend | 13.0.6 | 13.0.7 | Defer analyzer change |
+| fta-cli | 3.0.1 | 3.1.0 | Stable package updates |
+| knip | 6.38.0 | 6.41.0 | Stable package updates |
+| jscpd | 5.3.2 | 5.4.1 | Stable package updates |
+| secretlint | 13.0.6 | 13.0.7 | Stable package updates |
+| @secretlint/secretlint-rule-preset-recommend | 13.0.6 | 13.0.7 | Stable package updates |
 | audit-ci | 7.1.0 | 7.1.0 | Retain; already latest |
 
-The one update group is Vitest and coverage-v8 **5.0.5**, plus Vite **8.3.4**. Primary npm metadata declares:
+PR #14 updated Vitest and coverage-v8 to **5.0.5**, plus Vite to **8.3.4**. Primary npm metadata declares:
 
 - Vitest 5.0.5 requires coverage-v8 5.0.5 and supports Vite `^6.4.0 || ^7.0.0 || ^8.0.0`.
 - coverage-v8 5.0.5 requires Vitest 5.0.5.
 - Vitest Node range: `^22.12.0 || ^24.0.0 || >=26.0.0`; Vite range: `^20.19.0 || >=22.12.0`. Both accept every existing OxGuard Node version.
+
+The follow-up groups are Secretlint with its recommended rule preset; Oxlint with oxlint-tsgolint; and FTA/Knip/jscpd. Fresh registry metadata confirms all seven target versions. Secretlint requires Node 22+, Oxlint and Knip require `^20.19.0 || >=22.12.0`, and jscpd requires Node 18+. These fit the existing Node policy; FTA and tsgolint declare no Node engine range. Oxlint accepts tsgolint `>=7.0.2003`, including the selected 7.0.2004. Hosted distribution checks remain required for every supported OS.
 
 The canonical Node policy is now `tsguard/runtime-compatibility.json`. npm derives its engines field and Go embeds the same data for setup/doctor. The accepted versions remain `^22.18.0 || ^24.0.0 || >=26.0.0`. Documentation describes this policy but does not execute a second definition.
 
@@ -75,6 +77,27 @@ python pyguard/tests/analysis_contract_test.py
 ```
 
 The first local distribution attempt stopped at Go VCS stamping (`error obtaining VCS status: exit status 128`) in the isolated worktree. Re-running locally with `GOFLAGS=-buildvcs=false` bypasses metadata stamping only. No workflow or product default includes this workaround. Combined with PR 3, all three Go modules passed, as did 38 Node helper tests, two Python helper tests, two installed npm distribution tests, 30/30 capability scenarios and 39/39 installed maintainability scenarios. The combined installed run took 159.08 seconds locally; this is not a controlled timing comparison. Hosted Windows/macOS results require CI.
+
+## Stable package updates verification
+
+Each group was applied cumulatively and ran the unchanged packed-distribution test with
+`OXGUARD_EVAL_REPORT_DIR=eval-reports/updates-<group> node --test npm/distribution.test.cjs`.
+The registry versions above were rechecked before installation. Linux x64, Node 24.19.0:
+
+| Cumulative group | Distribution tests | Capability cases | Maintainability cases | Wall time |
+|---|---:|---:|---:|---:|
+| Secretlint + recommended preset | 2/2 | 31/31 | 39/39 | 176.642 s |
+| + Oxlint + tsgolint | 2/2 | 31/31 | 39/39 | 155.595 s |
+| + FTA + Knip + jscpd | 2/2 | 31/31 | 39/39 | 173.708 s |
+
+Each capability run detected all 18 expected quality findings with zero observed false
+positives or false negatives. No fixtures, assertions, thresholds, analyzer policy,
+Node range or mandatory checks changed. These timings are observations, not a speed
+comparison. All three Go suites, 38 Node harness tests, two Python helper tests,
+six identity-hook tests and five selector safety tests also passed. Local Go commands
+used the same worktree-only `GOFLAGS=-buildvcs=false` workaround described above.
+Hosted Windows/macOS distribution checks remain required before release. Go, Python,
+TypeScript, Opengrep and the previously updated Vitest/Vite pins are unchanged here.
 
 ## Separately deferred PyGuard gaps
 
