@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   validate-release:
@@ -56,6 +57,7 @@ jobs:
     with:
       tag: ${{ needs.validate-release.outputs.tag }}
       sha: ${{ needs.validate-release.outputs.sha }}
+      reuse-verification: true
 
   build:
     name: Build ${{ matrix.tool }} ${{ matrix.include_os.os }}/${{ matrix.include_os.arch }}
@@ -127,6 +129,9 @@ jobs:
           fi
           cd ..
 
+      - name: Smoke-check exact release archive before upload
+        run: python3 scripts/release-smoke.py archive "${{ matrix.tool }}" "$TAG" "$GOOS" "$GOARCH" dist
+
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.tool }}-${{ matrix.include_os.os }}-${{ matrix.include_os.arch }}
@@ -153,6 +158,10 @@ jobs:
           if [ "$PLATFORM" = "linux-x64" ]; then
             npm pack ./dist/npm/tsguard --pack-destination dist/npm
           fi
+
+      - name: Smoke-check exact npm tarballs before upload
+        if: matrix.tool == 'tsguard' && matrix.include_os.os == 'linux' && matrix.include_os.arch == 'amd64'
+        run: python3 scripts/release-smoke.py npm "$TAG" dist/npm
 
       - uses: actions/upload-artifact@v7
         if: matrix.tool == 'tsguard'
