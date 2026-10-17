@@ -97,7 +97,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   assert.equal(manifest.engines.node, '^22.18.0 || ^24.0.0 || >=26.0.0');
   assert.equal(manifest.dependencies.ultracite, '8.0.1');
   assert.equal(manifest.dependencies['@biomejs/biome'], '2.5.15');
-  assert.equal(manifest.dependencies.vitest, '5.0.4');
+  assert.equal(manifest.dependencies.vitest, '5.0.5');
   assert.equal(manifest.dependencies['@vitest/coverage-v8'], manifest.dependencies.vitest);
   assert.equal(manifest.dependencies.eslint, undefined);
   assert.equal(manifest.dependencies['typescript-eslint'], undefined);

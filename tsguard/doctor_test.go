@@ -44,6 +44,9 @@ func writeNodeCommand(t *testing.T, path string) {
 }
 
 func TestSupportedNodeVersionMatchesPackagedEngine(t *testing.T) {
+	if got := nodeEngineRange(); got != "^22.18.0 || ^24.0.0 || >=26.0.0" {
+		t.Fatalf("unexpected npm engine range: %s", got)
+	}
 	for _, tc := range []struct {
 		version string
 		allowed bool
