@@ -17,6 +17,12 @@ Run from the project or pass `--root /absolute/project/path` containing `pyproje
 
 Owned Python helpers execute from private temporary copies embedded in the installed binary. Project-local `tools/analysis` files are reference copies; changing or redeploying them does not change runtime helpers. For missing or incompatible bundled helpers, report the execution failure and update or reinstall a compatible PyGuard binary when authorized. Use `pyguard setup` for project dependencies, the secrets baseline and optional reference copies.
 
+## Reuse verified evidence
+
+Read available results and CI summaries before repeating equivalent checks. Reuse evidence only when source, tests, configuration, dependencies, toolchain, environment and requested scope still match. Changed or unverified inputs require the applicable checks; run missing or invalidated checks rather than repeating unrelated green checks or reviews. Request JSON only when the available record lacks required detail.
+
+For OxGuard's own releases, use the existing trusted exact-commit main-run evidence mechanism for the hash-pinned Python suite. Release-artifact smoke checks remain required. The test-selection prototype is shadow-only and does not authorize skipping mandatory tests. Do not invent a separate verification cache or claim measured CI savings without observed reuse.
+
 ## Run the bounded contract
 
 ```sh
@@ -37,6 +43,8 @@ JSON is complete for executed gates, not for steps skipped by fail-fast. If reru
 
 Use schema `"1"`: `status`, `command`, `exit_code`, `findings`, `measurements`, `artifacts` and `diagnostics`. Preserve finding `id`, `gate`, `rule`, source `location`, `category`, `status`, evidence and available observed/threshold values. Do not compare unrelated language-specific metrics as equal scores.
 
+Treat unknown statuses, contradictory gate/finding states and malformed reports as invalid evidence, never as advisory success. Schema-1 statuses remain readable strings; do not depend on internal numeric constants. Keep the original result and diagnostics when investigating a contract failure.
+
 - `quality` with `blocking`: explain the rule/location and a grounded fix. Preserve Ruff codes and mypy error codes; use owned metric thresholds as reported.
 - `quality` with `advisory`: describe advisory evidence without treating it as a failed quality gate. Criticality ranks distinct static function callers; it does not prove runtime impact.
 - `tool_missing`, `dependency_failure`, `timeout`, `invalid_configuration`, `lock_contention`, `startup_failure`, `interrupted`, `diagnostics_failure`, `adapter_failure`, `analyzer_failure`, `artifact_failure`, `lock_failure` or `unclassified_failure`: resolve or explain execution/configuration needs. Do not interpret these as instructions to change source. For unknown failures, inspect only the referenced gate diagnostics as needed.
@@ -44,6 +52,8 @@ Use schema `"1"`: `status`, `command`, `exit_code`, `findings`, `measurements`, 
 A run can be `pass`, `fail`, `error`, `advisory` or `skipped`. Advisory commands retain exit 0 even when `status` is `error`. Never equate code 0 with successful analysis or code 1 with a source defect. Codes 3/4 indicate invalid invocation/configuration and lock contention; human heavy commands also retain pipe refusal code 5.
 
 `check` stops at the first failing gate: Ruff → mypy → Radon → annotations → coverage → security. After an authorized fix, rerun the same command to reach later gates. Do not claim unexecuted gates passed. Use isolated commands for requested detail, not to silently replace the full check.
+
+Inside `security`, Bandit, pip-audit and detect-secrets all complete even if another security engine fails. Inspect every sub-gate and its diagnostics; a dependency failure does not establish that SAST or secret detection failed or passed. Any blocking security failure still prevents a successful full check.
 
 ## Present and drill down
 
@@ -59,4 +69,12 @@ Read `assessment` and `gates` in JSON. `assessment: complete` means every reques
 
 Read global coverage measurements against the existing 80% floor; per-file measurements do not add per-file blocking thresholds. Native pytest test failures are quality findings; collection/execution errors and missing or malformed reports are execution problems. Native analyzer reports are listed in `artifacts` and refreshed under `.pyguard-cache/reports`; inspect them for additional upstream fields.
 
-Bandit preserves native test IDs, severity and locations. pip-audit vulnerabilities are blocking quality findings with package identity and available fixed-version remediation; skipped dependencies are execution errors. Secrets findings preserve baseline comparison without exposing secret values or hashes. Vulture and deptry findings remain advisory. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. Existing analyzers remain Level 1; advisory criticality parity is present, but remaining Level 2 and all Level 3 checks are absent.
+Bandit preserves native test IDs, severity and locations. pip-audit vulnerabilities remain blocking quality findings unless an explicit valid exposure review applies; retain package identity and available fixed-version remediation. Skipped dependencies are execution errors. Secrets findings preserve baseline comparison without exposing secret values or hashes. Vulture and deptry findings remain advisory. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. Existing analyzers remain Level 1; advisory criticality parity is present, but remaining Level 2 and all Level 3 checks are absent.
+
+## Handle reviewed dependency exposure
+
+Keep runtime/product exposure separate from development-tool and CI risk. A development dependency alone is not safe. Without a valid review, retain the native blocking policy and full advisory visibility.
+
+Use `.oxguard-dependency-policy.json` only for an explicit package/advisory review with `scope` of `development_tool` or `ci`, `product_exposure: not_exposed`, `tooling_risk: accepted` and an evidence-backed reason. Bind `inputs` to SHA-256 hashes of `pyproject.toml` and every existing supported lockfile. Malformed, missing, stale or ambiguous evidence cannot waive a failure. Do not create acceptance entries or suppress advisories merely to make checks green.
+
+Inspect the native report and normalized findings together. Accepted reviews remain visible advisories. Reassess source, packaging and CI changes that can alter exposure: dependency hashes do not prove reachability. The result-contract guide contains the policy format; do not infer an automatic exception from package classification.

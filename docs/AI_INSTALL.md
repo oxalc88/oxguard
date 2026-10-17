@@ -140,9 +140,15 @@ pyguard setup --yes
 To redeploy updated skill files to your AI tools (e.g. after a version bump ships new SKILL.md content):
 
 ```bash
-tsguard hooks   # interactive — re-select your tools to overwrite stale skill files
+tsguard hooks   # interactive — re-select tools and review existing-file warnings
 pyguard hooks
 ```
+
+Claude skill copies are refreshed from the embedded canonical skill. Existing
+Codex `AGENTS.md` and customized hook files are protected from replacement;
+merge updated skill guidance into those project files deliberately when the
+command reports an existing-file warning. Do not assume every instruction
+file was overwritten successfully.
 
 **AI agent prompt for updating tsguard:**
 
@@ -235,3 +241,8 @@ Report the new version and any changes to the doctor output.
 ### Tsguard review guidance
 
 The v0.8 candidate skill follows the target project's applicable AGENTS.md and referenced policies; keep those rules in that project. Review helper purpose, error recovery, logging ownership and whole-workflow complexity separately from deterministic analyzer findings. The typed-lint gate uses an owned native semantic backend with explicit TypeScript 7 compatibility limits. See [supported maintainability scope](maintainability.md).
+
+Cursor selection installs its execution hook only. Separate Cursor `.mdc` rules
+are no longer bundled or generated; use the canonical `tsguard/skill/SKILL.md`
+or `pyguard/skill/SKILL.md` for instructions. Existing project Cursor rules are
+left in place and can be removed after checking for local changes.

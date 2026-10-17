@@ -219,7 +219,7 @@ your agent understands how to interpret gate output):
 |---|---|---|
 | Claude Code | `.claude/settings.local.json` | `.claude/skills/tsguard/SKILL.md` |
 | GitHub Copilot | `.github/hooks/tsguard-check.json` + `.vscode/tasks.json` | `.github/copilot-instructions.md` |
-| Cursor | `.cursor/hooks.json` | `.cursor/rules/tsguard.mdc` |
+| Cursor | `.cursor/hooks.json` | No separate Cursor rules; use the canonical skill |
 | OpenAI Codex CLI | `.codex/hooks.json` | `AGENTS.md` |
 | OpenCode | `.opencode/plugins/tsguard/index.ts` + `opencode.json` | (plugin is the skill) |
 

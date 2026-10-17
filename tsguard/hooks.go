@@ -65,11 +65,6 @@ func runHooks(root string) int {
 			fmt.Println("  [OK]   .cursor/hooks.json (afterFileEdit)")
 			generated++
 		}
-		if err := hooks.GenerateCursorRule(root, cursorRuleContent); err != nil {
-			fmt.Printf("  [WARN] Cursor rule: %v\n", err)
-		} else {
-			fmt.Println("  [OK]   .cursor/rules/tsguard.mdc")
-		}
 	}
 
 	if selected["4"] {
@@ -91,7 +86,6 @@ func runHooks(root string) int {
 			generated++
 		}
 	}
-
 
 	// Always update pre-commit
 	if err := hooks.GeneratePreCommit(root); err != nil {

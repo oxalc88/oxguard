@@ -11,9 +11,6 @@ import (
 //go:embed skill/SKILL.md
 var claudeSkillContent []byte
 
-//go:embed skill/cursor.mdc
-var cursorRuleContent []byte
-
 //go:embed skill/opencode.ts
 var opencodePluginContent []byte
 

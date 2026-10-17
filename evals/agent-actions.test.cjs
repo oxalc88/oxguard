@@ -52,6 +52,20 @@ test("source edits during execution repair fail the scenario", () => {
 	assert.equal(score(trace, skill).ready, false);
 });
 
+test("skills cannot waive unreviewed advisories, reuse changed locks or accept unknown statuses", () => {
+	for (const language of ["python", "typescript"]) {
+		for (const [key, decision] of [
+			["dependency_review", "may_waive"],
+			["verification_reuse", "reuse_allowed"],
+			["unknown_status", "valid_evidence"],
+		]) {
+			const { trace, skill } = fixture(language);
+			trace.interpretation.response[key][decision] = true;
+			assert.equal(score(trace, skill).ready, false);
+		}
+	}
+});
+
 test("native change evidence and interpretation cannot be replaced by a score-only claim", () => {
 	for (const mutate of [t=>t.change_events=[],t=>t.interpretation.response.change.simplification_proven=true]) {
 		const {trace,skill} = fixture("typescript");

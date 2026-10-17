@@ -105,6 +105,13 @@ function score(trace, skill) {
 			response.execution.source_edit_needed === false &&
 			response.execution.explanation.includes("tool_missing"),
 	);
+	for (const [id, key, decision] of [
+		["agent.dependency_review_boundary", "dependency_review", "may_waive"],
+		["agent.verification_reuse_boundary", "verification_reuse", "reuse_allowed"],
+		["agent.unknown_status_rejected", "unknown_status", "valid_evidence"],
+	]) {
+		check(id, response?.[key]?.[decision] === false && response[key].explanation?.length > 0);
+	}
 	if (trace.language === "typescript") {
 		const nativeChange = trace.change_events?.find(e=>e.result?.command === "change")?.result;
 		const responseChange = response?.change;

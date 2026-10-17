@@ -36,6 +36,16 @@ Keep requested scope and thresholds. Supported flags include `--root`, `--dirs <
 
 Opengrep is required for the security gate. A missing or untrusted engine is an execution failure, not a passing or skipped security assessment. npm installations use the package-owned engine; reinstall with optional dependencies if it is missing. Standalone installations verify a pinned SHA-256 digest and use the OS user cache outside the scanned project; authorized `tsguard setup` installs or repairs that engine.
 
+`security` completes SAST, dependency auditing and secret detection even when one fails. The outer `check` still stops at a failing gate. Inspect every security sub-gate and its diagnostics; a dependency failure does not establish that SAST or secret detection failed or passed.
+
+Keep the bundled stable TypeScript 5.9.3 fallback and the project's declared compiler. Do not upgrade a project to TypeScript 7 or infer full support from the native typed-lint backend's TypeScript 7 semantics. Full project TypeScript 7 support is not part of this release.
+
+## Reuse verified evidence
+
+Read available results and CI summaries before repeating equivalent checks. Reuse evidence only when source, tests, configuration, dependencies, toolchain, environment and requested scope still match. Changed or unverified inputs require the applicable checks; run missing or invalidated checks rather than repeating unrelated green checks or reviews. Request JSON only when the available record lacks required detail.
+
+For OxGuard's own releases, use the existing trusted exact-commit main-run evidence mechanism. Distribution checks remain fresh because npm transitives are unlocked; release artifacts still need smoke checks. The test-selection prototype is shadow-only and does not authorize skipping mandatory tests. Do not invent a separate verification cache or claim measured CI savings without observed reuse.
+
 ## Consume findings completely
 
 Use `--output agent` for the first bounded view. It shows the total count and at most ten findings. **If `omitted: N (use --output json)` appears, retrieve JSON with the same command, root, scope and thresholds before claiming that all findings have been reviewed or addressed.** The summary cannot describe omitted findings. A rerun produces a new result, so keep source/configuration unchanged during retrieval.
@@ -45,6 +55,8 @@ npx --no-install tsguard check --output json
 ```
 
 Parse JSON as data. Require `schema_version: "1"`. Use `status`, `exit_code`, `findings`, `measurements`, `artifacts` and `diagnostics`. Process the complete `findings` array, grouping work by rule and location; summarize groups without pasting the full JSON into context. Preserve the total count and any unresolved groups. Finding fields include stable `id`, `rule`, `gate`, `level`, `severity`, `status`, `category`, optional `location`, numeric `observed` / `threshold`, `evidence`, and diagnostic IDs. Do not reconstruct these fields from prose.
+
+Treat unknown statuses, contradictory gate/finding states and malformed reports as invalid evidence, never as advisory success. Schema-1 statuses remain readable strings; do not depend on internal numeric constants. Keep the original result and diagnostics when investigating a contract failure.
 
 Distinguish `blocking`, `advisory`, and `execution_error` findings. Read the semantic run status as well as the real process code:
 
@@ -104,3 +116,11 @@ Read `assessment` and `gates` in JSON. `assessment: complete` means every reques
 Read global coverage thresholds and per-file measurements directly; per-file measurements do not add per-file blocking thresholds. Native test failures are quality findings; no-test collection and missing or malformed reports are execution problems. Native analyzer reports are listed in `artifacts` and refreshed for each run; use those reports for additional upstream fields. Secretlint findings retain rules and positions while omitting secret values.
 
 Native dependency advisories are informational; `tsguard.dependencies.policy_failed` records audit-ci's blocking decision without guessing which individual advisory caused it. The CLI invokes audit-ci with `--moderate` and does not pass `--config`; do not claim a project's allowlist file was loaded automatically. Use `related` locations for duplicate pairs. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. PyGuard retains existing Level 1 and criticality capabilities; do not claim Python parity for the new TypeScript structural or change analyses.
+
+## Handle reviewed dependency exposure
+
+Keep runtime/product exposure separate from development-tool and CI risk. A devDependency alone is not safe. Without a valid review, retain the native blocking policy and full advisory visibility.
+
+Use `.oxguard-dependency-policy.json` only for an explicit package/advisory review with `scope` of `development_tool` or `ci`, `product_exposure: not_exposed`, `tooling_risk: accepted` and an evidence-backed reason. Bind `inputs` to SHA-256 hashes of the manifest and every existing supported lockfile. Malformed, missing, stale or ambiguous evidence cannot waive a failure. Do not create acceptance entries or suppress advisories merely to make checks green.
+
+Inspect the native report and normalized findings together. Accepted reviews remain visible advisories. Reassess source, packaging and CI changes that can alter exposure: dependency hashes do not prove reachability. The result-contract guide contains the policy format; do not infer an automatic exception from package classification.

@@ -28,6 +28,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Refresh the canonical Tsguard and PyGuard skills for independent security
+  scans, reviewed dependency exposure, strict result states and verified-input
+  reuse. Remove separately maintained Cursor rules and their deployment; retain
+  optional Cursor execution hooks and preserve existing project rule files.
+  Refresh real agent captures and cover the new guidance in the existing evals.
 - Update Secretlint and its recommended preset 13.0.6 → 13.0.7; Oxlint
   1.87.0 → 1.88.0 with oxlint-tsgolint 7.0.2003 → 7.0.2004; FTA
   3.0.1 → 3.1.0; Knip 6.38.0 → 6.41.0; and jscpd 5.3.2 → 5.4.1.
