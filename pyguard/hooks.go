@@ -53,6 +53,13 @@ func runHooks(root string) int {
 		deployClaudeSkill(root)
 	}
 
+	if selected["2"] || selected["4"] {
+		if err := deployAgentSkill(root); err != nil {
+			fmt.Printf("  [FAIL] Agent skill bundle: %v\n", err)
+			return 1
+		}
+	}
+
 	if selected["2"] {
 		if err := hooks.GenerateCopilotHook(root); err != nil {
 			fmt.Printf("  [FAIL] Copilot hook: %v\n", err)
@@ -61,7 +68,7 @@ func runHooks(root string) int {
 			fmt.Println("  [OK]   .vscode/tasks.json (pyguard check + pyguard fix tasks)")
 			generated++
 		}
-		if err := hooks.GenerateCopilotInstructions(root, claudeSkillContent); err != nil {
+		if err := hooks.GenerateCopilotInstructions(root, agentSkillInstructions); err != nil {
 			fmt.Printf("  [WARN] Copilot instructions: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .github/copilot-instructions.md")
@@ -78,7 +85,7 @@ func runHooks(root string) int {
 	}
 
 	if selected["4"] {
-		if err := hooks.GenerateCodexHook(root, claudeSkillContent); err != nil {
+		if err := hooks.GenerateCodexHook(root, agentSkillInstructions); err != nil {
 			fmt.Printf("  [FAIL] Codex hook: %v\n", err)
 		} else {
 			fmt.Println("  [OK]   .codex/hooks.json (PostToolUse)")

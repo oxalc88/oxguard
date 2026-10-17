@@ -1,126 +1,19 @@
 ---
 name: tsguard
-description: >-
-  Run Tsguard quality checks for TypeScript projects and act on its normalized
-  agent or JSON results. Use for type errors, lint, FTA scores, coverage,
-  security, maintainability, structural dependencies, baseline comparisons,
-  advisory criticality, or requests to run, interpret or review Tsguard results.
+description: Use tsguard to check TypeScript quality, fix findings, review security or maintainability, and interpret existing results.
 ---
 
-# Tsguard
+# Use tsguard
 
-Delegate analysis to Tsguard. Use normalized findings to select work; use raw analyzer diagnostics only when a finding needs more evidence.
+Read project `AGENTS.md`. Select a guide:
 
-## Invoke the installed CLI
+| Goal | Guide |
+| --- | --- |
+| Run checks or explain results | [Check](workflows/check.md) |
+| Fix findings or tools | [Fix](workflows/fix.md) |
+| Review vulnerabilities or secrets | [Security](workflows/security.md) |
+| Review complexity or changes | [Maintainability](workflows/review.md) |
 
-Work from the project containing `package.json`, or supply `--root <project>`. Prefer the project-local npm distribution:
+Read only relevant guides. Preserve scope and authorization. Default to `check` for general quality requests.
 
-```sh
-npx --no-install tsguard check --output agent
-```
-
-For a pnpm project, use `pnpm exec tsguard check --output agent`. Verify local installation with the same executor and `tsguard --version`; check that `--help` advertises `--output` and `--root` before relying on this contract. If the package is missing, use the project's package manager to install `@oxguard/tsguard` as a dev dependency when installation is authorized. Do not silently fetch a CLI with plain `npx`. Do not run `setup` or install a global binary as part of routine analysis.
-
-Use the command the user requested. Otherwise default to `check`:
-
-- `check`: blocking, fail-fast lint → FTA → types → typed-lint → coverage → security, then advisory maintainability, duplication and baseline comparison. Later analyses remain not_run after an earlier blocking failure.
-- `typed-lint`: upstream native compiler-aware unsafe assignment/assertion and promise rules; unnecessary conditions are advisory. Unsupported TypeScript 7 configurations or unresolved types leave assessment incomplete.
-- `lint`, `types`, `fta`, `coverage`, `security`, `npm-audit`, `secrets`: individual gates.
-- `criticality`: advisory function/method caller ranking and `CRITICALITY.md`.
-- `maintainability`, `smells`, `structure`: advisory compiler facts for single-return sync/async forwarding chains, repeated catch policy, silent catch exits, dropped settled rejections, runtime module cycles, coupling and dependency depth. Graph artifacts contain all selected facts, including distinct function callers/callees and SCC call depth, not runtime impact guarantees.
-- `change --baseline <Git ref>`: advisory structural and native FTA/Biome cognitive/jscpd comparison using inert source files. Missing or incomplete inputs leave change not_run; absence of a baseline does not fail the command. Retain --baseline when retrieving JSON.
-- `audit`: advisory criticality → dead-code → duplicates; exit 0 even on findings.
-- `fix`: source formatting/lint mutation; run when source changes are authorized.
-
-Keep requested scope and thresholds. Supported flags include `--root`, `--dirs <d1,d2>`, `--exclude <d1,d2>`, `--timeout <seconds>` and `--max-fta-score <n>`. CLI overrides root `oxguard.toml`, then defaults apply. Unknown flags, missing values and invalid output modes are errors. Agent/JSON modes accept captured stdout without `--allow-pipe`. Help, version, doctor, setup and hooks retain human output; do not give them `--output agent/json`.
-
-Opengrep is required for the security gate. A missing or untrusted engine is an execution failure, not a passing or skipped security assessment. npm installations use the package-owned engine; reinstall with optional dependencies if it is missing. Standalone installations verify a pinned SHA-256 digest and use the OS user cache outside the scanned project; authorized `tsguard setup` installs or repairs that engine.
-
-`security` completes SAST, dependency auditing and secret detection even when one fails. The outer `check` still stops at a failing gate. Inspect every security sub-gate and its diagnostics; a dependency failure does not establish that SAST or secret detection failed or passed.
-
-Keep the bundled stable TypeScript 5.9.3 fallback and the project's declared compiler. Do not upgrade a project to TypeScript 7 or infer full support from the native typed-lint backend's TypeScript 7 semantics. Full project TypeScript 7 support is not part of this release.
-
-## Reuse verified evidence
-
-Read available results and CI summaries before repeating equivalent checks. Reuse evidence only when source, tests, configuration, dependencies, toolchain, environment and requested scope still match. Changed or unverified inputs require the applicable checks; run missing or invalidated checks rather than repeating unrelated green checks or reviews. Request JSON only when the available record lacks required detail.
-
-For OxGuard's own releases, use the existing trusted exact-commit main-run evidence mechanism. Distribution checks remain fresh because npm transitives are unlocked; release artifacts still need smoke checks. The test-selection prototype is shadow-only and does not authorize skipping mandatory tests. Do not invent a separate verification cache or claim measured CI savings without observed reuse.
-
-## Consume findings completely
-
-Use `--output agent` for the first bounded view. It shows the total count and at most ten findings. **If `omitted: N (use --output json)` appears, retrieve JSON with the same command, root, scope and thresholds before claiming that all findings have been reviewed or addressed.** The summary cannot describe omitted findings. A rerun produces a new result, so keep source/configuration unchanged during retrieval.
-
-```sh
-npx --no-install tsguard check --output json
-```
-
-Parse JSON as data. Require `schema_version: "1"`. Use `status`, `exit_code`, `findings`, `measurements`, `artifacts` and `diagnostics`. Process the complete `findings` array, grouping work by rule and location; summarize groups without pasting the full JSON into context. Preserve the total count and any unresolved groups. Finding fields include stable `id`, `rule`, `gate`, `level`, `severity`, `status`, `category`, optional `location`, numeric `observed` / `threshold`, `evidence`, and diagnostic IDs. Do not reconstruct these fields from prose.
-
-Treat unknown statuses, contradictory gate/finding states and malformed reports as invalid evidence, never as advisory success. Schema-1 statuses remain readable strings; do not depend on internal numeric constants. Keep the original result and diagnostics when investigating a contract failure.
-
-Distinguish `blocking`, `advisory`, and `execution_error` findings. Read the semantic run status as well as the real process code:
-
-- `quality`: inspect the reported rule/location; use evidence to guide fixes.
-- `tool_missing`, `startup_failure`, `dependency_failure`, `timeout`: resolve
-execution or dependencies; do not treat them as source defects.
-- `invalid_configuration`: correct flags, project root or configuration.
-- `lock_contention`: report the active lock; do not delete it or retry blindly.
-- `adapter_failure`, `analyzer_failure`, `diagnostics_failure`, `artifact_failure`,
-`lock_failure`, `interrupted`, `unclassified_failure`: use the referenced diagnostics to identify the cause before making changes.
-
-Exit 1 alone does not mean “fix source.” `audit` and `criticality` can have `status: error` with exit 0. A passed gate does not prove that later gates ran: `check` stops at the first blocking failure. Fix authorized issues, rerun the failed gate, then rerun `check` to reach the remaining gates.
-
-Use Ultracite/Biome for the default lint policy. The separate typed-lint gate runs only five selected upstream semantic rules using package-owned Oxlint/tsgolint, with syntax categories disabled. It uses TypeScript 7 semantics; `types` and graph analysis retain the selected project compiler. No ESLint engine or second formatter runs. Do not claim TypeScript 5/6 semantic equivalence or complete coverage when native configuration/type diagnostics, strictNullChecks, unresolved types or scope budgets prevent analysis. Read the typed_lint_native artifact for actual backend versions and diagnostics. Project-wide unused-code detection uses Knip in audit; duplicate detection uses jscpd in check and audit, with advisory findings.
-
-FTA reports file scores and the configured cap; a cap failure exposes only the first failing file because the analyzer exits before producing JSON. On a cap failure, complexity-context adds branch counts, maximum branch nesting and branch source locations for the first failing file. These are compiler observations, not FTA contributions or per-function FTA scores. Do not invent later failing files or unreported component measurements. Biome and Opengrep preserve native rule IDs; TypeScript preserves TS codes. Unsupported tool details produce a stable gate-level fallback, whose cause must be checked in diagnostics.
-
-## Use criticality as advisory context
-
-Read `criticality.in_degree` measurements and `CRITICALITY.md`. The report ranks up to 30 functions/methods by distinct callers; JSON has all measured functions, including zero-caller functions. Repeated calls from one caller count once. Use the rank to identify functions that need careful tests before changes, not as a blocking threshold or proof of runtime impact. Static unresolved and external calls are disclosed in the report. Criticality alone does not evaluate module cycles or change quality; retrieve the maintainability/change results for those questions.
-
-## Interpret maintainability evidence
-
-Treat LONG_DELEGATION_CHAIN, FRAGMENTED_DELEGATION, REPEATED_ERROR_HANDLER, SILENT_EXCEPTION_FALLBACK, SILENT_EXCEPTION_EXIT, SILENT_PROMISE_REJECTION, DISCARDED_SETTLED_REJECTION and HIGH_MODULE_COUPLING as review cues, not instructions to flatten every abstraction. Verify the reported call path or repeated catch bodies. Preserve dependency injection, stable APIs, intentional best-effort policies and necessary domain validation. Do not add unsafe logging or change failure propagation just to remove an advisory.
-
-Read function.max_branch_nesting and branch_locations in the graph to locate nested paths. Async forwarding_mode preserves the observed boundary mode; a chain warning does not establish equivalent timing or stack behavior. Discarded-settled findings cover symbol-resolved native allSettled → local aliases → flatMap block callbacks and explicit status guards, not arbitrary promise flows. A reason reference suppresses that path warning but does not prove correct recovery.
-
-Read module.fan_in, module.fan_out, module.dependency_depth, function.fan_in, function.fan_out and function.call_depth with the graph artifact. Repeated calls by one function count once; recursive call components are measured without a quality violation. Depth measures edges between strongly connected components; type-only imports are separate. Missing local and nonliteral dynamic imports make graph assessment partial. External references and unresolved calls remain disclosed limitations; this is a static, scoped graph.
-
-Do not claim a maintainability improvement from smaller files or individual FTA scores. Read POSSIBLE_COMPLEXITY_DISPLACEMENT evidence against the resolved baseline SHA: decreased per-file branch concentration or native FTA maximum, unreduced branch work and increased structural cost support review, not a proof of equivalent behavior. Function branch counts are observations, not cognitive/FTA scores. Read the maintainability_change artifact for both native profiles, analyzer policy and identity matches. FTA distributions and jscpd clone/token deltas use the same pinned tools over isolated graph-selected sources, without project analyzer configs. Biome reports exact cognitive scores above 1; scores at or below 1 are bounds [0,1], not invented exact values. Suppressed measurements have unknown upper bounds and leave the assessment incomplete. Treat FUNCTION_COMPLEXITY_INCREASE and NEW_DUPLICATION as advisory review cues. File/symbol identities match by existing path/name or unique exact source/token fingerprints; ambiguous copies and arbitrary semantic renames stay unmatched. Runtime dispatch and behavioral equivalence are not proven.
-
-## Review code with project context
-
-Read the target project's applicable `AGENTS.md` and referenced architecture/error/observability rules before recommending design changes. Keep project rules in that project; do not create or rewrite them as a prerequisite for Tsguard review.
-
-Separate measured analyzer findings from agent review judgments. Cite source locations and relevant project policy for each judgment; describe missing context instead of presenting an opinion as a blocking Tsguard rule.
-
-- Inspect each helper's transformation, validation, shared policy or interface boundary. Review pass-through layers, but do not count functions or flatten shared domain logic solely to reduce a score.
-- Trace rejected work to a propagated failure, recorded failure, or documented recovery outcome. Inspect catches, `continue`/`break`/early returns and settled-result filters; do not require all catches to rethrow or log sensitive payloads.
-- Check event ownership across callers and callbacks. Report possible duplicate confirmation/error events only when a resolved call path supports them; repeated event names alone do not establish duplicate runtime logging.
-- Compare the whole affected workflow, including helper/callback branches, call depth and native change metrics. Explain whether evidence supports simplification or only movement of complexity. Preserve necessary validation, ordering, retry and time-budget behavior.
-
-Run `maintainability` or `smells` separately when fail-fast leaves those gates not_run and the user requested review. Use `change --baseline` only with a supplied or configured baseline; do not invent one. Review judgments do not change the CLI exit policy or prove runtime reachability.
-
-## Drill down and report
-
-Resolve finding diagnostic IDs through the JSON `diagnostics` array. Read only the relevant stdout/stderr file when evidence is insufficient. Structured modes save complete streams under `node_modules/.cache/oxguard/diagnostics/`; a later run can overwrite them. `--log-file` is optional additional logging; `--tail` limits human display only. Do not create a temp log and read every analyzer log for the normal path.
-
-If the user supplied an existing JSON result or log, interpret that artifact without rerunning unless asked. Label legacy prose as unnormalized and do not invent stable IDs or counts that it does not establish. Launcher errors before Go starts retain stderr/exit output; do not expect JSON for those failures.
-
-Report command/scope, semantic status, real exit code, total findings, blocking versus advisory work, execution problems and the next concrete action. State any omitted or unreviewed findings and gates that have not run. After fixes, verify the complete result before claiming success.
-
-## Verify assessment completeness
-
-Read `assessment` and `gates` in JSON. `assessment: complete` means every requested gate ran with supported normalization; it does not mean findings passed. Each gate has `status` (`passed`, `advisory`, `failed`, `error` or `not_run`) and `normalization` (`complete`, `partial` or `not_run`). The agent summary includes incomplete assessment, not-run and partial counts. Retrieve JSON with the same invocation when any count is nonzero to name the affected gates. Do not claim a complete assessment from a partial adapter, execution error, or fail-fast result. Use the relevant isolated gate to investigate, then rerun the full requested command after authorized fixes.
-
-Read global coverage thresholds and per-file measurements directly; per-file measurements do not add per-file blocking thresholds. Native test failures are quality findings; no-test collection and missing or malformed reports are execution problems. Native analyzer reports are listed in `artifacts` and refreshed for each run; use those reports for additional upstream fields. Secretlint findings retain rules and positions while omitting secret values.
-
-Native dependency advisories are informational; `tsguard.dependencies.policy_failed` records audit-ci's blocking decision without guessing which individual advisory caused it. The CLI invokes audit-ci with `--moderate` and does not pass `--config`; do not claim a project's allowlist file was loaded automatically. Use `related` locations for duplicate pairs. Report unsupported details explicitly rather than converting raw diagnostic prose into invented normalized findings. PyGuard retains existing Level 1 and criticality capabilities; do not claim Python parity for the new TypeScript structural or change analyses.
-
-## Handle reviewed dependency exposure
-
-Keep runtime/product exposure separate from development-tool and CI risk. A devDependency alone is not safe. Without a valid review, retain the native blocking policy and full advisory visibility.
-
-Use `.oxguard-dependency-policy.json` only for an explicit package/advisory review with `scope` of `development_tool` or `ci`, `product_exposure: not_exposed`, `tooling_risk: accepted` and an evidence-backed reason. Bind `inputs` to SHA-256 hashes of the manifest and every existing supported lockfile. Malformed, missing, stale or ambiguous evidence cannot waive a failure. Do not create acceptance entries or suppress advisories merely to make checks green.
-
-Inspect the native report and normalized findings together. Accepted reviews remain visible advisories. Reassess source, packaging and CI changes that can alter exposure: dependency hashes do not prove reachability. The result-contract guide contains the policy format; do not infer an automatic exception from package classification.
+Detailed formats: [result contract](https://github.com/oxalc88/oxguard/blob/main/docs/guides/tsguard-result-contract.md).

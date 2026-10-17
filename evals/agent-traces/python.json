@@ -1,12 +1,12 @@
 {
   "schema_version": "1",
   "language": "python",
-  "skill_sha256": "05ec2a6c54a5f9b03f2d11ee8b432264704e18d37bada38ee6bc83e967fc437a",
+  "skill_sha256": "ef91198998a6685d0011319201c2af9cc1eea26d4c52bf965f5f2af57a7846d4",
   "capture_date": "2026-10-17",
-  "provenance": "Fresh independent Codex agent read the updated canonical skill and chose real CLI, source fixes and offline package-manager repair in isolated fixtures. The unchanged record-agent-command.cjs observer recorded argv, native output and source fingerprints. Interpretation records include fresh native inputs and the actual independent response, including dependency review, lockfile-change reuse and unknown-status decisions. No previous capture was relabelled. CI replays this evidence without live model calls. The omission scenario starts from a freshly generated native bounded result supplied as task input; subsequent retrieval, edits and verification were chosen by the independent agent.",
+  "provenance": "Fresh independent agent used new skill in isolated fixtures. Same task brief and native toolchain for both versions. Unchanged command observer captured real argv, outputs and source fingerprints. Initial bounded quality and native read/repair records were supplied; subsequent retrieval, edits, offline repair and verification were agent actions. Bundle text fingerprints normalize line endings and terminal whitespace. File-read inventory and routes are agent-reported, not token telemetry. CI replays captures without live model calls.",
+  "additional_verification": null,
   "agent_tasks": [
-    "py_skill_forward",
-    "py_omitted_forward"
+    "router_py_total"
   ],
   "omitted_events": [
     {
@@ -74,7 +74,7 @@
       "exit_code": 0,
       "source_before": "5f8a2d32127ecf1363be8fbf834fa17c79a0438eefdb532eb496bfbbd4962821",
       "source_after": "5f8a2d32127ecf1363be8fbf834fa17c79a0438eefdb532eb496bfbbd4962821",
-      "tool_output": "pyguard \u2014 Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . \u2014 project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, security, coverage) pyguard refuses to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter commands warn on piped stdout but still run.\n"
+      "tool_output": "pyguard — Python quality gate runner\n\nQuality gates (replaces make):\n  pyguard check          full gate: ruff + mypy + radon + types + coverage + security\n  pyguard fix            auto-format: ruff --fix + ruff format\n  pyguard audit          informational: criticality + dead-code + deps\n  pyguard security       security only: bandit + pip-audit + secrets\n  pyguard ruff           lint + format check\n  pyguard mypy           type checking\n  pyguard radon          complexity analysis (fails if CC > 10)\n  pyguard types          type-annotation complexity (fails if depth>2 or length>40)\n  pyguard coverage       run tests with coverage\n  pyguard bandit         security scan\n  pyguard pip-audit      dependency vulnerability scan\n  pyguard secrets        credential scan\n  pyguard criticality    call-graph criticality analysis\n  pyguard dead-code      detect dead code\n  pyguard deps           dependency hygiene\n\nEnvironment setup (replaces mise):\n  pyguard setup          install uv, run uv sync, configure AI tool hooks\n  pyguard doctor         verify toolchain (read-only)\n\nTesting (replaces jq):\n  pyguard invoke <fn> <payload>   aws lambda invoke + parse response\n  pyguard test <fn> <client>      invoke test harness + parse summary\n\nFlags:\n  --output <mode>  human (default), agent (bounded), json (complete)\n  --root <path>    explicit project root containing pyproject.toml\n  --dirs <d1,d2>    override target directories (default: . — project root)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-python       only run check if stdin context indicates a .py file was edited\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe pyguard through an external tail (pyguard check 2>&1 | tail -50).\n      Use pyguard check --tail 50 or pyguard check --log-file /tmp/pyguard.log --tail 50.\n      For heavy gates (check, security, coverage) pyguard refuses to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter commands warn on piped stdout but still run.\n"
     },
     {
       "tool": "uv",
@@ -124,7 +124,7 @@
       "argv": [
         "check",
         "--root",
-        "/tmp/oxguard-skill-refresh-20261017/python-quality2",
+        "/tmp/oxguard-router-eval/new/python/quality",
         "--dirs",
         "src",
         "--output",
@@ -472,7 +472,7 @@
       "argv": [
         "mypy",
         "--root",
-        "/tmp/oxguard-skill-refresh-20261017/python-quality2",
+        "/tmp/oxguard-router-eval/new/python/quality",
         "--dirs",
         "src",
         "--output",
@@ -597,7 +597,7 @@
       "argv": [
         "run",
         "python",
-        "/tmp/pyguard-analysis-3699560679/check_halstead.py",
+        "/tmp/pyguard-analysis-2354275878/check_halstead.py",
         "--json",
         "src"
       ],
@@ -611,7 +611,7 @@
       "argv": [
         "run",
         "python",
-        "/tmp/pyguard-analysis-603357792/check_type_complexity.py",
+        "/tmp/pyguard-analysis-1895265360/check_type_complexity.py",
         "src",
         "--json"
       ],
@@ -625,7 +625,7 @@
       "argv": [
         "check",
         "--root",
-        "/tmp/oxguard-skill-refresh-20261017/python-quality2",
+        "/tmp/oxguard-router-eval/new/python/quality",
         "--dirs",
         "src",
         "--output",
@@ -814,21 +814,6 @@
       "stderr": "error: Failed to spawn: mypy\n  cause: No such file or directory (os error 2)\n"
     },
     {
-      "tool": "uv",
-      "argv": [
-        "run",
-        "mypy",
-        "--output",
-        "json",
-        "src"
-      ],
-      "exit_code": 2,
-      "source_before": "d1145f730760c9d076d606c2cdb62ff74c84acb9aa727f3fc213e91b3da9f59a",
-      "source_after": "d1145f730760c9d076d606c2cdb62ff74c84acb9aa727f3fc213e91b3da9f59a",
-      "tool_output": "",
-      "stderr": "error: Failed to spawn: mypy\n  cause: No such file or directory (os error 2)\n"
-    },
-    {
       "tool": "pyguard",
       "argv": [
         "mypy",
@@ -894,14 +879,14 @@
         "install",
         "--offline",
         "--python",
-        "/tmp/oxguard-skill-refresh-20261017/python-repair-env/bin/python",
-        "mypy==1.18.2"
+        "/tmp/oxguard-router-eval/new/python/repair-env/bin/python",
+        "mypy"
       ],
       "exit_code": 0,
       "source_before": "d1145f730760c9d076d606c2cdb62ff74c84acb9aa727f3fc213e91b3da9f59a",
       "source_after": "d1145f730760c9d076d606c2cdb62ff74c84acb9aa727f3fc213e91b3da9f59a",
       "tool_output": "",
-      "stderr": "Using Python 3.12.14 environment at: /tmp/oxguard-skill-refresh-20261017/python-repair-env\nResolved 4 packages in 5ms\nInstalled 4 packages in 19ms\n + mypy==1.18.2\n + mypy-extensions==1.1.0\n + pathspec==1.1.1\n + typing-extensions==4.16.0\n"
+      "stderr": "Using Python 3.12.14 environment at: /tmp/oxguard-router-eval/new/python/repair-env\nResolved 4 packages in 4ms\nInstalled 4 packages in 15ms\n + mypy==1.18.2\n + mypy-extensions==1.1.0\n + pathspec==1.1.1\n + typing-extensions==4.16.0\n"
     },
     {
       "tool": "uv",
@@ -921,6 +906,8 @@
       "tool": "pyguard",
       "argv": [
         "mypy",
+        "--root",
+        "/tmp/oxguard-router-eval/new/python/repair",
         "--dirs",
         "src",
         "--output",
@@ -1116,30 +1103,166 @@
         "semantic_status": "advisory",
         "exit_code": 0,
         "source_edit_needed": false,
-        "explanation": "Supplied criticality result: complete assessment, one advisory quality finding; index.target at src/index.py:1 has 3 distinct static callers (rank 1). No failed quality gate or required source edit.",
-        "limitations": "Static callers do not prove runtime impact. CRITICALITY.md is a listed artifact, not independently verified current content."
+        "explanation": "Supplied read-input.json reports a complete criticality assessment: index.target has 3 distinct static callers, rank 1. CRITICALITY.md and src/index.py confirm the three callers a, b and c. This is informational ranking and does not require a source change. The supplied invocation was not rerun.",
+        "limitations": "Static caller ranking is not runtime impact, reachability, or a blocking threshold; it does not establish whole-project quality or security."
       },
       "execution": {
         "semantic_status": "error",
         "exit_code": 1,
         "source_edit_needed": false,
-        "explanation": "Supplied mypy result: incomplete assessment and one tool_missing execution error. Restore the analyzer environment rather than edit source.",
-        "limitations": "This supplied failure establishes no source typing outcome. Authorized repair verification is separate."
+        "explanation": "Original repair-input.json is an incomplete mypy execution error, pyguard.execution.tool_missing, rather than a source typing failure. Its diagnostic-002 stderr says mypy could not be spawned because it was missing. Restored mypy 1.18.2 and dependencies via uv pip install --offline into repair-env, without source edits. A new mypy invocation completed pass with exit 0 and no findings; repair-after.json preserves its full machine-readable record.",
+        "limitations": "The original supplied error remains error/1; the successful rerun is separate evidence covering mypy only, not a full check."
       },
-      "quality_summary": "Fixed all 12 mypy assignment findings in src/index.py (lines 1\u201312), including the two omitted from the supplied agent output: replaced quoted numeric strings with integer literals, matching the declared int types. Retrieved complete pre-edit JSON using the same check command and --dirs src before fixing.\n\nVerification (PATH=/tmp/oxguard-skill-refresh-20261017/python-bin:$PATH):\n- pyguard mypy --root /tmp/oxguard-skill-refresh-20261017/python-quality2 --dirs src --output json: actual exit 0, status pass, assessment complete, 0 findings.\n- pyguard check --root /tmp/oxguard-skill-refresh-20261017/python-quality2 --dirs src --output json: actual exit 1, status error, assessment incomplete. Ruff, mypy, Radon and annotations passed. Coverage is blocked by tool_missing: \u201cNo test runner or test files found.\u201d Bandit, pip-audit and secrets were not run because check stopped at coverage; those checks remain unverified. No tests or dependencies were added.\n\nAn initial help/check attempt from outside the fixture was rejected by the capture wrapper; both were rerun successfully from the project directory. No skill/repository edits, publishing, tags or external contacts.\n",
-      "repair_summary": "Confirmed missing mypy: stderr reported failed spawn, No such file or directory. Offline uv pip install --python /tmp/oxguard-skill-refresh-20261017/python-repair-env/bin/python mypy==1.18.2 exited 0 and installed mypy 1.18.2, mypy-extensions 1.1.0, pathspec 1.1.1, typing-extensions 4.16.0. Repaired pyguard mypy --dirs src --output json exited 0, status pass, complete assessment, zero findings. No repair-project source changes. Only mypy analysis verified.",
       "dependency_review": {
         "may_waive": false,
-        "explanation": "Development dependency classification alone cannot waive a high-severity advisory. Without a valid evidence-backed exposure policy/review retain native blocking policy and full advisory visibility."
+        "explanation": "High severity development-only classification is insufficient. Without an explicit evidence-backed exposure review and valid policy, retain native blocking policy. An authorized .oxguard-dependency-policy.json review requires package/advisory identity, scope development_tool or ci, product_exposure not_exposed, tooling_risk accepted, an evidence-backed reason, and SHA-256 bindings for the manifest and every existing supported lockfile. Accepted findings remain visible; hashes alone do not prove reachability."
       },
       "verification_reuse": {
         "reuse_allowed": false,
-        "explanation": "Changed lockfile invalidates equivalent-input reuse despite identical source/tests/configuration. Run checks applicable to changed dependencies."
+        "explanation": "A changed lockfile invalidates applicable prior checks even with identical source, tests and configuration. Reuse requires matching source, tests, configuration, dependencies, toolchain, environment and scope; rerun checks affected by dependency changes."
       },
       "unknown_status": {
         "valid_evidence": false,
-        "explanation": "Unknown schema-1 status unexpected is invalid evidence; exit 0 and empty findings cannot establish success or advisory success. Preserve original report and diagnostics during investigation."
+        "explanation": "Schema version 1 with status unexpected is invalid evidence even when exit_code is 0 and findings are empty. Unknown, contradictory or malformed semantic statuses cannot establish success."
+      },
+      "quality_summary": "Retrieved the full original check inventory with --root /tmp/oxguard-router-eval/new/python/quality --dirs src --output json before editing: fail/1, 12 mypy assignment findings, six not-run gates. Replaced all twelve string initializers with integer literals while preserving int annotations. Isolated mypy passed/0, complete, no findings (quality-mypy-after.json). Full requested check rerun with the same scope returned error/1, incomplete (quality-after.json): ruff, mypy, radon and types passed; coverage reported pyguard.execution.tool_missing because no test runner or test files were found; bandit, pip-audit and secrets were not_run. No installs, tests, suppressions or threshold changes were added. Remaining action requires authorized test setup before the full check can succeed.",
+      "repair_summary": "Resolved original diagnostic IDs against repair diagnostics and confirmed missing mypy. Authorized offline uv package-manager installation into /tmp/oxguard-router-eval/new/python/repair-env succeeded/0 using cached mypy 1.18.2, mypy-extensions 1.1.0, pathspec 1.1.1 and typing-extensions 4.16.0. No source changes. Reran mypy --root /tmp/oxguard-router-eval/new/python/repair --dirs src --output json: pass/0, complete, no findings, recorded in repair-after.json.",
+      "parity_explanation": "PyGuard provides advisory criticality, dead-code and dependency analysis, but Python structural and baseline-change analyses are absent. It cannot perform TypeScript-style structural baseline comparisons, and language-specific metrics must not be equated.",
+      "skill_reads": [
+        "skill/SKILL.md",
+        "skill/workflows/check.md",
+        "skill/workflows/fix.md",
+        "skill/workflows/security.md",
+        "skill/workflows/review.md"
+      ],
+      "routes": {
+        "quality": "workflows/fix.md",
+        "repair": "workflows/fix.md",
+        "security": "workflows/security.md",
+        "review": "workflows/review.md"
       }
     }
+  },
+  "skill_layout": "router",
+  "focused_review": {
+    "input": {
+      "schema_version": "1",
+      "status": "advisory",
+      "assessment": "complete",
+      "gates": [
+        {
+          "name": "criticality",
+          "status": "advisory",
+          "normalization": "complete"
+        }
+      ],
+      "command": "criticality",
+      "exit_code": 0,
+      "findings": [
+        {
+          "id": "pyguard.criticality.ranked:70bef815ae7018339e087afe19dc9bb5e3d8838b5417441eab30b3df2d85c61e",
+          "level": "structure",
+          "gate": "criticality",
+          "rule": "pyguard.criticality.ranked",
+          "severity": "info",
+          "status": "advisory",
+          "category": "quality",
+          "location": {
+            "file": "src/index.py",
+            "line": 1,
+            "symbol": "index.target"
+          },
+          "observed": 3,
+          "evidence": "index.target has 3 distinct callers (rank 1).",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.py",
+            "line": 1,
+            "symbol": "index.target"
+          },
+          "value": 3,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.py",
+            "line": 4,
+            "symbol": "index.a"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.py",
+            "line": 7,
+            "symbol": "index.b"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.py",
+            "line": 10,
+            "symbol": "index.c"
+          },
+          "value": 0,
+          "unit": "callers"
+        }
+      ],
+      "artifacts": [
+        {
+          "kind": "criticality",
+          "path": "CRITICALITY.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "criticality",
+          "channel": "stdout",
+          "path": ".pyguard-cache/diagnostics/diagnostic-001-criticality-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "criticality",
+          "channel": "stderr",
+          "path": ".pyguard-cache/diagnostics/diagnostic-002-criticality-stderr.log"
+        }
+      ]
+    },
+    "response": {
+      "semantic_status": "advisory",
+      "exit_code": 0,
+      "source_edit_needed": false,
+      "explanation": "The supplied schema-1 criticality record reports advisory status, a complete assessment, and a criticality gate with advisory status and complete normalization. The command exited 0; this indicates no reported execution failure, but does not turn the advisory into a passing quality verdict. Its single informational quality finding ranks index.target at src/index.py:1 first with 3 distinct callers. Measurements also show zero callers for index.a, index.b and index.c. This is a structural ranking, not a blocking defect or vulnerability finding. No source edit is required by this record. The next action is optional review of index.target when prioritizing impact-sensitive testing or maintenance.",
+      "limitations": [
+        "Interpretation is limited to the supplied record; no analysis was rerun and no project files were changed.",
+        "The complete assessment covers the requested criticality analysis only; it does not establish results for other checks. No partial or not-run gates are listed.",
+        "CRITICALITY.md and the two referenced diagnostic streams were not inspected; their contents are not inferred.",
+        "No project AGENTS.md was found in the provided Python task directory or current workspace."
+      ],
+      "skill_reads": [
+        "SKILL.md",
+        "workflows/check.md"
+      ]
+    },
+    "agent_task": "router_focused_py_total"
   }
 }

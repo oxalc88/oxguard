@@ -28,6 +28,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Split Tsguard and PyGuard consumer skills into short task routers, four
+  workflows, capped at 700 words per complete language bundle. Remove OxGuard release procedures
+  from consumer instructions. Embed and deploy the complete bundles for Claude,
+  Codex and Copilot, with project instruction pointers and existing-file protection.
+  Compare old/new skills with fresh agent actions; fingerprint every task guide so stale captures fail the existing readiness gate.
+
 - Refresh the canonical Tsguard and PyGuard skills for independent security
   scans, reviewed dependency exposure, strict result states and verified-input
   reuse. Remove separately maintained Cursor rules and their deployment; retain

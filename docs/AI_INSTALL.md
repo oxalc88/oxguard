@@ -246,3 +246,20 @@ Cursor selection installs its execution hook only. Separate Cursor `.mdc` rules
 are no longer bundled or generated; use the canonical `tsguard/skill/SKILL.md`
 or `pyguard/skill/SKILL.md` for instructions. Existing project Cursor rules are
 left in place and can be removed after checking for local changes.
+
+### Task-based skill bundles
+
+Each canonical skill now has a short `SKILL.md` entry that selects one of four
+workflows: run checks, fix findings, review security, or review maintainability.
+The complete installed language bundle stays below 700 words. Read only relevant
+workflows; detailed formats remain in the linked project result-contract guide. Python does not gain TypeScript structural/change checks.
+
+Selecting Claude deploys the complete bundle to `.claude/skills/<guard>/`.
+Selecting Codex or Copilot deploys it to `.agents/skills/<guard>/`; their project
+instructions point to that entry. All workflow paths are bundled in the
+binary and resolve inside the installed skill. Re-running hooks refreshes these
+owned files. Existing project `AGENTS.md` and customized hook configurations remain
+protected: merge the displayed instruction pointer deliberately if replacement is
+refused. Copilot preserves an existing marked instruction block; update an older
+block deliberately. Neither integration requires downloading guides at runtime.
+Cursor execution hooks and existing project rules keep their current behavior.

@@ -1,23 +1,27 @@
 {
   "schema_version": "1",
   "language": "typescript",
-  "skill_sha256": "ba02b6d94f427b7d1546313693c1365ec17b5d7d779fe1be4b66428fb098dee6",
+  "skill_sha256": "e9834b61178b38a429cb98444708a5a99e030e38920f2536c5b3a24a783b9b45",
   "capture_date": "2026-10-17",
-  "provenance": "Fresh independent Codex agent read the updated canonical skill and chose real CLI, source fixes and offline package-manager repair in isolated fixtures. The unchanged record-agent-command.cjs observer recorded argv, native output and source fingerprints. Interpretation records include fresh native inputs and the actual independent response, including dependency review, lockfile-change reuse and unknown-status decisions. No previous capture was relabelled. CI replays this evidence without live model calls.",
+  "provenance": "Fresh independent agent used new skill in isolated fixtures. Same task brief and native toolchain for both versions. Unchanged command observer captured real argv, outputs and source fingerprints. Initial bounded quality and native read/repair records were supplied; subsequent retrieval, edits, offline repair and verification were agent actions. Bundle text fingerprints normalize line endings and terminal whitespace. File-read inventory and routes are agent-reported, not token telemetry. CI replays captures without live model calls.",
+  "additional_verification": "Initial offline repair did not use the package-manager observer; the repair fixture was reset and only the explicitly observed before/install/after retry earns the repair score.",
   "agent_tasks": [
-    "ts_skill_forward",
-    "ts_repair_forward"
+    "router_ts_total"
   ],
   "omitted_events": [
     {
       "tool": "tsguard",
       "argv": [
-        "--version"
+        "check",
+        "--dirs",
+        "src",
+        "--output",
+        "agent"
       ],
-      "exit_code": 0,
+      "exit_code": 1,
       "source_before": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
       "source_after": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
-      "tool_output": "dev\n"
+      "summary": "FAIL\ncommand: check\ngate: types; assessment: incomplete; not_run: 8; partial: 0\nfindings: 12\nTS2322 src/index.ts:1 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:2 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:3 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:4 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:5 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:6 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:7 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:8 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:9 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:10 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nomitted: 2 (use --output json)\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log (paths in --output json)\n"
     },
     {
       "tool": "tsguard",
@@ -27,26 +31,14 @@
       "exit_code": 0,
       "source_before": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
       "source_after": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
-      "tool_output": "tsguard \u2014 TypeScript quality gate runner\n\nQuality gates (replaces npm scripts):\n  tsguard check          full quality gate + advisory maintainability/change\n  tsguard fix            auto-format: ultracite fix\n  tsguard lint           lint + format check (ultracite check)\n  tsguard types          type checking (tsc --noEmit)\n  tsguard typed-lint     native compiler-aware unsafe-operation and promise checks\n  tsguard maintainability AST evidence for delegation and repeated error policy\n  tsguard smells         focused maintainability diagnosis\n  tsguard structure      runtime module graph, cycles, coupling and depth\n  tsguard change         advisory Git baseline versus current maintainability\n  tsguard complexity     compatibility alias; complexity is enforced by ultracite check\n  tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)\n  tsguard coverage       run tests with coverage (vitest --coverage)\n  tsguard security       security: secretlint + npm/pnpm audit + audit-ci + opengrep SAST\n  tsguard npm-audit      dependency vulnerability scan (npm/pnpm/yarn audit + audit-ci)\n  tsguard secrets        credential scan (secretlint)\n  tsguard dead-code      detect unused exports/deps (knip)\n  tsguard duplicates     detect copy-paste code (jscpd)\n  tsguard criticality    informational: function/method caller ranking\n  tsguard audit          informational: criticality + dead-code + duplicates\n\nEnvironment setup:\n  tsguard setup          npm install, configure AI tool hooks\n  tsguard doctor         verify toolchain (read-only)\n  tsguard hooks          generate AI tool hook configs\n\nFlags:\n  --output <mode>  human (default), agent (bounded), or json (complete result)\n  --root <path>    explicit project root containing package.json\n  --baseline <ref> explicit Git revision for source-only change comparison\n  --dirs <d1,d2>    override target directories (default: . \u2014 project root)\n  --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-typescript   only run check if stdin context indicates a .ts/.tsx file was edited\n  --max-fta-score <n> FTA score cap per file (default: 60; >60 = Needs Improvement)\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe tsguard through an external tail (tsguard check 2>&1 | tail -50).\n      Use tsguard check --tail 50 or tsguard check --log-file /tmp/tsguard.log --tail 50.\n      In human mode, heavy gates (check, security, coverage) refuse to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter human commands warn on piped stdout but still run.\n      Agent and JSON modes accept piped stdout.\n"
+      "tool_output": "tsguard — TypeScript quality gate runner\n\nQuality gates (replaces npm scripts):\n  tsguard check          full quality gate + advisory maintainability/change\n  tsguard fix            auto-format: ultracite fix\n  tsguard lint           lint + format check (ultracite check)\n  tsguard types          type checking (tsc --noEmit)\n  tsguard typed-lint     native compiler-aware unsafe-operation and promise checks\n  tsguard maintainability AST evidence for delegation and repeated error policy\n  tsguard smells         focused maintainability diagnosis\n  tsguard structure      runtime module graph, cycles, coupling and depth\n  tsguard change         advisory Git baseline versus current maintainability\n  tsguard complexity     compatibility alias; complexity is enforced by ultracite check\n  tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)\n  tsguard coverage       run tests with coverage (vitest --coverage)\n  tsguard security       security: secretlint + npm/pnpm audit + audit-ci + opengrep SAST\n  tsguard npm-audit      dependency vulnerability scan (npm/pnpm/yarn audit + audit-ci)\n  tsguard secrets        credential scan (secretlint)\n  tsguard dead-code      detect unused exports/deps (knip)\n  tsguard duplicates     detect copy-paste code (jscpd)\n  tsguard criticality    informational: function/method caller ranking\n  tsguard audit          informational: criticality + dead-code + duplicates\n\nEnvironment setup:\n  tsguard setup          npm install, configure AI tool hooks\n  tsguard doctor         verify toolchain (read-only)\n  tsguard hooks          generate AI tool hook configs\n\nFlags:\n  --output <mode>  human (default), agent (bounded), or json (complete result)\n  --root <path>    explicit project root containing package.json\n  --baseline <ref> explicit Git revision for source-only change comparison\n  --dirs <d1,d2>    override target directories (default: . — project root)\n  --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-typescript   only run check if stdin context indicates a .ts/.tsx file was edited\n  --max-fta-score <n> FTA score cap per file (default: 60; >60 = Needs Improvement)\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe tsguard through an external tail (tsguard check 2>&1 | tail -50).\n      Use tsguard check --tail 50 or tsguard check --log-file /tmp/tsguard.log --tail 50.\n      In human mode, heavy gates (check, security, coverage) refuse to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter human commands warn on piped stdout but still run.\n      Agent and JSON modes accept piped stdout.\n"
     },
     {
       "tool": "tsguard",
       "argv": [
-        "types",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 1,
-      "source_before": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
-      "source_after": "98ba85230ff4bcd39ea5c6b9fee5f37de66cb83dfa97ef08eabba29140732430",
-      "summary": "FAIL\ncommand: types\ngate: types; assessment: complete; not_run: 0; partial: 0\nfindings: 12\nTS2322 src/index.ts:1 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:2 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:3 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:4 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:5 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:6 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:7 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:8 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:9 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nTS2322 src/index.ts:10 [quality/blocking]\nType 'string' is not assignable to type 'number'.\nomitted: 2 (use --output json)\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
-        "types",
+        "check",
+        "--root",
+        "/tmp/oxguard-router-eval/new/typescript/quality",
         "--dirs",
         "src",
         "--output",
@@ -58,15 +50,65 @@
       "result": {
         "schema_version": "1",
         "status": "fail",
-        "assessment": "complete",
+        "assessment": "incomplete",
         "gates": [
+          {
+            "name": "lint",
+            "status": "passed",
+            "normalization": "complete"
+          },
+          {
+            "name": "fta",
+            "status": "passed",
+            "normalization": "complete"
+          },
           {
             "name": "types",
             "status": "failed",
             "normalization": "complete"
+          },
+          {
+            "name": "typed-lint",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "coverage",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "secrets",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "dependencies",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "security",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "maintainability",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "duplicates",
+            "status": "not_run",
+            "normalization": "not_run"
+          },
+          {
+            "name": "change",
+            "status": "not_run",
+            "normalization": "not_run"
           }
         ],
-        "command": "types",
+        "command": "check",
         "exit_code": 1,
         "findings": [
           {
@@ -84,8 +126,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -103,8 +145,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -122,8 +164,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -141,8 +183,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -160,8 +202,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -179,8 +221,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -198,8 +240,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -217,8 +259,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -236,8 +278,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -255,8 +297,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -274,8 +316,8 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           },
           {
@@ -293,11 +335,92 @@
             },
             "evidence": "Type 'string' is not assignable to type 'number'.",
             "diagnostics": [
-              "diagnostic-001",
-              "diagnostic-002"
+              "diagnostic-005",
+              "diagnostic-006"
             ]
           }
         ],
+        "measurements": [
+          {
+            "metric": "fta.score",
+            "level": "code",
+            "location": {
+              "file": "src/index.ts"
+            },
+            "value": 9.922897245213235,
+            "unit": "score",
+            "threshold": 60
+          }
+        ],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "lint",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "lint",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-lint-stderr.log"
+          },
+          {
+            "id": "diagnostic-003",
+            "gate": "fta",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-003-fta-stdout.log"
+          },
+          {
+            "id": "diagnostic-004",
+            "gate": "fta",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-004-fta-stderr.log"
+          },
+          {
+            "id": "diagnostic-005",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-005-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-006",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-006-types-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--root",
+        "/tmp/oxguard-router-eval/new/typescript/quality",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
+      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
+      "result": {
+        "schema_version": "1",
+        "status": "pass",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "types",
+        "exit_code": 0,
+        "findings": [],
         "measurements": [],
         "artifacts": [],
         "diagnostics": [
@@ -319,35 +442,9 @@
     {
       "tool": "tsguard",
       "argv": [
-        "types",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 0,
-      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "summary": "PASS\ncommand: types\ngate: none; assessment: complete; not_run: 0; partial: 0\nfindings: 0\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
         "check",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 1,
-      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "summary": "ERROR\ncommand: check\ngate: coverage; assessment: incomplete; not_run: 6; partial: 0\nfindings: 3\ntsguard.execution.invalid_configuration [invalid_configuration/execution_error]\nNo tests were collected.\ntsguard.coverage.lines_threshold_failed [quality/blocking]\nlines coverage 0% is below 80%.\ntsguard.coverage.statements_threshold_failed [quality/blocking]\nstatements coverage 0% is below 80%.\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-lint-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
-        "check",
+        "--root",
+        "/tmp/oxguard-router-eval/new/typescript/quality",
         "--dirs",
         "src",
         "--output",
@@ -638,216 +735,17 @@
           }
         ]
       }
-    },
-    {
-      "tool": "npm",
-      "argv": [
-        "audit",
-        "--audit-level=moderate",
-        "--json"
-      ],
-      "exit_code": 1,
-      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "tool_output": "{\n  \"error\": {\n    \"code\": \"ENOLOCK\",\n    \"summary\": \"This command requires an existing lockfile.\",\n    \"detail\": \"Try creating one first with: npm i --package-lock-only\\nOriginal error: loadVirtual requires existing shrinkwrap file\"\n  }\n}\n",
-      "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\nnpm error code ENOLOCK\nnpm error audit This command requires an existing lockfile.\nnpm error audit Try creating one first with: npm i --package-lock-only\nnpm error audit Original error: loadVirtual requires existing shrinkwrap file\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-17T03_34_32_470Z-debug-0.log\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
-        "security",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 1,
-      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "summary": "ERROR\ncommand: security\ngate: dependencies; assessment: incomplete; not_run: 0; partial: 1\nfindings: 3\ntsguard.execution.adapter_failure [adapter_failure/execution_error]\nAnalyzer structured output could not be decoded; inspect diagnostics.\ntsguard.execution.dependency_failure [dependency_failure/execution_error]\nDependency registry audit failed; inspect diagnostics.\ntsguard.execution.tool_missing [tool_missing/execution_error]\nBundled Opengrep is missing; reinstall with optional dependencies.\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-secrets-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
-        "maintainability",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 0,
-      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "summary": "PASS\ncommand: maintainability\ngate: none; assessment: complete; not_run: 0; partial: 0\nfindings: 0\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-maintainability-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
-        "duplicates",
-        "--dirs",
-        "src",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 0,
-      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "summary": "PASS\ncommand: duplicates\ngate: none; assessment: complete; not_run: 0; partial: 0\nfindings: 0\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-duplicates-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "npm",
-      "argv": [
-        "audit",
-        "--audit-level=moderate",
-        "--json"
-      ],
-      "exit_code": 1,
-      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "tool_output": "{\n  \"error\": {\n    \"code\": \"ENOLOCK\",\n    \"summary\": \"This command requires an existing lockfile.\",\n    \"detail\": \"Try creating one first with: npm i --package-lock-only\\nOriginal error: loadVirtual requires existing shrinkwrap file\"\n  }\n}\n",
-      "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\nnpm error code ENOLOCK\nnpm error audit This command requires an existing lockfile.\nnpm error audit Try creating one first with: npm i --package-lock-only\nnpm error audit Original error: loadVirtual requires existing shrinkwrap file\nnpm error A complete log of this run can be found in: /root/.npm/_logs/2026-10-17T03_34_37_778Z-debug-0.log\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
-        "security",
-        "--dirs",
-        "src",
-        "--output",
-        "json"
-      ],
-      "exit_code": 1,
-      "source_before": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "source_after": "32da6f3cd9d428fad2aa4daad2976b5f92b7cb39b4e8a82b847486b10253301b",
-      "result": {
-        "schema_version": "1",
-        "status": "error",
-        "assessment": "incomplete",
-        "gates": [
-          {
-            "name": "secrets",
-            "status": "passed",
-            "normalization": "complete"
-          },
-          {
-            "name": "dependencies",
-            "status": "error",
-            "normalization": "partial"
-          },
-          {
-            "name": "security",
-            "status": "error",
-            "normalization": "complete"
-          }
-        ],
-        "command": "security",
-        "exit_code": 1,
-        "findings": [
-          {
-            "id": "tsguard.execution.adapter_failure:a5f5c86a80ec36df46a0c75d1b92efc31e5b474456c62e37d4c367f70f59b373",
-            "level": "code",
-            "gate": "dependencies",
-            "rule": "tsguard.execution.adapter_failure",
-            "severity": "error",
-            "status": "execution_error",
-            "category": "adapter_failure",
-            "evidence": "Analyzer structured output could not be decoded; inspect diagnostics.",
-            "diagnostics": [
-              "diagnostic-005",
-              "diagnostic-006"
-            ]
-          },
-          {
-            "id": "tsguard.execution.dependency_failure:29d6a60a7e2c56f1fa02ab7cd27a1c507915f9d6bdccb9cbc6dcb1663b8f83fd",
-            "level": "code",
-            "gate": "dependencies",
-            "rule": "tsguard.execution.dependency_failure",
-            "severity": "error",
-            "status": "execution_error",
-            "category": "dependency_failure",
-            "evidence": "Dependency registry audit failed; inspect diagnostics.",
-            "diagnostics": []
-          },
-          {
-            "id": "tsguard.execution.tool_missing:9837191bf61dedc01d9c8450d84066dc5e285bb04ad0d4cad556993a9078c983",
-            "level": "code",
-            "gate": "security",
-            "rule": "tsguard.execution.tool_missing",
-            "severity": "error",
-            "status": "execution_error",
-            "category": "tool_missing",
-            "evidence": "Bundled Opengrep is missing; reinstall with optional dependencies.",
-            "diagnostics": []
-          }
-        ],
-        "measurements": [],
-        "artifacts": [],
-        "diagnostics": [
-          {
-            "id": "diagnostic-001",
-            "gate": "secrets",
-            "channel": "stdout",
-            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-secrets-stdout.log"
-          },
-          {
-            "id": "diagnostic-002",
-            "gate": "secrets",
-            "channel": "stderr",
-            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-secrets-stderr.log"
-          },
-          {
-            "id": "diagnostic-003",
-            "gate": "dependencies",
-            "channel": "stdout",
-            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-003-dependencies-stdout.log"
-          },
-          {
-            "id": "diagnostic-004",
-            "gate": "dependencies",
-            "channel": "stderr",
-            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-004-dependencies-stderr.log"
-          },
-          {
-            "id": "diagnostic-005",
-            "gate": "dependencies",
-            "channel": "stdout",
-            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-005-dependencies-stdout.log"
-          },
-          {
-            "id": "diagnostic-006",
-            "gate": "dependencies",
-            "channel": "stderr",
-            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-006-dependencies-stderr.log"
-          }
-        ]
-      }
     }
   ],
   "repair_events": [
     {
       "tool": "tsguard",
       "argv": [
-        "--version"
-      ],
-      "exit_code": 0,
-      "source_before": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
-      "source_after": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
-      "tool_output": "dev\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
-        "--help"
-      ],
-      "exit_code": 0,
-      "source_before": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
-      "source_after": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
-      "tool_output": "tsguard \u2014 TypeScript quality gate runner\n\nQuality gates (replaces npm scripts):\n  tsguard check          full quality gate + advisory maintainability/change\n  tsguard fix            auto-format: ultracite fix\n  tsguard lint           lint + format check (ultracite check)\n  tsguard types          type checking (tsc --noEmit)\n  tsguard typed-lint     native compiler-aware unsafe-operation and promise checks\n  tsguard maintainability AST evidence for delegation and repeated error policy\n  tsguard smells         focused maintainability diagnosis\n  tsguard structure      runtime module graph, cycles, coupling and depth\n  tsguard change         advisory Git baseline versus current maintainability\n  tsguard complexity     compatibility alias; complexity is enforced by ultracite check\n  tsguard fta            Halstead + cyclomatic + LOC score per file (fta command, default cap 60)\n  tsguard coverage       run tests with coverage (vitest --coverage)\n  tsguard security       security: secretlint + npm/pnpm audit + audit-ci + opengrep SAST\n  tsguard npm-audit      dependency vulnerability scan (npm/pnpm/yarn audit + audit-ci)\n  tsguard secrets        credential scan (secretlint)\n  tsguard dead-code      detect unused exports/deps (knip)\n  tsguard duplicates     detect copy-paste code (jscpd)\n  tsguard criticality    informational: function/method caller ranking\n  tsguard audit          informational: criticality + dead-code + duplicates\n\nEnvironment setup:\n  tsguard setup          npm install, configure AI tool hooks\n  tsguard doctor         verify toolchain (read-only)\n  tsguard hooks          generate AI tool hook configs\n\nFlags:\n  --output <mode>  human (default), agent (bounded), or json (complete result)\n  --root <path>    explicit project root containing package.json\n  --baseline <ref> explicit Git revision for source-only change comparison\n  --dirs <d1,d2>    override target directories (default: . \u2014 project root)\n  --exclude <d1,d2> additional directories to exclude from all scans (node_modules,dist,.next,build,coverage excluded by default)\n  --timeout <s>     per-tool timeout in seconds (default: 300)\n  --tail <n>        print only the last N lines of each tool's output to stdout\n  --log-file <path> append full output to file (in addition to stdout)\n  --if-typescript   only run check if stdin context indicates a .ts/.tsx file was edited\n  --max-fta-score <n> FTA score cap per file (default: 60; >60 = Needs Improvement)\n  --allow-pipe      suppress pipe refusal/warning (for CI wrappers that use tee)\n\nNote: never pipe tsguard through an external tail (tsguard check 2>&1 | tail -50).\n      Use tsguard check --tail 50 or tsguard check --log-file /tmp/tsguard.log --tail 50.\n      In human mode, heavy gates (check, security, coverage) refuse to run when\n      stdout is a pipe; use --allow-pipe to override.\n      Lighter human commands warn on piped stdout but still run.\n      Agent and JSON modes accept piped stdout.\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
         "types",
+        "--root",
+        "/tmp/oxguard-router-eval/new/typescript/repair",
+        "--dirs",
+        "src",
         "--output",
         "json"
       ],
@@ -905,18 +803,26 @@
       "tool": "npm",
       "argv": [
         "install",
-        "--offline"
+        "--offline",
+        "--include=optional",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund"
       ],
       "exit_code": 0,
       "source_before": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
       "source_after": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
-      "tool_output": "\nadded 1 package in 438ms\n",
+      "tool_output": "\nadded 1 package in 441ms\n",
       "stderr": "npm warn Unknown env config \"http-proxy\". This will stop working in the next major version of npm.\n"
     },
     {
       "tool": "tsguard",
       "argv": [
         "types",
+        "--root",
+        "/tmp/oxguard-router-eval/new/typescript/repair",
+        "--dirs",
+        "src",
         "--output",
         "json"
       ],
@@ -1115,36 +1021,49 @@
         "semantic_status": "advisory",
         "exit_code": 0,
         "source_edit_needed": false,
-        "explanation": "The supplied schema-1 criticality record is complete and contains one informational advisory: src/index.ts:1 target has three distinct static callers and rank 1. All four measured functions are represented; a, b and c have zero callers. This is review and test-prioritization context, not a blocking source defect.",
-        "limitations": "Static caller counts do not establish runtime impact, reachability, module cycles, or change quality. The supplied record was interpreted without rerunning or changing its project."
+        "explanation": "Supplied read-input.json has complete criticality analysis. target at src/index.ts:1 is rank 1 with 3 distinct static callers, a, b and c. This is informational caller ranking, not a blocking threshold. No rerun was performed.",
+        "limitations": "Static resolved calls within selected TypeScript scope; module-level calls excluded. Caller count does not establish runtime impact or require a source edit."
       },
       "execution": {
         "semantic_status": "error",
         "exit_code": 1,
         "source_edit_needed": false,
-        "explanation": "The supplied schema-1 types record has an incomplete assessment and one execution_error finding, tsguard.execution.tool_missing, category tool_missing. It indicates a missing analyzer or required module, not a demonstrated source typing defect. The live repair project's referenced stderr identifies MODULE_NOT_FOUND for typescript/package.json; the project declares TypeScript 5.9.3.",
-        "limitations": "The original record does not establish source correctness because compilation could not execute. The later successful repair analysis is separate evidence, described in repair_summary."
+        "explanation": "Original repair-input.json is semantic error, exit 1, assessment incomplete, with normalized category tool_missing and rule tsguard.execution.tool_missing. Diagnostic-002 identified missing typescript/package.json. It requires analyzer repair, not source edits. After the isolated repair fixture was reset, explicitly executed RUN/bin/tsguard types --root /tmp/oxguard-router-eval/new/typescript/repair --dirs src --output json: repair-before-observed.json confirms error, incomplete, tool_missing, actual exit 1. Explicit RUN/bin/npm install --offline --include=optional --ignore-scripts --no-audit --no-fund restored declared TypeScript 5.9.3, actual exit 0. The same explicit RUN/bin/tsguard types command then produced repair-after-observed.json: pass, complete, no findings, actual exit 0. Source and declared compiler were preserved.",
+        "limitations": "Supplied original record was interpreted without rerunning it initially. The newly authorized before/after executions are separately recorded. Earlier repair-types.json was prior evidence from an installation not captured by the command observer; it is not relabeled as current observed repair evidence. Verification covers types only, not full quality or security."
       },
       "change": {
         "semantic_status": "advisory",
         "exit_code": 0,
         "simplification_proven": false,
-        "explanation": "tsguard change --baseline HEAD was run in typescript-change in agent and JSON modes. Schema 1 reports complete normalization, one advisory FUNCTION_COMPLEXITY_INCREASE at src/index.ts:1 decision, and a passed maintainability gate. HEAD resolved to 4bb648585ded4997edf0a8c054bb064552a97a97. One file and one function match by path_or_symbol. Native Biome cognitive complexity increased from the baseline bound [0,1] to exactly 3; branches increased from 0 to 2, cyclomatic paths from 1 to 3, and native FTA score from 5.583128210518055 to 25.74731360590968. Duplication remained zero. The comparison supports review of increased complexity, not a simplification claim.",
-        "limitations": "The artifact specifies identical pinned analyzers over graph-selected inert sources without project analyzer configurations: Biome 2.5.15, fta-cli 3.1.0, jscpd 5.4.1. Baseline cognitive complexity is a bound, not a known exact score. Static matched metrics do not prove behavioral equivalence, runtime dispatch, or that added domain behavior is unnecessary. No source edits were made."
+        "explanation": "Executed change --root /tmp/oxguard-router-eval/new/typescript/change --baseline HEAD --dirs src --output json. Complete result reports tsguard.change.FUNCTION_COMPLEXITY_INCREASE at src/index.ts:1 decision. Native baseline cognitive complexity is bounded [0,1], candidate exact 3. Cyclomatic complexity rises 1 to 3 and FTA 5.583128210518055 to 25.74731360590968. Baseline resolves to bc66a9f819b4b5d06a761cb6515e32d7e0607093. Inspected source diff and native maintainability-change artifact.",
+        "limitations": "Advisory exit 0 does not establish simplification. Native path_or_symbol matching does not prove behavioral equivalence; source now adds nested branches and returns different values for x > 10. Review added domain behavior. No blocking violation is implied solely by complexity increase."
       },
-      "quality_summary": "In typescript-quality, tsguard types --dirs src --output agent exposed 12 blocking TS2322 findings and omitted two from its bounded display. The same invocation in JSON reviewed all 12 before editing. src/index.ts lines 1-12 assigned strings to declared numbers; these were changed to corresponding numeric literals while preserving numeric export annotations. The scoped types rerun passed, complete, exit 0, zero findings. The whole check --dirs src was rerun in agent and JSON modes: lint, FTA, types and typed-lint passed; FTA was 9.922897245213235 against cap 60. Overall check remained error/incomplete, exit 1, with three findings: no tests collected (invalid_configuration execution error), global lines coverage 0% < 80%, and global statements coverage 0% < 80% (two blocking quality findings). In that check, secrets, dependencies, security, maintainability, duplicates and change were not_run. Supplemental isolated maintainability and duplicates commands passed complete with zero findings. A supplemental scoped security run returned error/incomplete, exit 1: secrets passed; dependencies errored with partial normalization (adapter_failure and dependency_failure); security errored because bundled Opengrep is missing. Referenced dependency diagnostics show npm ENOLOCK and audit-ci inability to establish the package manager because no supported lockfile exists. These execution failures do not establish vulnerability findings or a successful SAST assessment. No dependencies were installed and no tests were added. The complete check is still not green; fixing the no-test/coverage configuration and provisioning security prerequisites requires work beyond the authorized typing repair. No baseline was invented for the quality project's unrun change gate.",
-      "repair_summary": "Project: /tmp/oxguard-skill-refresh-20261017/typescript-repair2\nUsed the tsguard skill and the required PATH for all tsguard/npm commands. Verified installed CLI version and help via tsguard directly (project-local npx --no-install could not resolve an executable).\nInitial tsguard types --output json: schema_version 1, status error, assessment incomplete, real exit 1, one execution_error finding (tsguard.execution.tool_missing), no source-quality findings. Referenced stderr confirmed missing typescript/package.json.\nRestored the existing declared TypeScript 5.9.3 compiler with npm install --offline (exit 0; added one package).\nVerified with tsguard types --output json: schema_version 1, status pass, assessment complete, types passed with complete normalization, real exit 0, zero findings.\nNo source or skill/repository edits. Only the requested types gate was assessed; unrelated gates were not requested or run.\n",
       "dependency_review": {
         "may_waive": false,
-        "explanation": "A high-severity advisory affecting a devDependency is not automatically safe. With no valid explicit exposure review/policy, retain the native blocking policy and advisory visibility. A waiver requires evidence-backed development_tool or ci scope, product_exposure not_exposed, tooling_risk accepted, and manifest plus all existing supported lockfile SHA-256 bindings; classification alone cannot substitute for that review."
+        "explanation": "Development-only classification alone cannot waive a high-severity advisory. Retain native blocking policy without valid explicit exposure review and authorized policy. A valid .oxguard-dependency-policy.json acceptance requires package/advisory identity, scope development_tool or ci, product_exposure not_exposed, tooling_risk accepted, evidence-backed reason, and SHA-256 bindings to manifest and every existing supported lockfile. Stale/malformed reviews cannot waive; accepted findings remain visible; hashes do not prove reachability."
       },
       "verification_reuse": {
         "reuse_allowed": false,
-        "explanation": "The changed dependency lockfile invalidates equivalence with the prior green result even when source, tests and configuration match. Dependencies and toolchain/environment must also match. Rerun the checks applicable to the changed dependency inputs rather than claiming the prior result proves the current state or repeating unrelated checks."
+        "explanation": "A changed lockfile invalidates applicable prior green checks even if source/tests/config are identical. Reuse requires matching dependencies, toolchain, environment and scope as well as source/tests/config; rerun affected verification."
       },
       "unknown_status": {
         "valid_evidence": false,
-        "explanation": "A schema-1 result with unknown status unexpected is invalid evidence. Exit 0 and empty findings do not convert an unknown semantic status into passing or advisory success; preserve the original report and diagnostics for contract investigation."
+        "explanation": "Schema-1 status unexpected is unknown and therefore invalid evidence even with exit_code 0 and empty findings. Exit zero alone cannot establish success; obtain a valid recognized semantic status and complete assessment/gates."
+      },
+      "quality_summary": "Retrieved full original check JSON with --dirs src before edits (quality-before.json): 12 TS2322 blocking findings at src/index.ts lines 1-12, including both omitted findings. Replaced string initializers with corresponding numeric literals, preserving numeric exports. Isolated types passed complete with actual exit 0 (quality-types.json). Full check with original scope exited 1, semantic error, assessment incomplete (quality-after.json): lint, fta, types, typed-lint passed; coverage errored because no tests collected, plus line and statement coverage 0% below 80%. Secrets, dependencies, security, maintainability, duplicates and change not_run; no partial gates. No tests, installs, suppressions or thresholds added in quality. Next action is authorized test/config work before full verification can pass; typing repair itself is complete.",
+      "repair_summary": "Original tool_missing error required restoring declared TypeScript 5.9.3, with source unchanged. Earlier offline install and repair-types.json pass evidence predated a fixture reset and the install was not captured by the command observer. Repeated only repair using explicit RUN/bin commands: repair-before-observed.json error/incomplete exit 1; RUN/bin/npm offline optional-inclusive install exit 0; repair-after-observed.json pass/complete with no findings exit 0. No source changes or compiler-version changes. Full quality/security checks were not claimed.",
+      "skill_reads": [
+        "skill/SKILL.md",
+        "skill/workflows/check.md",
+        "skill/workflows/fix.md",
+        "skill/workflows/security.md",
+        "skill/workflows/review.md"
+      ],
+      "routes": {
+        "quality": "workflows/check.md",
+        "repair": "workflows/fix.md",
+        "security": "workflows/security.md",
+        "review": "workflows/review.md"
       }
     }
   },
@@ -1153,22 +1072,12 @@
       "tool": "tsguard",
       "argv": [
         "change",
+        "--root",
+        "/tmp/oxguard-router-eval/new/typescript/change",
         "--baseline",
         "HEAD",
-        "--output",
-        "agent"
-      ],
-      "exit_code": 0,
-      "source_before": "d0aeba073b8a2c3cbe864a614d14bf7dcf2edb127901a0fb50821e6d8e710ec1",
-      "source_after": "d0aeba073b8a2c3cbe864a614d14bf7dcf2edb127901a0fb50821e6d8e710ec1",
-      "summary": "ADVISORY\ncommand: change\ngate: change; assessment: complete; not_run: 0; partial: 0\nfindings: 1\ntsguard.change.FUNCTION_COMPLEXITY_INCREASE src/index.ts:1 [quality/advisory]\nMatched by path_or_symbol against 4bb648585ded4997edf0a8c054bb064552a97a97: native Biome cognitive complexity increased beyond baseline upper bound 1 to at least 3.\ndiagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-maintainability-stdout.log (paths in --output json)\n"
-    },
-    {
-      "tool": "tsguard",
-      "argv": [
-        "change",
-        "--baseline",
-        "HEAD",
+        "--dirs",
+        "src",
         "--output",
         "json"
       ],
@@ -1216,7 +1125,7 @@
                 "symbol": "decision"
               }
             ],
-            "evidence": "Matched by path_or_symbol against 4bb648585ded4997edf0a8c054bb064552a97a97: native Biome cognitive complexity increased beyond baseline upper bound 1 to at least 3.",
+            "evidence": "Matched by path_or_symbol against bc66a9f819b4b5d06a761cb6515e32d7e0607093: native Biome cognitive complexity increased beyond baseline upper bound 1 to at least 3.",
             "remediation": "Review the added paths and required domain behavior; an increase alone is not a blocking violation.",
             "diagnostics": []
           }
@@ -2014,5 +1923,239 @@
         ]
       }
     }
-  ]
+  ],
+  "unobserved_initial_repair": [
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 1,
+      "source_before": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "source_after": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "result": {
+        "schema_version": "1",
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "types",
+            "status": "error",
+            "normalization": "complete"
+          }
+        ],
+        "command": "types",
+        "exit_code": 1,
+        "findings": [
+          {
+            "id": "tsguard.execution.tool_missing:18cdf7323caea57a67357060a9447bc6478bc368e800f3074aa14e8a1fecff8e",
+            "level": "code",
+            "gate": "types",
+            "rule": "tsguard.execution.tool_missing",
+            "severity": "error",
+            "status": "execution_error",
+            "category": "tool_missing",
+            "evidence": "An analyzer or required module is missing.",
+            "diagnostics": [
+              "diagnostic-001",
+              "diagnostic-002"
+            ]
+          }
+        ],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+          }
+        ]
+      }
+    },
+    {
+      "tool": "tsguard",
+      "argv": [
+        "types",
+        "--root",
+        "/tmp/oxguard-router-eval/new/typescript/repair",
+        "--dirs",
+        "src",
+        "--output",
+        "json"
+      ],
+      "exit_code": 0,
+      "source_before": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "source_after": "3b804f8cdbaf53b72de99458457bbbf9099d09fe28a960565572bd5fda92a06b",
+      "result": {
+        "schema_version": "1",
+        "status": "pass",
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "types",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "command": "types",
+        "exit_code": 0,
+        "findings": [],
+        "measurements": [],
+        "artifacts": [],
+        "diagnostics": [
+          {
+            "id": "diagnostic-001",
+            "gate": "types",
+            "channel": "stdout",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log"
+          },
+          {
+            "id": "diagnostic-002",
+            "gate": "types",
+            "channel": "stderr",
+            "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-types-stderr.log"
+          }
+        ]
+      }
+    }
+  ],
+  "skill_layout": "router",
+  "focused_review": {
+    "input": {
+      "schema_version": "1",
+      "status": "advisory",
+      "assessment": "complete",
+      "gates": [
+        {
+          "name": "criticality",
+          "status": "advisory",
+          "normalization": "complete"
+        }
+      ],
+      "command": "criticality",
+      "exit_code": 0,
+      "findings": [
+        {
+          "id": "tsguard.criticality.ranked:7c0b44cf7be52bb88a608701854da70eedb177e792b586b03070335b74202497",
+          "level": "structure",
+          "gate": "criticality",
+          "rule": "tsguard.criticality.ranked",
+          "severity": "info",
+          "status": "advisory",
+          "category": "quality",
+          "location": {
+            "file": "src/index.ts",
+            "line": 1,
+            "column": 1,
+            "symbol": "target"
+          },
+          "observed": 3,
+          "evidence": "target has 3 distinct callers (rank 1).",
+          "diagnostics": [
+            "diagnostic-001",
+            "diagnostic-002"
+          ]
+        }
+      ],
+      "measurements": [
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.ts",
+            "line": 1,
+            "column": 1,
+            "symbol": "target"
+          },
+          "value": 3,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.ts",
+            "line": 2,
+            "column": 1,
+            "symbol": "a"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.ts",
+            "line": 3,
+            "column": 1,
+            "symbol": "b"
+          },
+          "value": 0,
+          "unit": "callers"
+        },
+        {
+          "metric": "criticality.in_degree",
+          "level": "structure",
+          "location": {
+            "file": "src/index.ts",
+            "line": 4,
+            "column": 1,
+            "symbol": "c"
+          },
+          "value": 0,
+          "unit": "callers"
+        }
+      ],
+      "artifacts": [
+        {
+          "kind": "criticality",
+          "path": "CRITICALITY.md"
+        }
+      ],
+      "diagnostics": [
+        {
+          "id": "diagnostic-001",
+          "gate": "criticality",
+          "channel": "stdout",
+          "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-001-criticality-stdout.log"
+        },
+        {
+          "id": "diagnostic-002",
+          "gate": "criticality",
+          "channel": "stderr",
+          "path": "node_modules/.cache/oxguard/diagnostics/diagnostic-002-criticality-stderr.log"
+        }
+      ]
+    },
+    "response": {
+      "semantic_status": "advisory",
+      "exit_code": 0,
+      "source_edit_needed": false,
+      "explanation": "The supplied schema-1 criticality record reports an advisory outcome with a complete assessment and a criticality gate whose status is advisory and normalization is complete. Exit code 0 indicates the invocation completed without a nonzero process exit; it does not turn the advisory into a clean pass. The sole informational quality advisory, tsguard.criticality.ranked, identifies target at src/index.ts:1:1 as rank 1 with 3 distinct callers. Measurements give target in-degree 3 and a, b, and c in-degree 0. This is a dependency-centrality ranking, not a blocking quality failure or an execution error, and does not itself require a source edit. The record references CRITICALITY.md and two diagnostic streams. No incomplete or not-run gates are reported for this requested criticality analysis. The next action is to use this ranking to prioritize review or testing of target if useful; no mandatory remediation follows from this record.",
+      "limitations": [
+        "Interpretation is limited to the supplied record; no analysis was rerun and no project files were changed.",
+        "The referenced report and diagnostic streams were not inspected; their contents and the actual identities of the three callers are not established by this record.",
+        "A complete criticality assessment does not establish that other quality or security checks ran or passed.",
+        "No project AGENTS.md was found under the read project directory."
+      ],
+      "skill_reads": [
+        "SKILL.md",
+        "workflows/check.md"
+      ]
+    },
+    "agent_task": "router_focused_ts_total"
+  }
 }

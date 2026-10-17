@@ -217,10 +217,10 @@ your agent understands how to interpret gate output):
 
 | AI tool | Hook written | Skill / instructions written |
 |---|---|---|
-| Claude Code | `.claude/settings.local.json` | `.claude/skills/tsguard/SKILL.md` |
-| GitHub Copilot | `.github/hooks/tsguard-check.json` + `.vscode/tasks.json` | `.github/copilot-instructions.md` |
+| Claude Code | `.claude/settings.local.json` | `.claude/skills/tsguard/` (entry and workflows) |
+| GitHub Copilot | `.github/hooks/tsguard-check.json` + `.vscode/tasks.json` | `.github/copilot-instructions.md` → `.agents/skills/tsguard/` |
 | Cursor | `.cursor/hooks.json` | No separate Cursor rules; use the canonical skill |
-| OpenAI Codex CLI | `.codex/hooks.json` | `AGENTS.md` |
+| OpenAI Codex CLI | `.codex/hooks.json` | `AGENTS.md` → `.agents/skills/tsguard/` |
 | OpenCode | `.opencode/plugins/tsguard/index.ts` + `opencode.json` | (plugin is the skill) |
 
 *(pyguard writes the same set with `pyguard` names in each path.)*

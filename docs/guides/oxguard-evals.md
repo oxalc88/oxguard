@@ -109,11 +109,21 @@ See [PyGuard agent evaluation](pyguard-agent-evaluation.md) for repository evide
 
 The existing report job runs `evals/level1-ready.cjs` and publishes `level1-ready.json`; no extra workflow or runner is added. Readiness requires every case in both current corpora, all 18 shared capabilities, and the recorded action scores for both current skills. Missing cases, failed/unsupported/skipped outcomes, stale skill captures, missing complete JSON retrieval or source changes during execution repair block readiness. An initial TypeScript forward-test had an invalid fixture because the distribution harness deliberately renamed its native package; that attempt is retained as `invalid-initial-typescript.json` and earns no score. A fresh independent task supplied the scored replacement.
 
-The current traces were recaptured on 2026-10-09 with the hardened skills, using fresh independent agents in isolated projects. Both agents retrieved all 12 type findings before editing, fixed them, reran the isolated gate and full check, and disclosed the remaining coverage execution errors and unexecuted security gates. Authorized offline repair restored TypeScript with npm and mypy with uv without changing `src` files. Read-only answers distinguish missing tools from source defects and advisory criticality from blocking policy. Neither quality fixture contains tests, so full-check verification remains incomplete; these are recorded error results, not claims that all gates passed. The Python verification follow-up reran the repaired isolated gate and full check without further changes. Local capture used Go 1.26.1, Node 24.18.0, npm 11.16.0, uv 0.11.31, Python 3.12.13, TypeScript 5.9.3, mypy 1.18.2 and Ruff 0.14.0; CI uses its separately pinned toolchain, including uv 0.12.19. Additional models, production projects, analyzer versions and long-term capability accuracy need new evidence. Passing this gate does not authorize implementing or releasing Level 2/3.
+The current traces were recaptured on 2026-10-17 with the task routers, using
+fresh independent agents in isolated projects. Each retrieved all 12 type
+findings before edits, fixed them, verified the isolated typing gate and reran
+the full check. Both disclosed blocked coverage and unexecuted security gates.
+Offline repair restored the declared TypeScript compiler with npm and mypy with
+uv without source edits. Supplied criticality and missing-tool records were
+interpreted separately. These projects have no tests, so incomplete full checks
+are expected evidence rather than whole-project passing claims. The old skill
+baseline used the same fixtures and native toolchain; additional verification is
+identified in its provenance. Passing these controlled cases does not establish
+production accuracy, broader model behavior, or Python structural/change parity.
 
 ### Refresh skill evidence
 
-Changing `SKILL.md` invalidates its recorded fingerprint. Run fresh independent agents with the current skill and realistic fixture tasks; do not replace only the old fingerprint. Give agents the requested scope and authorized operations without supplying scorer expectations or historical answers. Keep their fixture projects outside the repository. The installed-package harness can retain an npm toolchain with `TSGUARD_KEEP_TEST_DIR=1`; copy it into a separate fixture toolchain and restore the real built native binary before use, because integration tests deliberately rename native packages and replace binaries to test launcher failures. Python uses the pinned eval environment above, with a separate incomplete environment for dependency repair.
+Changing `SKILL.md` or any workflow invalidates its recorded bundle fingerprint. Run fresh independent agents with the current skill and realistic fixture tasks; do not replace only the old fingerprint. Give agents the requested scope and authorized operations without supplying scorer expectations or historical answers. Keep their fixture projects outside the repository. The installed-package harness can retain an npm toolchain with `TSGUARD_KEEP_TEST_DIR=1`; copy it into a separate fixture toolchain and restore the real built native binary before use, because integration tests deliberately rename native packages and replace binaries to test launcher failures. Python uses the pinned eval environment above, with a separate incomplete environment for dependency repair.
 
 `evals/record-agent-command.cjs` observes actual commands chosen by those agents. Configure absolute paths to real tools and fixture projects, then put wrapper executables on the agent's PATH. A minimal configuration has this shape:
 
@@ -130,7 +140,7 @@ Changing `SKILL.md` invalidates its recorded fingerprint. Run fresh independent 
 
 A wrapper forwards its arguments with `node /absolute/path/evals/record-agent-command.cjs /absolute/path/config.json pyguard "$@"`; use the corresponding tool name for each wrapper. Run from the fixture directory. The observer records argv, actual exit code, complete JSON or bounded stdout, stderr, and before/after fingerprints of files under `src`. It rejects unrelated working directories and source symlinks. Configure the environment's PATH so analyzers use the intended fixture environment. It does not choose commands, retrieve JSON automatically, generate semantic answers, or infer normalized findings from summaries.
 
-Assemble `omitted_events` and `repair_events` from the resulting JSONL records, and attach the real native interpretation inputs and the agent's read-only response. Record the current skill hash, capture date and actual provenance in `agent-traces/{typescript,python}.json`. Finally run `node evals/agent-actions.cjs`, the harness regression tests and `level1-ready.cjs` against fresh CLI corpus reports. The fingerprint and behavioral checks remain unchanged.
+Assemble `omitted_events` and `repair_events` from the resulting JSONL records, and attach the real native interpretation inputs and the agent's read-only response. Record the current skill hash, capture date and actual provenance in `agent-traces/{typescript,python}.json`. Finally run `node evals/agent-actions.cjs`, the harness regression tests and `level1-ready.cjs` against fresh CLI corpus reports. The existing behavioral checks remain required; the fingerprint covers the full bundle in deterministic path order, with line endings and terminal whitespace normalized. Instruction changes still invalidate evidence.
 
 ## Contract eval design and cost
 
@@ -143,3 +153,27 @@ These are development-only fixtures and evaluator scripts. npm manifests still p
 ### Review-gap regression extension
 
 `review-gaps.cjs` is included in the installed maintainability corpus and its provenance hash. It covers semantic-only native rules, supported/unsupported TypeScript configuration, unresolved declarations, stale reports, silent exits, dropped settled rejections and recovery controls, async forwarding boundaries, nesting/callback separation and FTA failure context. Python parity remains independent. The current TypeScript skill capture was refreshed with a fresh independent agent on projects with their own AGENTS.md, including a resolved duplicate-event path. Review judgments are recorded separately from the actual advisory analyzer findings.
+
+### Task router comparison
+
+`agent-traces/router-baseline-{typescript,python}.json` preserves fresh actions
+using the pre-split skills, including the exact old entry text. Current language
+captures use the split bundle on the same fixture tasks and toolchain. Initial
+bounded results are native fixture setup outputs; retrieval, fixes, package repair
+and verification are chosen by independent agents. Supplementary verification is
+identified in capture provenance. These controlled projects have no tests, so an
+honest incomplete full check is expected, never a passing whole-project claim.
+
+`agent-actions.cjs` retains the existing action checks and adds current router
+selection checks. Route and file-read inventories come from the agent's response;
+argv, native outputs and source fingerprints come from the unchanged observer.
+`agent-actions.test.cjs` checks old/new correctness, current bundle identity and
+installed workflow integrity. Entry, complete-bundle and selected-file word counts are
+text-size measurements, not model token, latency or CI-savings claims. Combined
+multi-goal requests can read more text than the old single file. No live model
+calls or new workflow are introduced in CI.
+
+The installed size budget is 700 words per complete language bundle, including
+frontmatter, entry and every task guide. `compareSkills` checks both the total and
+focused-file sizes. Detailed schema/analyzer documentation remains outside the
+installed skill in the existing project guides.
