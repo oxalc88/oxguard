@@ -211,6 +211,19 @@ Report the new version and any changes to the doctor output.
 
 ---
 
+## Match documentation to the installed version
+
+Run `tsguard --version` or `pyguard --version`. Read repository documentation at
+that same Git tag for release-specific behavior. The `main` branch can describe
+unreleased changes; historical plans keep their original version names.
+
+A release tag supplies the binary and npm package versions. It also identifies
+the matching documentation snapshot; it does not rewrite version text in Markdown.
+The skills are embedded from that tagged commit. After installing a newer binary,
+run `tsguard hooks` or `pyguard hooks` to refresh the selected skill bundles.
+Existing project instructions remain protected; merge the new skill pointer when
+an existing-file warning requires it.
+
 ## Notes for the agent
 
 - **setup is idempotent** — it adds only what's missing. Re-running it on an
@@ -240,7 +253,7 @@ Report the new version and any changes to the doctor output.
 
 ### Tsguard review guidance
 
-The v0.8 candidate skill follows the target project's applicable AGENTS.md and referenced policies; keep those rules in that project. Review helper purpose, error recovery, logging ownership and whole-workflow complexity separately from deterministic analyzer findings. The typed-lint gate uses an owned native semantic backend with explicit TypeScript 7 compatibility limits. See [supported maintainability scope](maintainability.md).
+The bundled skill follows the target project's applicable AGENTS.md and referenced policies; keep those rules in that project. Review helper purpose, error recovery, logging ownership and whole-workflow complexity separately from deterministic analyzer findings. The typed-lint gate uses an owned native semantic backend with explicit TypeScript 7 compatibility limits. See [supported maintainability scope](maintainability.md).
 
 Cursor selection installs its execution hook only. Separate Cursor `.mdc` rules
 are no longer bundled or generated; use the canonical `tsguard/skill/SKILL.md`

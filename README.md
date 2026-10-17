@@ -62,7 +62,7 @@ copies to the project's `tools/analysis/`; these are not executed during checks.
 
 ### `tsguard` — TypeScript quality gate
 
-The v0.8 candidate implements three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
+The current implementation provides three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
 
 `tsguard/` is the CLI for TypeScript projects. Runs:
 

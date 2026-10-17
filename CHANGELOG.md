@@ -28,6 +28,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Remove stale v0.8 candidate labels from current guides. Explain matching
+  installed binaries, embedded skills and repository documentation through the
+  same release tag; preserve historical plan version names.
+
 - Split Tsguard and PyGuard consumer skills into short task routers, four
   workflows, capped at 700 words per complete language bundle. Remove OxGuard release procedures
   from consumer instructions. Embed and deploy the complete bundles for Claude,
