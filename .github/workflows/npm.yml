@@ -3,6 +3,16 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact candidate commit (empty uses the dispatch commit)
+        type: string
+        required: false
+      reuse-verification:
+        description: Reuse matching trusted main verification; never publish
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       tag:
@@ -11,9 +21,13 @@ on:
       sha:
         type: string
         required: false
+      reuse-verification:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
+  actions: read
 
 # New PR commits supersede earlier checks; release invocations keep running.
 concurrency:
@@ -31,11 +45,17 @@ jobs:
           - {name: npm, version: bundled}
           - {name: pnpm, version: 10.34.5}
           - {name: pnpm, version: 12.6.0}
+    env:
+      REUSE_VERIFICATION: ${{ inputs.reuse-verification || false }}
+      TSGUARD_PACKAGE_MANAGER: ${{ matrix.manager.name }}
+      VERIFICATION_SUITE: npm
+      VERIFICATION_GROUP: npm-${{ matrix.os }}-${{ matrix.manager.name }}-${{ matrix.manager.version }}
+      VERIFICATION_ARTIFACT: oxguard-evals-${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.sha || inputs.tag || github.ref }}
+          ref: ${{ inputs.sha || inputs.tag || github.sha }}
       - uses: actions/setup-go@v6
         with:
           go-version-file: tsguard/go.mod
@@ -43,22 +63,47 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Go regression tests
-        if: matrix.manager.name == 'npm' && runner.os != 'Windows'
-        run: go test ./...
-        working-directory: tsguard
       - name: Install pnpm test tool
         if: matrix.manager.name == 'pnpm'
         run: npm install --global pnpm@${{ matrix.manager.version }}
-      - name: Eval harness regression tests
+      - name: Find trusted verification for these inputs
         if: matrix.manager.name == 'npm'
-        run: node --test evals/evals.test.cjs evals/python/evals.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs
-      - run: node --test npm/distribution.test.cjs
+        id: evidence
+        run: node scripts/verification-evidence.cjs lookup
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Restore trusted verification reports
+        if: steps.evidence.outputs.run_id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.VERIFICATION_ARTIFACT }}
+          path: eval-reports
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.evidence.outputs.run_id }}
+      - name: Validate restored inputs and reports
+        if: matrix.manager.name == 'npm'
+        id: reuse
+        run: node scripts/verification-evidence.cjs check eval-reports
+      - name: Go regression tests
+        if: steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && runner.os != 'Windows'
+        run: go test ./...
+        working-directory: tsguard
+      - name: Eval harness regression tests
+        if: steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm'
+        run: node --test scripts/verification-evidence.test.cjs evals/evals.test.cjs evals/python/evals.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs
+      - name: Fresh distribution verification (unlocked npm transitive dependencies)
+        run: |
+          node -e "require('node:fs').rmSync('eval-reports', { recursive: true, force: true })"
+          node --test npm/distribution.test.cjs
         env:
           TSGUARD_PACKAGE_MANAGER: ${{ matrix.manager.name }}
           OXGUARD_EVAL_REPORT_DIR: ${{ matrix.manager.name == 'npm' && 'eval-reports' || '' }}
-          OXGUARD_EVAL_REVISION: ${{ github.sha }}
+          OXGUARD_EVAL_REVISION: ${{ inputs.sha || github.sha }}
           OXGUARD_EVAL_BASELINE_REF: ${{ matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest' && github.event.pull_request.base.sha || '' }}
+      - name: Record successful verification inputs
+        if: matrix.manager.name == 'npm'
+        run: node scripts/verification-evidence.cjs record eval-reports
       - name: Upload capability eval reports
         if: always() && matrix.manager.name == 'npm'
         uses: actions/upload-artifact@v4
@@ -73,11 +118,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      REUSE_VERIFICATION: ${{ inputs.reuse-verification || false }}
+      VERIFICATION_SUITE: pyguard
+      VERIFICATION_GROUP: pyguard-${{ matrix.os }}
+      VERIFICATION_ARTIFACT: oxguard-python-evals-${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.sha || inputs.tag || github.ref }}
+          ref: ${{ inputs.sha || inputs.tag || github.sha }}
       - uses: actions/setup-go@v6
         with:
           go-version-file: pyguard/go.mod
@@ -88,11 +138,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Repository identity hook regression tests
-        shell: bash
-        run: |
-          python scripts/test-identity-hooks.py
-          python -m unittest discover -s experiments/test-selection -p "test_*.py"
       - name: Install pinned eval toolchain
         shell: bash
         run: |
@@ -102,19 +147,46 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then EVAL_PY="$RUNNER_TEMP/python-evals/Scripts/python.exe"; fi
           uv pip install --python "$EVAL_PY" --require-hashes -r evals/python/requirements.txt
           echo "EVAL_PY=$EVAL_PY" >> "$GITHUB_ENV"
+      - name: Find trusted verification for these inputs
+        id: evidence
+        run: node scripts/verification-evidence.cjs lookup
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Restore trusted verification reports
+        if: steps.evidence.outputs.run_id != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.VERIFICATION_ARTIFACT }}
+          path: eval-reports/pyguard
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.evidence.outputs.run_id }}
+      - name: Validate restored inputs and reports
+        id: reuse
+        run: node scripts/verification-evidence.cjs check eval-reports/pyguard
+      - name: Repository identity hook regression tests
+        if: steps.reuse.outputs.hit != 'true'
+        shell: bash
+        run: |
+          python scripts/test-identity-hooks.py
+          python -m unittest discover -s experiments/test-selection -p "test_*.py"
       - name: Shared result contract tests
+        if: steps.reuse.outputs.hit != 'true'
         run: go test ./...
         working-directory: contract
       - name: PyGuard regression tests
+        if: steps.reuse.outputs.hit != 'true'
         run: go test ./...
         working-directory: pyguard
       - name: Owned helper source-location tests
+        if: steps.reuse.outputs.hit != 'true'
         shell: bash
         run: '"$EVAL_PY" pyguard/tests/analysis_contract_test.py'
       - name: Evaluate Python behavior and contract parity
+        if: steps.reuse.outputs.hit != 'true'
         shell: bash
         env:
-          EVAL_REVISION: ${{ github.sha }}
+          EVAL_REVISION: ${{ inputs.sha || github.sha }}
           EVAL_BASELINE: ${{ github.event.pull_request.base.sha || '' }}
         run: |
           (cd pyguard && go build -o "$RUNNER_TEMP/pyguard-eval.exe" .)
@@ -126,6 +198,8 @@ jobs:
             ARGS+=(--baseline-binary "$RUNNER_TEMP/pyguard-baseline.exe" --baseline-source "$RUNNER_TEMP/pyguard-baseline" --baseline-revision "$EVAL_BASELINE")
           fi
           node evals/python/run.cjs "${ARGS[@]}"
+      - name: Record successful verification inputs
+        run: node scripts/verification-evidence.cjs record eval-reports/pyguard
       - name: Upload Python behavior and parity reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -141,7 +215,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.sha || inputs.tag || github.ref }}
+          ref: ${{ inputs.sha || inputs.tag || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
