@@ -165,7 +165,7 @@ func (r *Runner) structureFindings(gate string, s *maintainabilitySnapshot, refs
 		r.measure("module.fan_out", "structure", m.Location, float64(len(g.Out[m.ID])), "modules")
 		r.measure("module.dependency_depth", "structure", m.Location, float64(g.Depth[m.ID]), "edges")
 		if len(g.Out[m.ID]) >= 8 && len(g.In[m.ID]) >= 3 {
-			r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.structure.HIGH_MODULE_COUPLING", Status: "advisory", Severity: "warning", Category: "quality", Location: &m.Location,
+			r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.structure.HIGH_MODULE_COUPLING", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &m.Location,
 				Evidence: fmt.Sprintf("%d importing modules depend on this module, which imports %d in-scope runtime modules.", len(g.In[m.ID]), len(g.Out[m.ID])), Remediation: "Review the change surface and cohesion; these counts alone do not prove excessive coupling.", Diagnostics: refs})
 		}
 	}
@@ -185,7 +185,7 @@ func (r *Runner) structureFindings(gate string, s *maintainabilitySnapshot, refs
 		for _, id := range c {
 			locations = append(locations, Location{File: id})
 		}
-		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.structure.CIRCULAR_DEPENDENCY", Status: "advisory", Severity: "warning", Category: "quality", Location: &locations[0], Related: locations[1:],
+		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.structure.CIRCULAR_DEPENDENCY", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &locations[0], Related: locations[1:],
 			Evidence: "Runtime imports form a strongly connected component: " + strings.Join(c, ", "), Remediation: "Inspect initialization and ownership; remove accidental cycles while preserving deliberate domain relationships.", Diagnostics: refs})
 	}
 	r.fragmentationFindings(gate, s, refs)
@@ -239,7 +239,7 @@ func (r *Runner) fragmentationFindings(gate string, s *maintainabilitySnapshot, 
 		if len(chain) < 3 || len(files) < 3 {
 			continue
 		}
-		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.structure.FRAGMENTED_DELEGATION", Status: "advisory", Severity: "warning", Category: "quality", Location: &chain[0], Related: chain[1:],
+		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.structure.FRAGMENTED_DELEGATION", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &chain[0], Related: chain[1:],
 			Evidence: fmt.Sprintf("An unchanged forwarding chain crosses %d modules whose analyzed functions only forward calls.", len(files)), Remediation: "Review whether these modules express separate responsibilities; file count alone is not a violation.", Diagnostics: refs})
 	}
 }

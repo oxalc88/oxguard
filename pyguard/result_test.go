@@ -53,7 +53,7 @@ func TestProcessContract(t *testing.T) {
 		t.Fatal("blocking run passed")
 	}
 	r.result.Finish(1)
-	if r.result.Status != "fail" || len(r.result.Findings) != 2 {
+	if r.result.Status != StatusFail || len(r.result.Findings) != 2 {
 		t.Fatal(r.result)
 	}
 	for _, f := range r.result.Findings {
@@ -94,7 +94,7 @@ func TestExecutionCategories(t *testing.T) {
 			}
 			res := r.RunTool(toolSpec{gate: "mypy", adapter: tc.adapter}, "fixture", args...)
 			r.result.Finish(1)
-			if res.ok || r.result.Status != "error" || len(r.result.Findings) != 1 || r.result.Findings[0].Category != tc.category {
+			if res.ok || r.result.Status != StatusError || len(r.result.Findings) != 1 || r.result.Findings[0].Category != tc.category {
 				t.Fatal(res, r.result)
 			}
 		})
@@ -170,13 +170,13 @@ func TestCLIInputsAndLock(t *testing.T) {
 	os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("[project]\nname='fixture'\nversion='0.0.0'\n"), 0644)
 	for _, args := range [][]string{{"--timout", "30"}, {"--timeout"}, {"--output", "xml"}} {
 		code, r := captureCLI(t, "check", append(args, "--output", "json", "--root", root))
-		if code != 3 || r.Status != "error" || r.Findings[0].Category != "invalid_configuration" {
+		if code != 3 || r.Status != StatusError || r.Findings[0].Category != "invalid_configuration" {
 			t.Fatal(code, r)
 		}
 	}
 	os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("["), 0644)
 	code, r := captureCLI(t, "mypy", []string{"--root", root, "--output", "json"})
-	if code != 3 || r.Status != "error" {
+	if code != 3 || r.Status != StatusError {
 		t.Fatal(code, r)
 	}
 	os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("[project]\nname='fixture'\nversion='0.0.0'\n"), 0644)
@@ -194,7 +194,18 @@ func TestAdvisoryAndMissingHelper(t *testing.T) {
 	r := contractRunner(t)
 	r.RunTool(toolSpec{gate: "criticality", adapter: "owned", advisory: true}, "criticality", "uv", "run", "python", "tools/analysis/analyze_criticality.py", "--json")
 	r.result.Finish(0)
-	if r.result.Status != "error" || r.result.ExitCode != 0 || r.result.Findings[0].Category != "tool_missing" {
+	if r.result.Status != StatusError || r.result.ExitCode != 0 || r.result.Findings[0].Category != "tool_missing" {
 		t.Fatal(r.result)
+	}
+}
+
+func TestOwnedFindingStatusCannotBeMaskedByAdvisoryPolicy(t *testing.T) {
+	for _, status := range []string{"unknown", "pass", "execution_error"} {
+		r := contractRunner(t)
+		payload := `{"schema_version":"1","findings":[{"status":"` + status + `","rule":"example"}],"measurements":[],"artifacts":[]}`
+		r.normalize(toolSpec{gate: "test", adapter: "owned", advisory: true}, Result{ok: true}, strings.NewReader(payload), nil)
+		if len(r.result.Findings) != 1 || r.result.Findings[0].Status != StatusExecutionError {
+			t.Fatalf("%s status hidden", status)
+		}
 	}
 }

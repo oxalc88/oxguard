@@ -42,19 +42,19 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	}
 	complete := spec.adapter != ""
 	defer func() { r.result.RecordGate(spec.gate, res.ok, complete) }()
-	status := "blocking"
+	status := StatusBlocking
 	if spec.advisory {
-		status = "advisory"
+		status = StatusAdvisory
 	}
 	add := func(rule, severity, category, evidence string, location *Location) {
 		s := status
 		if category != "quality" {
-			s = "execution_error"
+			s = StatusExecutionError
 		}
 		r.result.AddFinding(Finding{Gate: spec.gate, Rule: rule, Severity: severity, Status: s, Category: category, Evidence: evidence, Location: location, Diagnostics: refs})
 	}
 	execution := func(category, message string) {
-		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "pyguard.execution." + category, Severity: "error", Status: "execution_error", Category: category, Evidence: message, Diagnostics: refs})
+		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "pyguard.execution." + category, Severity: "error", Status: StatusExecutionError, Category: category, Evidence: message, Diagnostics: refs})
 	}
 	if res.category != "" {
 		execution(res.category, res.message)
@@ -202,7 +202,12 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 			execution(data.Error.Category, data.Error.Message)
 			return
 		}
-		for _, f := range data.Findings {
+		for _, raw := range data.Findings {
+			f := Finding(raw)
+			if f.Status != StatusUnknown && f.Status != StatusBlocking && f.Status != StatusAdvisory {
+				decodeFailed = true
+				break
+			}
 			if f.Rule == "" {
 				decodeFailed = true
 				break
@@ -237,11 +242,15 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	}
 }
 
+// Analyzer inputs predate normalized finding statuses; absent means use gate policy.
+// Explicit unknown or cross-domain states are still rejected before policy is applied.
+type analyzerFinding Finding
+
 type ownedResult struct {
-	SchemaVersion string        `json:"schema_version"`
-	Findings      []Finding     `json:"findings"`
-	Measurements  []Measurement `json:"measurements"`
-	Artifacts     []Artifact    `json:"artifacts"`
+	SchemaVersion string            `json:"schema_version"`
+	Findings      []analyzerFinding `json:"findings"`
+	Measurements  []Measurement     `json:"measurements"`
+	Artifacts     []Artifact        `json:"artifacts"`
 	Error         *struct {
 		Category string `json:"category"`
 		Message  string `json:"message"`

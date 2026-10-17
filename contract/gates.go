@@ -3,9 +3,9 @@ package contract
 // Gate describes requested execution separately from normalized finding detail.
 // A failed quality gate can be complete; an execution error cannot complete an assessment.
 type Gate struct {
-	Name          string `json:"name"`
-	Status        string `json:"status"`        // not_run, passed, advisory, failed, error
-	Normalization string `json:"normalization"` // not_run, complete, partial
+	Name          string       `json:"name"`
+	Status        Status       `json:"status"`        // not_run, passed, advisory, failed, error
+	Normalization Completeness `json:"normalization"` // not_run, complete, partial
 }
 
 func (r *RunResult) Plan(names ...string) {
@@ -18,7 +18,7 @@ func (r *RunResult) Plan(names ...string) {
 			}
 		}
 		if !found {
-			r.Gates = append(r.Gates, Gate{Name: name, Status: "not_run", Normalization: "not_run"})
+			r.Gates = append(r.Gates, Gate{Name: name, Status: StatusNotRun, Normalization: NotRun})
 		}
 	}
 }
@@ -31,37 +31,37 @@ func (r *RunResult) RecordGate(name string, success, complete bool) {
 		if g.Name != name {
 			continue
 		}
-		state := "passed"
+		state := StatusPassed
 		blocking := false
 		if !success {
-			state = "failed"
+			state = StatusFailed
 		}
 		for _, f := range r.Findings {
 			if f.Gate != name {
 				continue
 			}
-			if f.Status == "execution_error" {
-				state = "error"
+			if f.Status == StatusExecutionError {
+				state = StatusError
 				break
 			}
-			if f.Status == "advisory" && state != "error" {
+			if f.Status == StatusAdvisory && state != StatusError {
 				if !blocking {
-					state = "advisory"
+					state = StatusAdvisory
 				}
 			}
-			if f.Status == "blocking" {
-				state = "failed"
+			if f.Status == StatusBlocking {
+				state = StatusFailed
 				blocking = true
 			}
 		}
-		priorities := map[string]int{"not_run": 0, "passed": 1, "advisory": 2, "failed": 3, "error": 4}
+		priorities := map[Status]int{StatusNotRun: 0, StatusPassed: 1, StatusAdvisory: 2, StatusFailed: 3, StatusError: 4}
 		if priorities[state] > priorities[g.Status] {
 			g.Status = state
 		}
-		if !complete || g.Normalization == "partial" {
-			g.Normalization = "partial"
+		if !complete || g.Normalization == Partial {
+			g.Normalization = Partial
 		} else {
-			g.Normalization = "complete"
+			g.Normalization = Complete
 		}
 		return
 	}

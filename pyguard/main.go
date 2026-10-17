@@ -95,7 +95,10 @@ func runCLI(cmd string, args []string) int {
 	cfg, err := parseFlags(flagArgs)
 	result := newRunResult(cmd)
 	finish := func(code int) int {
-		result.Finish(code)
+		if err := result.Finish(code); err != nil {
+			fmt.Fprintln(os.Stderr, "invalid result contract:", err)
+			return exitUnknown
+		}
 		if cfg.output != "human" {
 			if err := reportResult(os.Stdout, cfg.output, result); err != nil {
 				return 1
@@ -157,7 +160,7 @@ func runCLI(cmd string, args []string) int {
 	}
 	cfg.exclude = append(cfg.exclude, pgCfg.Exclude...)
 	if cfg.ifPython && !editedFileIsPython() {
-		result.Status = "skipped"
+		result.Status = StatusSkipped
 		return finish(0)
 	}
 	if cmd == "doctor" {

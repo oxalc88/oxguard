@@ -91,7 +91,7 @@ func runRadonMachine(r *Runner, dirs []string) int {
 			return 1
 		}
 		for _, f := range r.result.Findings {
-			if f.Gate == "radon" && f.Status == "blocking" {
+			if f.Gate == "radon" && f.Status == StatusBlocking {
 				return 1
 			}
 		}

@@ -76,7 +76,7 @@ func TestAbsentBaselineIsNotEvaluatedAndNonBlocking(t *testing.T) {
 		t.Fatal(code)
 	}
 	r.result.Finish(0)
-	if r.result.Assessment != "incomplete" || r.result.Gates[0].Status != "not_run" || r.result.Findings[0].Status != "advisory" {
+	if r.result.Assessment != Incomplete || r.result.Gates[0].Status != StatusNotRun || r.result.Findings[0].Status != StatusAdvisory {
 		t.Fatal(r.result)
 	}
 }

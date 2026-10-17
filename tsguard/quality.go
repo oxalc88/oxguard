@@ -68,7 +68,7 @@ func (r *Runner) runOwnedAnalysis(gate, source string, advisory bool, extra map[
 	r.comparison = analyzer.comparison
 	failed := !res.ok
 	for _, f := range r.result.Findings {
-		if f.Gate == gate && (f.Status == "execution_error" || f.Status == "blocking") {
+		if f.Gate == gate && (f.Status == StatusExecutionError || f.Status == StatusBlocking) {
 			failed = true
 		}
 	}
@@ -119,6 +119,9 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 		return false, fmt.Errorf("missing findings/measurements arrays")
 	}
 	for _, f := range report.Findings {
+		if f.Status != StatusBlocking && f.Status != StatusAdvisory {
+			return false, fmt.Errorf("owned analyzer finding has invalid status")
+		}
 		if spec.gate == "structure" && f.Level == "code" {
 			continue
 		}
@@ -127,7 +130,7 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 		}
 		f.Gate, f.Diagnostics = spec.gate, refs
 		if spec.advisory {
-			f.Status = "advisory"
+			f.Status = StatusAdvisory
 		}
 		r.result.AddFinding(f)
 	}
@@ -156,7 +159,7 @@ func (r *Runner) normalizeOwnedAnalysis(spec toolSpec, stdout io.Reader, refs []
 		r.snapshot = report.Snapshot
 	}
 	if report.Partial {
-		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".not_evaluated", Severity: "info", Status: "advisory", Category: "quality", Evidence: report.Limitation, Diagnostics: refs})
+		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".not_evaluated", Severity: "info", Status: StatusAdvisory, Category: "quality", Evidence: report.Limitation, Diagnostics: refs})
 	}
 	return !report.Partial, nil
 }

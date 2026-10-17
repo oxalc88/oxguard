@@ -40,7 +40,7 @@ func TestNativeAdapters(t *testing.T) {
 			r := &Runner{root: t.TempDir(), outputMode: "json", result: newRunResult(c.adapter)}
 			r.normalize(toolSpec{gate: c.adapter, adapter: c.adapter, advisory: c.advisory}, Result{ok: false}, strings.NewReader(c.report), nil)
 			r.result.Finish(1)
-			if len(r.result.Findings) != 1 || r.result.Findings[0].Rule != c.rule || r.result.Assessment != "complete" {
+			if len(r.result.Findings) != 1 || r.result.Findings[0].Rule != c.rule || r.result.Assessment != Complete {
 				t.Fatalf("%+v", r.result)
 			}
 			if c.adapter == "secretlint" && strings.Contains(r.result.Findings[0].Evidence, "must not expose secret") {
@@ -59,14 +59,14 @@ func TestDependencyPolicyPreserved(t *testing.T) {
 		if !ok {
 			want = 1
 		}
-		if len(r.result.Findings) != want || r.result.Assessment != "complete" {
+		if len(r.result.Findings) != want || r.result.Assessment != Complete {
 			t.Fatal("native allowlist decision not preserved")
 		}
 	}
 	r := &Runner{root: t.TempDir(), outputMode: "json", result: newRunResult("npm-audit")}
 	r.normalize(toolSpec{gate: "dependencies", adapter: "dependency-audit", advisory: true}, Result{ok: false}, strings.NewReader(report), nil)
 	r.result.Finish(0)
-	if r.result.Status != "advisory" || r.result.Findings[0].Rule != "GHSA-example" || r.result.Gates[0].Status != "advisory" {
+	if r.result.Status != StatusAdvisory || r.result.Findings[0].Rule != "GHSA-example" || r.result.Gates[0].Status != StatusAdvisory {
 		t.Fatal("informational audit treated as blocking")
 	}
 }
@@ -83,7 +83,7 @@ func TestMissingOrMalformedCoverageReportIsExecutionFailure(t *testing.T) {
 			}
 			r.normalize(toolSpec{gate: "coverage", adapter: "coverage-summary", reportPath: report}, Result{ok: true}, strings.NewReader(""), nil)
 			r.result.Finish(1)
-			if r.result.Status != "error" || r.result.Assessment != "incomplete" || len(r.result.Findings) != 1 || r.result.Findings[0].Category != "adapter_failure" || len(r.result.Measurements) != 0 {
+			if r.result.Status != StatusError || r.result.Assessment != Incomplete || len(r.result.Findings) != 1 || r.result.Findings[0].Category != "adapter_failure" || len(r.result.Measurements) != 0 {
 				t.Fatalf("missing/invalid report misrepresented as coverage: %+v", r.result)
 			}
 		})

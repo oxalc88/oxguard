@@ -87,7 +87,10 @@ func runCLI(cmd string, args []string) int {
 	cliCfg, err := parseFlags(args)
 	result := newRunResult(cmd)
 	finish := func(code int) int {
-		result.Finish(code)
+		if err := result.Finish(code); err != nil {
+			fmt.Fprintln(os.Stderr, "invalid result contract:", err)
+			return exitUnknown
+		}
 		if cliCfg.output == "agent" || cliCfg.output == "json" {
 			if err := reportResult(os.Stdout, cliCfg.output, result); err != nil {
 				return 1
@@ -133,7 +136,7 @@ func runCLI(cmd string, args []string) int {
 	}
 	cfg.pkgManager = detectPackageManager(root)
 	if cfg.ifTypeScript && !editedFileIsTypeScript() {
-		result.Status = "skipped"
+		result.Status = StatusSkipped
 		return finish(0)
 	}
 	if cmd == "doctor" {

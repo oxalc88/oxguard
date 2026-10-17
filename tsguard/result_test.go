@@ -49,7 +49,7 @@ func TestProcessNormalizationIgnoresTailAndKeepsCompleteDiagnostics(t *testing.T
 		t.Fatal("blocking compiler result passed")
 	}
 	r.result.Finish(1)
-	if r.result.Status != "fail" || len(r.result.Findings) != 2 {
+	if r.result.Status != StatusFail || len(r.result.Findings) != 2 {
 		t.Fatalf("result: %+v", r.result)
 	}
 	rules := map[string]bool{}
@@ -118,13 +118,13 @@ func TestSuccessfulResultAndAdvisoryExit(t *testing.T) {
 		t.Fatal("success failed")
 	}
 	r.result.Finish(0)
-	if r.result.Status != "pass" || len(r.result.Findings) != 0 {
+	if r.result.Status != StatusPass || len(r.result.Findings) != 0 {
 		t.Fatal(r.result)
 	}
 	t.Setenv("TSGUARD_CONTRACT_HELPER", "unknown")
 	r.RunTool(toolSpec{gate: "dead-code", advisory: true}, "knip", os.Args[0], "-test.run=^TestAnalyzerProcess$")
 	r.result.Finish(0)
-	if r.result.Status != "error" || r.result.ExitCode != 0 || r.result.Assessment != "incomplete" || r.result.Findings[0].Category != "unclassified_failure" {
+	if r.result.Status != StatusError || r.result.ExitCode != 0 || r.result.Assessment != Incomplete || r.result.Findings[0].Category != "unclassified_failure" {
 		t.Fatal(r.result)
 	}
 }
@@ -132,7 +132,7 @@ func TestSuccessfulResultAndAdvisoryExit(t *testing.T) {
 func TestAgentReporterBoundAndStableIDs(t *testing.T) {
 	a, b := newRunResult("types"), newRunResult("types")
 	for i := 0; i < 1000; i++ {
-		f := Finding{Gate: "types", Rule: "TS2322", Severity: "error", Status: "blocking", Category: "quality",
+		f := Finding{Gate: "types", Rule: "TS2322", Severity: "error", Status: StatusBlocking, Category: "quality",
 			Location: &Location{File: strings.Repeat("file", 200), Line: i + 1}, Evidence: strings.Repeat("é\n\x1b", 1000)}
 		a.AddFinding(f)
 		f.Evidence = "Message changed by an analyzer update"
@@ -186,7 +186,7 @@ func TestAdapters(t *testing.T) {
 			if tc.adapter == "biome" && tc.category == "quality" && f.Location.Line != 3 {
 				t.Fatal("Biome line must be one-based")
 			}
-			if tc.name == "Opengrep rule" && (f.Severity != "warning" || f.Status != "blocking") {
+			if tc.name == "Opengrep rule" && (f.Severity != "warning" || f.Status != StatusBlocking) {
 				t.Fatal("Opengrep severity and gate policy differ", f)
 			}
 		})
@@ -256,7 +256,7 @@ func TestCLIInvalidInputsAndLock(t *testing.T) {
 	for _, args := range [][]string{{"--timout", "30"}, {"--timeout"}, {"--output", "xml"}} {
 		args = append(args, "--output", "json", "--root", root)
 		code, result := captureCLI(t, "check", args)
-		if code != 3 || result.Status != "error" || result.Findings[0].Category != "invalid_configuration" {
+		if code != 3 || result.Status != StatusError || result.Findings[0].Category != "invalid_configuration" {
 			t.Fatal(code, result)
 		}
 	}
@@ -272,7 +272,7 @@ func TestCLIInvalidInputsAndLock(t *testing.T) {
 	}
 	defer release()
 	code, result = captureCLI(t, "types", []string{"--output", "json", "--root", root})
-	if code != 4 || result.Status != "error" || result.Findings[0].Category != "lock_contention" {
+	if code != 4 || result.Status != StatusError || result.Findings[0].Category != "lock_contention" {
 		t.Fatal(code, result)
 	}
 }

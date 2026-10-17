@@ -12,7 +12,7 @@ func TestBothLanguagesUseSameShapeAndBounds(t *testing.T) {
 		t.Run(language, func(t *testing.T) {
 			a, b := New(language, "check"), New(language, "check")
 			for i := 0; i < 1000; i++ {
-				f := Finding{Gate: "types", Rule: "type.error", Severity: "error", Status: "blocking", Category: "quality", Location: &Location{File: strings.Repeat("file", 200), Line: i + 1}, Evidence: strings.Repeat("é\n\x1b", 1000)}
+				f := Finding{Gate: "types", Rule: "type.error", Severity: "error", Status: StatusBlocking, Category: "quality", Location: &Location{File: strings.Repeat("file", 200), Line: i + 1}, Evidence: strings.Repeat("é\n\x1b", 1000)}
 				a.AddFinding(f)
 				f.Evidence = "Changed analyzer prose"
 				b.AddFinding(f)
@@ -39,7 +39,7 @@ func TestBothLanguagesUseSameShapeAndBounds(t *testing.T) {
 			clean := New(language, "check")
 			clean.Execution("invocation", "tool_missing", "missing")
 			clean.Finish(0)
-			if clean.Status != "error" || clean.Findings[0].Rule != language+".execution.tool_missing" {
+			if clean.Status != StatusError || clean.Findings[0].Rule != language+".execution.tool_missing" {
 				t.Fatal(clean)
 			}
 		})

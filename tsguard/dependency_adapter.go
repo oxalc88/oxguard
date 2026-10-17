@@ -21,7 +21,7 @@ func (r *Runner) normalizeDependencyAudit(spec toolSpec, res Result, reader io.R
 			severity = "warning"
 		}
 		if spec.adapter == "dependency-audit" {
-			r.result.AddFinding(Finding{Gate: spec.gate, Rule: id, Severity: severity, Status: "advisory", Category: "quality", Location: &Location{File: "package.json", Symbol: name}, Evidence: name + ": " + title, Diagnostics: refs})
+			r.result.AddFinding(Finding{Gate: spec.gate, Rule: id, Severity: severity, Status: StatusAdvisory, Category: "quality", Location: &Location{File: "package.json", Symbol: name}, Evidence: name + ": " + title, Diagnostics: refs})
 		}
 		count++
 	}
@@ -96,7 +96,7 @@ func (r *Runner) normalizeDependencyAudit(spec toolSpec, res Result, reader io.R
 		if count == 0 {
 			r.result.Execution(spec.gate, "analyzer_failure", "audit-ci failed without a reported vulnerability; inspect diagnostics.")
 		} else {
-			r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard.dependencies.policy_failed", Severity: "error", Status: "blocking", Category: "quality", Evidence: "audit-ci rejected the native dependency report under the configured severity and allowlist policy.", Diagnostics: refs})
+			r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard.dependencies.policy_failed", Severity: "error", Status: StatusBlocking, Category: "quality", Evidence: "audit-ci rejected the native dependency report under the configured severity and allowlist policy.", Diagnostics: refs})
 		}
 	}
 	return nil

@@ -32,7 +32,7 @@ func TestOwnedCapabilityErrorIsIncomplete(t *testing.T) {
 	}
 	r.result.RecordGate("maintainability", true, false)
 	r.result.Finish(1)
-	if r.result.Assessment != "incomplete" || r.result.Status != "error" {
+	if r.result.Assessment != Incomplete || r.result.Status != StatusError {
 		t.Fatalf("%+v", r.result)
 	}
 }
@@ -45,7 +45,17 @@ func TestOwnedPartialCapabilityDoesNotPass(t *testing.T) {
 	}
 	r.result.RecordGate("maintainability", true, complete)
 	r.result.Finish(0)
-	if r.result.Assessment != "incomplete" {
+	if r.result.Assessment != Incomplete {
 		t.Fatal(r.result)
+	}
+}
+
+func TestOwnedFindingStatusCannotBeMaskedByAdvisoryPolicy(t *testing.T) {
+	for _, status := range []string{"unknown", "pass", "execution_error"} {
+		r := contractRunner(t)
+		payload := `{"findings":[{"status":"` + status + `","rule":"example","evidence":"example","location":{"file":"src/a.ts"}}],"measurements":[]}`
+		if _, err := r.normalizeOwnedAnalysis(toolSpec{gate: "maintainability", advisory: true}, strings.NewReader(payload), nil); err == nil {
+			t.Fatalf("%s status accepted", status)
+		}
 	}
 }
