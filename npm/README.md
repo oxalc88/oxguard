@@ -40,7 +40,7 @@ and source notices are included in the native package's `licenses/` directory.
 
 Source and distribution guide: https://github.com/oxalc88/oxguard
 
-The unreleased maintainability candidate adds a zero-config Ultracite/Biome baseline and advisory
+The maintainability checks add a zero-config Ultracite/Biome baseline and advisory
 smell/module analysis to `check`. Focused commands are `maintainability`, `smells`, `structure`, and `change --baseline <Git ref>`.
 Project lint configurations remain authoritative. Missing optional baselines are
 not evaluated and do not fail the command. Scope and limits:

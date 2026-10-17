@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Release-tag version labels and `VERSION` metadata for packaged documentation
+  and deployed skill bundles. Release archives and the main npm package include
+  tagged docs; generated links target the matching Git tag. Hook redeployment
+  refreshes skill versions after CLI upgrades. Pre-publication smoke checks reject
+  missing/stale documentation metadata without rewriting repository source docs.
+
 - Versioned zero-config Tsguard lint policy using Ultracite/Biome, preserving
   project syntax-lint and formatting policy.
 - Advisory resolved delegation/handler smells and static module graph

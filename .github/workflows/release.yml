@@ -113,6 +113,7 @@ jobs:
           [ "$OS" = "windows" ] && BIN="${BIN}.exe"
           cp "dist/${BIN}" "$OUTDIR/"
           cp LICENSE "$OUTDIR/" 2>/dev/null || true
+          python3 scripts/package-release-docs.py "$TAG" "$OUTDIR"
 
           # pyguard ships the analysis helper scripts
           if [ "$TOOL" = "pyguard" ]; then

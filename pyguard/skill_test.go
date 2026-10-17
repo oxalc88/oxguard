@@ -37,7 +37,7 @@ func TestInstalledSkillBundle(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				if !bytes.Equal(expected, actual) {
+				if !bytes.Equal(versionedSkillContent(expected), actual) {
 					t.Errorf("installed %s differs", source)
 				}
 				for _, link := range links.FindAllSubmatch(actual, -1) {
@@ -62,7 +62,7 @@ func TestInstalledSkillBundle(t *testing.T) {
 			}
 			actual, _ := os.ReadFile(owned)
 			expected, _ := skillFiles.ReadFile("skill/workflows/check.md")
-			if !bytes.Equal(actual, expected) {
+			if !bytes.Equal(actual, versionedSkillContent(expected)) {
 				t.Fatal("workflow was not refreshed")
 			}
 		})
@@ -88,5 +88,63 @@ func TestSkillDeploymentRejectsSymlink(t *testing.T) {
 	content, _ := os.ReadFile(external)
 	if string(content) != "keep" {
 		t.Fatal("changed external file")
+	}
+}
+
+func TestSkillVersionUpgrade(t *testing.T) {
+	original := version
+	defer func() { version = original }()
+	root := t.TempDir()
+	for _, tag := range []string{"v0.9.0", "v0.9.1"} {
+		version = tag
+		if err := deployAgentSkill(root); err != nil {
+			t.Fatal(err)
+		}
+		directory := filepath.Join(root, ".agents/skills/pyguard")
+		marker, err := os.ReadFile(filepath.Join(directory, "VERSION"))
+		if err != nil || string(marker) != tag+"\n" {
+			t.Fatalf("version marker: %q, %v", marker, err)
+		}
+		total := 0
+		err = filepath.WalkDir(directory, func(file string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			content, err := os.ReadFile(file)
+			if err != nil {
+				return err
+			}
+			total += len(strings.Fields(string(content)))
+			if strings.HasSuffix(file, ".md") && !bytes.Contains(content, []byte("OxGuard version: "+tag)) {
+				t.Errorf("unversioned skill file %s", file)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total > 700 {
+			t.Fatalf("installed bundle has %d words", total)
+		}
+		entry, _ := os.ReadFile(filepath.Join(directory, "SKILL.md"))
+		if len(strings.Fields(string(entry))) > 150 {
+			t.Fatal("installed router exceeds 150 words")
+		}
+		if !bytes.HasPrefix(entry, []byte("---\nname:")) {
+			t.Fatal("frontmatter moved")
+		}
+		if !bytes.Contains(entry, []byte("/blob/"+tag+"/docs/")) || bytes.Contains(entry, []byte("/blob/main/")) {
+			t.Fatal("documentation link does not match installed version")
+		}
+	}
+}
+
+func TestVersionLabelPreservesWindowsFrontmatter(t *testing.T) {
+	rendered := versionedSkillContent([]byte("---\r\nname: example\r\ndescription: Example\r\n---\r\n\r\n# Example\r\n"))
+	if !bytes.HasPrefix(rendered, []byte("---\nname:")) || !bytes.Contains(rendered, []byte("\n---\n\nOxGuard version: ")) {
+		t.Fatal("version label broke frontmatter")
 	}
 }

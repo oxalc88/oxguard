@@ -9,6 +9,19 @@ const nodeEngine = compatibility.node.map(({ minimum, future }) =>
   `${future ? '>=' : '^'}${minimum.join('.')}`).join(' || ');
 
 const platforms = ['linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64', 'win32-x64'];
+function stampDocumentation(content, tag) {
+  let text = content.replace(/\r\n/g, '\n').replaceAll('https://github.com/oxalc88/oxguard/blob/main/', `https://github.com/oxalc88/oxguard/blob/${tag}/`)
+    .replaceAll('https://github.com/oxalc88/oxguard/tree/main/', `https://github.com/oxalc88/oxguard/tree/${tag}/`);
+  const label = `\nOxGuard version: ${tag}\n`;
+  if (text.startsWith('---\n')) {
+    const end = text.indexOf('\n---\n', 4);
+    if (end >= 0) {
+      const offset = end + '\n---\n'.length;
+      return text.slice(0, offset) + label + text.slice(offset);
+    }
+  }
+  return label + '\n' + text;
+}
 function prepare(tag, binaries, output, selected = platforms) {
   const version = tag.replace(/^v/, '');
   // Release tags intentionally support stable and prerelease versions, not build metadata.
@@ -30,15 +43,26 @@ function prepare(tag, binaries, output, selected = platforms) {
   function writePackage(directory, manifest) {
     fs.mkdirSync(directory, { recursive: true });
     fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
-    fs.copyFileSync(path.join(__dirname, 'README.md'), path.join(directory, 'README.md'));
+    fs.writeFileSync(path.join(directory, 'README.md'), stampDocumentation(fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8'), tag));
+    fs.writeFileSync(path.join(directory, 'VERSION'), tag + '\n');
   }
   const main = path.join(output, 'tsguard');
   writePackage(main, {
     ...common, name: '@oxguard/tsguard', engines: { node: nodeEngine },
-    bin: { tsguard: 'bin/tsguard.cjs' }, files: ['bin', 'config'],
+    bin: { tsguard: 'bin/tsguard.cjs' }, files: ['bin', 'config', 'docs', 'VERSION'],
     dependencies: require('./toolchain.json'),
     optionalDependencies: Object.fromEntries(platforms.map(p => [`@oxguard/tsguard-${p}`, version])),
   });
+  const docs = path.join(main, 'docs');
+  fs.cpSync(path.join(__dirname, '../docs'), docs, { recursive: true });
+  function stampDirectory(directory) {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const file = path.join(directory, entry.name);
+      if (entry.isDirectory()) stampDirectory(file);
+      else if (entry.name.endsWith('.md')) fs.writeFileSync(file, stampDocumentation(fs.readFileSync(file, 'utf8'), tag));
+    }
+  }
+  stampDirectory(docs);
   fs.mkdirSync(path.join(main, 'bin'), { recursive: true });
   fs.cpSync(path.join(__dirname, 'tsguard/bin'), path.join(main, 'bin'), { recursive: true });
   fs.cpSync(path.join(__dirname, 'tsguard/config'), path.join(main, 'config'), { recursive: true });
@@ -46,7 +70,7 @@ function prepare(tag, binaries, output, selected = platforms) {
   for (const platform of selected) {
     const [os, cpu] = platform.split('-');
     const directory = path.join(output, `tsguard-${platform}`);
-    writePackage(directory, { ...common, name: `@oxguard/tsguard-${platform}`, os: [os], cpu: [cpu], files: ['bin', 'licenses'] });
+    writePackage(directory, { ...common, name: `@oxguard/tsguard-${platform}`, os: [os], cpu: [cpu], files: ['bin', 'licenses', 'VERSION'] });
     const bin = os === 'win32' ? 'tsguard.exe' : 'tsguard';
     fs.mkdirSync(path.join(directory, 'bin'), { recursive: true });
     fs.copyFileSync(path.join(binaries, platform, bin), path.join(directory, 'bin', bin));

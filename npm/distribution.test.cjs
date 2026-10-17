@@ -164,10 +164,24 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
       const source = path.join(root, 'tsguard/skill', folder);
       const files = folder ? fs.readdirSync(source) : ['SKILL.md'];
       for (const file of files) {
-        assert.deepEqual(fs.readFileSync(path.join(consumer, target, folder, file)), fs.readFileSync(path.join(source, file)));
+        const actual = fs.readFileSync(path.join(consumer, target, folder, file), 'utf8');
+        assert.ok(actual.includes(`OxGuard version: v${version}`));
+        const unstamped = actual.replace(`\nOxGuard version: v${version}\n`, '')
+          .replaceAll(`https://github.com/oxalc88/oxguard/blob/v${version}/`, 'https://github.com/oxalc88/oxguard/blob/main/').trim();
+        assert.equal(unstamped, fs.readFileSync(path.join(source, file), 'utf8').replace(/\r\n/g, '\n').trim());
       }
     }
   }
+  for (const target of ['.claude/skills/tsguard', '.agents/skills/tsguard']) {
+    assert.equal(fs.readFileSync(path.join(consumer, target, 'VERSION'), 'utf8'), `v${version}\n`);
+  }
+  for (const target of [path.dirname(path.dirname(launcher)), nativeDirectory]) {
+    assert.equal(fs.readFileSync(path.join(target, 'VERSION'), 'utf8'), `v${version}\n`);
+    assert.ok(fs.readFileSync(path.join(target, 'README.md'), 'utf8').includes(`OxGuard version: v${version}`));
+  }
+  const packagedGuide = fs.readFileSync(path.join(installed, 'tsguard/docs/guides/tsguard-result-contract.md'), 'utf8');
+  assert.ok(packagedGuide.includes(`OxGuard version: v${version}`));
+  assert.ok(!packagedGuide.includes('https://github.com/oxalc88/oxguard/blob/main/'));
   assert.match(fs.readFileSync(path.join(consumer, 'AGENTS.md'), 'utf8'), /\.agents\/skills\/tsguard\/SKILL\.md/);
   assert.match(fs.readFileSync(path.join(consumer, '.github/copilot-instructions.md'), 'utf8'), /\.agents\/skills\/tsguard\/SKILL\.md/);
 

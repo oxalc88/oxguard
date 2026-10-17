@@ -217,12 +217,20 @@ Run `tsguard --version` or `pyguard --version`. Read repository documentation at
 that same Git tag for release-specific behavior. The `main` branch can describe
 unreleased changes; historical plans keep their original version names.
 
-A release tag supplies the binary and npm package versions. It also identifies
-the matching documentation snapshot; it does not rewrite version text in Markdown.
-The skills are embedded from that tagged commit. After installing a newer binary,
-run `tsguard hooks` or `pyguard hooks` to refresh the selected skill bundles.
+A release tag supplies the binary, npm package, documentation and skill versions.
+Release archives include a stamped README, the documentation snapshot and a
+`VERSION` file. The main npm package includes the stamped docs; every npm package
+has a versioned README and `VERSION`. Documentation links point to that Git tag.
+Source Markdown stays version-neutral; packaging does not commit generated labels.
+
+After installing a newer binary, run `tsguard hooks` or `pyguard hooks`. Every
+installed skill guide displays the binary version, its `VERSION` file matches,
+and its detailed documentation link points to that tag. Running hooks again after
+another upgrade replaces the owned bundle with that binary's matching version.
+A development binary displays `dev` and keeps documentation links on `main`.
 Existing project instructions remain protected; merge the new skill pointer when
-an existing-file warning requires it.
+an existing-file warning requires it. Release smoke checks reject mismatched or
+missing documentation version metadata before publication.
 
 ## Notes for the agent
 
