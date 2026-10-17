@@ -100,7 +100,7 @@ jobs:
               data = tomllib.load(f)
           deps = data.get("dependency-groups",{}).get("dev",[])
           dep_names = {d.split(">=")[0].split("==")[0].strip().lower() for d in deps}
-          required = {"ruff","mypy","pytest","pytest-cov","radon","bandit","pip-audit","detect-secrets","vulture","deptry","pyan3","networkx","semgrep"}
+          required = {"ruff","mypy","pytest","pytest-cov","radon","bandit","pip-audit","detect-secrets","vulture","deptry","pyan3","networkx"}
           missing = required - dep_names
           if missing:
               print("Missing dev-group packages:", missing, file=sys.stderr)

@@ -3,6 +3,11 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+// Shared with the embedded Go setup/doctor policy; analyzer pins stay separate.
+const compatibility = require('../tsguard/runtime-compatibility.json');
+const nodeEngine = compatibility.node.map(({ minimum, future }) =>
+  `${future ? '>=' : '^'}${minimum.join('.')}`).join(' || ');
+
 const platforms = ['linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64', 'win32-x64'];
 function prepare(tag, binaries, output, selected = platforms) {
   const version = tag.replace(/^v/, '');
@@ -29,7 +34,7 @@ function prepare(tag, binaries, output, selected = platforms) {
   }
   const main = path.join(output, 'tsguard');
   writePackage(main, {
-    ...common, name: '@oxguard/tsguard', engines: { node: '^22.18.0 || ^24.0.0 || >=26.0.0' },
+    ...common, name: '@oxguard/tsguard', engines: { node: nodeEngine },
     bin: { tsguard: 'bin/tsguard.cjs' }, files: ['bin', 'config'],
     dependencies: require('./toolchain.json'),
     optionalDependencies: Object.fromEntries(platforms.map(p => [`@oxguard/tsguard-${p}`, version])),

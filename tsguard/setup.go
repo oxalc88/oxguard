@@ -18,7 +18,7 @@ func runSetup(root string, cfg config) int {
 	fmt.Println("tsguard setup")
 	fmt.Println("─────────")
 
-	fmt.Println("  [1/4] Node.js (22.18+ on 22.x, 24.x, or 26+)...")
+	fmt.Printf("  [1/4] Node.js (%s)...\n", nodeEngineRange())
 	if !checkNode() {
 		return 2
 	}
@@ -38,7 +38,9 @@ func runSetup(root string, cfg config) int {
 	fmt.Println("  [OK]   node_modules ready")
 
 	fmt.Println("  [4/4] Opengrep SAST engine (verified cache)...")
-	if !ensureOpengrep(root, cfg) { return 1 }
+	if !ensureOpengrep(root, cfg) {
+		return 1
+	}
 
 	fmt.Println()
 	runHooks(root)
@@ -63,19 +65,9 @@ func checkNode() bool {
 		fmt.Printf("  [OK]   Node.js %s\n", version)
 		return true
 	}
-	fmt.Printf("  [FAIL] Node.js — found %s but need 22.18+ on 22.x, 24.x, or 26+\n", version)
+	fmt.Printf("  [FAIL] Node.js — found %s but need %s\n", version, nodeEngineRange())
 	printNodeInstallHint()
 	return false
-}
-
-// isSupportedNodeVersion matches the npm package engine range.
-func isSupportedNodeVersion(version string) bool {
-	var major, minor, patch int
-	n, err := fmt.Sscanf(version, "v%d.%d.%d", &major, &minor, &patch)
-	if err != nil || n != 3 {
-		return false
-	}
-	return (major == 22 && minor >= 18) || major == 24 || major >= 26
 }
 
 func printNodeInstallHint() {

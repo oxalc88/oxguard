@@ -1,0 +1,7 @@
+{
+  "node": [
+    { "minimum": [22, 18, 0] },
+    { "minimum": [24, 0, 0] },
+    { "minimum": [26, 0, 0], "future": true }
+  ]
+}
