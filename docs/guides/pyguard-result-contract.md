@@ -62,3 +62,44 @@ Level 1 analyzers are existing. The normalized contract and Python agent parity 
 Both guards expose the same additive schema-1 `assessment` and ordered `gates` fields. Each gate records execution status (`passed`, `advisory`, `failed`, `error` or `not_run`) and normalization (`complete`, `partial` or `not_run`). A complete assessment means all requested gates ran with supported normalization; it does not mean blocking findings passed. Errors, partial adapters and fail-fast steps make the assessment incomplete. The agent summary exposes assessment and not-run/partial counts; JSON names those gates. A failed quality gate can have complete normalization.
 
 Native report artifacts are refreshed under `.pyguard-cache/reports` before execution. Coverage keeps the global 80% floor and adds per-file measurements without per-file thresholds. JUnit supplies test names/locations; collection or execution errors remain execution problems. Owned helpers, including `vulture_report.py` and the secrets adapter, execute from private temporary copies embedded in the binary. `pyguard setup` deploys project-local reference copies only; update the binary to update runtime helpers. Missing helpers/reports or unsupported formats cannot certify a passing assessment. Raw reports retain additional native fields for drill-down.
+
+
+## Dependency exposure reviews
+
+All security engines run even if another security engine fails. Native audits still
+scan every dependency, and complete reports remain in the diagnostic artifacts.
+A development dependency is not automatically safe: tools can execute in CI and
+can affect shipped artifacts. Unreviewed exposure keeps the existing blocking
+policy (audit-ci severity policy for TypeScript; pip-audit findings for Python).
+
+An optional `.oxguard-dependency-policy.json` accepts a **specific package and
+advisory** only after a review concludes that the product is not exposed and
+explicitly accepts the tooling risk. It is a reviewed risk decision, not automatic
+reachability analysis. Bind it to SHA-256 hashes of the exact manifest and lockfile:
+
+```json
+{
+  "inputs": {
+    "pyproject.toml": "<sha256 of current manifest bytes>",
+    "uv.lock": "<sha256 of current lockfile bytes>"
+  },
+  "reviews": [{
+    "ecosystem": "pypi",
+    "package": "affected-build-tool",
+    "advisory": "GHSA-example",
+    "scope": "development_tool",
+    "product_exposure": "not_exposed",
+    "tooling_risk": "accepted",
+    "reason": "Record the advisory's affected operation, product exclusion evidence, CI exposure and accepted risk here."
+  }]
+}
+```
+
+`scope` accepts `development_tool` or `ci`. Unknown exposure, missing reasons,
+invalid input hashes and changed manifests/lockfiles cannot authorize exceptions.
+Malformed or stale policy reports an execution error and retains native findings.
+Do not add a review based only on a package's dev flag. Reassess the decision when
+source, packaging or CI changes could alter exposure; hashes detect dependency
+changes, not behavioral reachability changes. Reviewed findings remain visible as
+advisories with the reason and the original advisory ID. No exceptions are shipped
+with OxGuard.

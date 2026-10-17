@@ -63,16 +63,13 @@ func runAudit(r *Runner, dirs []string) int {
 // runSecurity runs bandit → pip-audit → secrets, sequentially.
 func runSecurity(r *Runner, dirs []string) int {
 	r.println("  security:")
-	r.println("  starting bandit...")
-	if code := runBandit(r, dirs); code != 0 {
-		return code
+	code := 0
+	for _, check := range []func() int{func() int { return runBandit(r, dirs) }, func() int { return runPipAudit(r) }, func() int { return runSecrets(r, config{}) }} {
+		if check() != 0 {
+			code = 1
+		}
 	}
-	r.println("  starting pip-audit...")
-	if code := runPipAudit(r); code != 0 {
-		return code
-	}
-	r.println("  starting detect-secrets...")
-	return runSecrets(r, config{})
+	return code
 }
 
 // runRuff runs lint + format check.
@@ -168,11 +165,8 @@ func runBandit(r *Runner, dirs []string) int {
 
 // runPipAudit runs dependency vulnerability scanning.
 func runPipAudit(r *Runner) int {
-	args := []string{"uv", "run", "pip-audit"}
-	if r.machine() {
-		args = append(args, "--format", "json")
-	}
-	res := r.RunTool(toolSpec{gate: "pip-audit", adapter: "pip-audit"}, "pip-audit", args...)
+	args := []string{"uv", "run", "pip-audit", "--format", "json"}
+	res := r.runDependencyTool(toolSpec{gate: "pip-audit", adapter: "pip-audit"}, "pip-audit", args...)
 	if !res.ok {
 		return 1
 	}
