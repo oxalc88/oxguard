@@ -37,7 +37,7 @@ func TestNativeComparisonEmitsComplexityAndNewCloneEvidence(t *testing.T) {
 		t.Fatal(r.result.Findings)
 	}
 	for _, f := range r.result.Findings {
-		if f.Status != "advisory" || f.Level != "change" {
+		if f.Status != StatusAdvisory || f.Level != "change" {
 			t.Fatal(f)
 		}
 	}

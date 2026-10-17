@@ -43,7 +43,7 @@ func TestCriticalityReportTop30AndCompleteMeasurements(t *testing.T) {
 		t.Fatal(err)
 	}
 	result.Finish(0)
-	if len(result.Findings) != 30 || len(result.Measurements) != 35 || result.Status != "advisory" || result.ExitCode != 0 {
+	if len(result.Findings) != 30 || len(result.Measurements) != 35 || result.Status != StatusAdvisory || result.ExitCode != 0 {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 	report, err := os.ReadFile(filepath.Join(root, "CRITICALITY.md"))
@@ -54,7 +54,7 @@ func TestCriticalityReportTop30AndCompleteMeasurements(t *testing.T) {
 		t.Fatalf("unexpected report: %s", report)
 	}
 	for _, f := range result.Findings {
-		if f.Level != "structure" || f.Rule != "tsguard.criticality.ranked" || f.Status != "advisory" {
+		if f.Level != "structure" || f.Rule != "tsguard.criticality.ranked" || f.Status != StatusAdvisory {
 			t.Fatalf("unexpected finding: %+v", f)
 		}
 	}
@@ -88,7 +88,7 @@ func TestCriticalityExecutionErrorRemainsAdvisoryExit(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.result.Finish(0)
-	if r.result.Status != "error" || r.result.ExitCode != 0 || r.result.Findings[0].Category != "tool_missing" || len(r.result.Artifacts) != 0 {
+	if r.result.Status != StatusError || r.result.ExitCode != 0 || r.result.Findings[0].Category != "tool_missing" || len(r.result.Artifacts) != 0 {
 		t.Fatalf("unexpected result: %+v", r.result)
 	}
 }

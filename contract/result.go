@@ -13,8 +13,8 @@ import (
 type RunResult struct {
 	namespace     string
 	SchemaVersion string        `json:"schema_version"`
-	Status        string        `json:"status"`
-	Assessment    string        `json:"assessment"`
+	Status        Status        `json:"status"`
+	Assessment    Completeness  `json:"assessment"`
 	Gates         []Gate        `json:"gates"`
 	Command       string        `json:"command"`
 	ExitCode      int           `json:"exit_code"`
@@ -37,7 +37,7 @@ type Finding struct {
 	Gate        string     `json:"gate"`
 	Rule        string     `json:"rule"`
 	Severity    string     `json:"severity"`
-	Status      string     `json:"status"` // blocking, advisory, or execution_error
+	Status      Status     `json:"status"` // blocking, advisory, or execution_error
 	Category    string     `json:"category"`
 	Location    *Location  `json:"location,omitempty"`
 	Related     []Location `json:"related,omitempty"`
@@ -70,8 +70,8 @@ type Diagnostic struct {
 }
 
 func New(namespace, command string) *RunResult {
-	return &RunResult{namespace: namespace, SchemaVersion: "1", Status: "pass", Command: command,
-		Gates: []Gate{}, Assessment: "incomplete", Findings: []Finding{}, Measurements: []Measurement{}, Artifacts: []Artifact{}, Diagnostics: []Diagnostic{}}
+	return &RunResult{namespace: namespace, SchemaVersion: "1", Status: StatusPass, Command: command,
+		Gates: []Gate{}, Assessment: Incomplete, Findings: []Finding{}, Measurements: []Measurement{}, Artifacts: []Artifact{}, Diagnostics: []Diagnostic{}}
 }
 
 func (r *RunResult) AddFinding(f Finding) {
@@ -99,35 +99,29 @@ func (r *RunResult) AddFinding(f Finding) {
 
 func (r *RunResult) Execution(gate, category, evidence string) {
 	r.AddFinding(Finding{Gate: gate, Rule: r.namespace + ".execution." + category,
-		Severity: "error", Status: "execution_error", Category: category, Evidence: evidence})
+		Severity: "error", Status: StatusExecutionError, Category: category, Evidence: evidence})
 	r.RecordGate(gate, false, true)
 }
 
-func (r *RunResult) Finish(code int) {
+func (r *RunResult) Finish(code int) error {
+	if err := r.validateStates(); err != nil {
+		return err
+	}
+	r.Status = r.semanticStatus(code)
 	r.ExitCode = code
-	r.Assessment = "complete"
+	r.Assessment = Complete
 	if len(r.Gates) == 0 {
-		r.Assessment = "incomplete"
+		r.Assessment = Incomplete
 	}
 	for _, g := range r.Gates {
-		if g.Status == "not_run" || g.Status == "error" || g.Normalization != "complete" {
-			r.Assessment = "incomplete"
+		if g.Status == StatusNotRun || g.Status == StatusError || g.Normalization != Complete {
+			r.Assessment = Incomplete
 		}
 	}
-	for _, f := range r.Findings {
-		if f.Status == "execution_error" {
-			r.Status = "error"
-			break
-		}
-		if f.Status == "blocking" {
-			r.Status = "fail"
-		} else if r.Status == "pass" {
-			r.Status = "advisory"
-		}
-	}
+
 	sort.SliceStable(r.Findings, func(i, j int) bool {
 		a, b := r.Findings[i], r.Findings[j]
-		priority := map[string]int{"execution_error": 0, "blocking": 1, "advisory": 2}
+		priority := map[Status]int{StatusExecutionError: 0, StatusBlocking: 1, StatusAdvisory: 2}
 		if priority[a.Status] != priority[b.Status] {
 			return priority[a.Status] < priority[b.Status]
 		}
@@ -165,6 +159,7 @@ func (r *RunResult) Finish(code int) {
 		}
 		return a.Location.Symbol < b.Location.Symbol
 	})
+	return r.Validate()
 }
 
 func RelativePath(root, path string) string {

@@ -238,7 +238,7 @@ func (r *Runner) compareNativeMetrics(before, after *maintainabilitySnapshot, sh
 		b, a := functionB[match.Baseline], functionA[match.Candidate]
 		if b.CognitiveMax != nil && a.CognitiveMin > *b.CognitiveMax {
 			loc := a.Location
-			r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.FUNCTION_COMPLEXITY_INCREASE", Status: "advisory", Severity: "warning", Category: "quality", Location: &loc, Related: []Location{b.Location}, Evidence: fmt.Sprintf("Matched by %s against %s: native Biome cognitive complexity increased beyond baseline upper bound %g to at least %g.", match.Method, sha, *b.CognitiveMax, a.CognitiveMin), Remediation: "Review the added paths and required domain behavior; an increase alone is not a blocking violation."})
+			r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.FUNCTION_COMPLEXITY_INCREASE", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &loc, Related: []Location{b.Location}, Evidence: fmt.Sprintf("Matched by %s against %s: native Biome cognitive complexity increased beyond baseline upper bound %g to at least %g.", match.Method, sha, *b.CognitiveMax, a.CognitiveMin), Remediation: "Review the added paths and required domain behavior; an increase alone is not a blocking violation."})
 		}
 	}
 	baseClones := map[string]int{}
@@ -248,7 +248,7 @@ func (r *Runner) compareNativeMetrics(before, after *maintainabilitySnapshot, sh
 	for _, g := range c.Candidate.Duplicates.Groups {
 		if g.Count > baseClones[g.Fingerprint] {
 			loc := g.Locations[0]
-			r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.NEW_DUPLICATION", Status: "advisory", Severity: "warning", Category: "quality", Location: &loc, Related: g.Locations[1:], Evidence: fmt.Sprintf("Native jscpd clone group %s has %d additional matches against %s; exact token identity survives file moves.", g.Fingerprint[:min(12, len(g.Fingerprint))], g.Count-baseClones[g.Fingerprint], sha), Remediation: "Review duplicated logic and independent failure policies; share it only when semantics and ownership permit."})
+			r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.NEW_DUPLICATION", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &loc, Related: g.Locations[1:], Evidence: fmt.Sprintf("Native jscpd clone group %s has %d additional matches against %s; exact token identity survives file moves.", g.Fingerprint[:min(12, len(g.Fingerprint))], g.Count-baseClones[g.Fingerprint], sha), Remediation: "Review duplicated logic and independent failure policies; share it only when semantics and ownership permit."})
 		}
 	}
 	r.measure("change.matched_files", "change", Location{File: "."}, float64(len(files)), "files")

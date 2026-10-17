@@ -147,16 +147,16 @@ func (r *Runner) smellFindings(gate string, s *maintainabilitySnapshot, refs []s
 			locations = append(locations, nodes[next].Location)
 		}
 		value, threshold := float64(n), float64(3)
-		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.maintainability.LONG_DELEGATION_CHAIN", Severity: "warning", Status: "advisory", Category: "quality", Location: &f.Location, Related: locations, Observed: &value, Threshold: &threshold,
+		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "tsguard.maintainability.LONG_DELEGATION_CHAIN", Severity: "warning", Status: StatusAdvisory, Category: "quality", Location: &f.Location, Related: locations, Observed: &value, Threshold: &threshold,
 			Evidence: fmt.Sprintf("%d resolved single-return layers forward the same arguments and return type without transformation; async modes are recorded in the graph and may preserve intentional timing or stack boundaries.", n), Remediation: "Review whether intermediate layers provide a required boundary; preserve deliberate interfaces and failure policies.", Diagnostics: refs})
 	}
 	handlers := map[string][]handlerFact{}
 	for _, h := range s.Handlers {
 		if h.Fallback {
-			r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.SILENT_EXCEPTION_FALLBACK", Status: "advisory", Severity: "warning", Category: "quality", Location: &h.Location, Evidence: "The catch body returns only a constant or no value; it does not inspect, propagate or record the caught failure.", Remediation: "Verify this is an intentional best-effort policy; preserve valid recovery and make unexpected failures diagnosable.", Diagnostics: refs})
+			r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.SILENT_EXCEPTION_FALLBACK", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &h.Location, Evidence: "The catch body returns only a constant or no value; it does not inspect, propagate or record the caught failure.", Remediation: "Verify this is an intentional best-effort policy; preserve valid recovery and make unexpected failures diagnosable.", Diagnostics: refs})
 		}
 		if h.SilentExit {
-			r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.SILENT_EXCEPTION_EXIT", Status: "advisory", Severity: "warning", Category: "quality", Location: &h.Location, Evidence: "The catch body only continues or breaks; it does not inspect, propagate or record the caught failure.", Remediation: "Verify the project recovery policy and failure visibility; an intentional best-effort exit need not rethrow.", Diagnostics: refs})
+			r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.SILENT_EXCEPTION_EXIT", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &h.Location, Evidence: "The catch body only continues or breaks; it does not inspect, propagate or record the caught failure.", Remediation: "Verify the project recovery policy and failure visibility; an intentional best-effort exit need not rethrow.", Diagnostics: refs})
 		}
 		if h.Tokens >= 12 {
 			handlers[h.Fingerprint] = append(handlers[h.Fingerprint], h)
@@ -177,7 +177,7 @@ func (r *Runner) smellFindings(gate string, s *maintainabilitySnapshot, refs []s
 			locations = append(locations, h.Location)
 		}
 		value := float64(len(group))
-		r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.REPEATED_ERROR_HANDLER", Severity: "warning", Status: "advisory", Category: "quality", Location: &group[0].Location, Related: locations, Observed: &value,
+		r.result.AddFinding(Finding{Gate: gate, Rule: "tsguard.maintainability.REPEATED_ERROR_HANDLER", Severity: "warning", Status: StatusAdvisory, Category: "quality", Location: &group[0].Location, Related: locations, Observed: &value,
 			Evidence: fmt.Sprintf("%d catch blocks contain the same %d tokens, including identifiers and literals.", len(group), group[0].Tokens), Remediation: "Review repeated error policy; consolidate only when recovery and propagation semantics remain equivalent.", Diagnostics: refs})
 	}
 	r.measure("calls.unresolved", "structure", Location{File: "."}, float64(s.UnresolvedCalls), "calls")

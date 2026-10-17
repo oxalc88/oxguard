@@ -15,7 +15,7 @@ func (r *RunResult) Coverage(namespace, metric string, value, threshold float64,
 	}
 	r.Measurements = append(r.Measurements, Measurement{Metric: "coverage." + metric, Level: "code", Value: value, Unit: "percent", Threshold: threshold})
 	if value < threshold {
-		r.AddFinding(Finding{Gate: "coverage", Rule: namespace + ".coverage." + metric + "_threshold_failed", Severity: "error", Status: "blocking", Category: "quality", Observed: &value, Threshold: &threshold, Evidence: fmt.Sprintf("%s coverage %g%% is below %g%%.", metric, value, threshold), Diagnostics: refs})
+		r.AddFinding(Finding{Gate: "coverage", Rule: namespace + ".coverage." + metric + "_threshold_failed", Severity: "error", Status: StatusBlocking, Category: "quality", Observed: &value, Threshold: &threshold, Evidence: fmt.Sprintf("%s coverage %g%% is below %g%%.", metric, value, threshold), Diagnostics: refs})
 	}
 	return nil
 }

@@ -21,13 +21,13 @@ func TestNativeAdapters(t *testing.T) {
 			r := &Runner{root: t.TempDir(), outputMode: "json", result: newRunResult(c.adapter)}
 			r.normalize(toolSpec{gate: c.adapter, adapter: c.adapter, advisory: c.advisory}, Result{ok: false, exitCode: 1}, strings.NewReader(c.report), nil)
 			r.result.Finish(1)
-			if len(r.result.Findings) != 1 || r.result.Findings[0].Rule != c.rule || r.result.Assessment != "complete" {
+			if len(r.result.Findings) != 1 || r.result.Findings[0].Rule != c.rule || r.result.Assessment != Complete {
 				t.Fatalf("%+v", r.result)
 			}
 			bad := &Runner{root: r.root, outputMode: "json", result: newRunResult(c.adapter)}
 			bad.normalize(toolSpec{gate: c.adapter, adapter: c.adapter}, Result{ok: true}, strings.NewReader(`{}`), nil)
 			bad.result.Finish(0)
-			if bad.result.Status != "error" || bad.result.Assessment != "incomplete" {
+			if bad.result.Status != StatusError || bad.result.Assessment != Incomplete {
 				t.Fatal("malformed report certified pass")
 			}
 		})

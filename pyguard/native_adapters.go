@@ -35,9 +35,9 @@ func (r *Runner) normalizeNative(spec toolSpec, reader io.Reader, refs []string)
 		r.result.Artifacts = append(r.result.Artifacts, Artifact{Kind: "analyzer-report", Path: relativePath(r.root, spec.reportPath)})
 	}
 	add := func(rule, severity, message, file string, line int) {
-		status := "blocking"
+		status := StatusBlocking
 		if spec.advisory {
-			status = "advisory"
+			status = StatusAdvisory
 		}
 		var loc *Location
 		if file != "" {
@@ -113,7 +113,7 @@ func (r *Runner) normalizeNative(spec toolSpec, reader io.Reader, refs []string)
 				if len(v.FixVersions) > 0 {
 					remediation = "Fixed versions: " + strings.Join(v.FixVersions, ", ")
 				}
-				r.result.AddFinding(Finding{Gate: spec.gate, Rule: v.ID, Severity: "error", Status: "blocking", Category: "quality", Location: &Location{Symbol: pkg.Name}, Evidence: pkg.Name + "@" + pkg.Version + ": " + v.Description, Remediation: remediation, Diagnostics: refs})
+				r.result.AddFinding(Finding{Gate: spec.gate, Rule: v.ID, Severity: "error", Status: StatusBlocking, Category: "quality", Location: &Location{Symbol: pkg.Name}, Evidence: pkg.Name + "@" + pkg.Version + ": " + v.Description, Remediation: remediation, Diagnostics: refs})
 			}
 		}
 	case "deptry":

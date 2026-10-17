@@ -31,9 +31,9 @@ func (r *Runner) normalizeNative(spec toolSpec, res Result, reader io.Reader, re
 		r.result.Artifacts = append(r.result.Artifacts, Artifact{Kind: "analyzer-report", Path: relativePath(r.root, spec.reportPath)})
 	}
 	add := func(rule, message string, loc *Location) {
-		status, severity := "blocking", "error"
+		status, severity := StatusBlocking, "error"
 		if spec.advisory {
-			status, severity = "advisory", "warning"
+			status, severity = StatusAdvisory, "warning"
 		}
 		r.result.AddFinding(Finding{Gate: spec.gate, Rule: rule, Severity: severity, Status: status, Category: "quality", Evidence: message, Location: loc, Diagnostics: refs})
 	}
@@ -147,7 +147,7 @@ func (r *Runner) normalizeNative(spec toolSpec, res Result, reader io.Reader, re
 				first, second = second, first
 			}
 			lines := float64(d.Lines)
-			r.result.AddFinding(Finding{Gate: spec.gate, Rule: "jscpd.duplicate", Severity: "warning", Status: "advisory", Category: "quality", Observed: &lines, Evidence: fmt.Sprintf("%d duplicated lines.", d.Lines), Location: &first, Related: []Location{second}, Diagnostics: refs})
+			r.result.AddFinding(Finding{Gate: spec.gate, Rule: "jscpd.duplicate", Severity: "warning", Status: StatusAdvisory, Category: "quality", Observed: &lines, Evidence: fmt.Sprintf("%d duplicated lines.", d.Lines), Location: &first, Related: []Location{second}, Diagnostics: refs})
 		}
 	case "coverage-summary":
 		if err := r.result.IstanbulSummary(reader, r.root, refs); err != nil {

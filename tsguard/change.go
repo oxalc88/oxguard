@@ -193,7 +193,7 @@ func (r *Runner) comparisonUnavailable(rule, message string) {
 	if rule == "INCOMPLETE_INPUT" {
 		remediation = "Resolve compiler, source-scope or local-import errors and rerun the same baseline comparison."
 	}
-	r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change." + rule, Status: "advisory", Severity: "info", Category: "quality", Evidence: message, Remediation: remediation})
+	r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change." + rule, Status: StatusAdvisory, Severity: "info", Category: "quality", Evidence: message, Remediation: remediation})
 	r.printf("  change: not evaluated — %s\n", message)
 }
 
@@ -247,7 +247,7 @@ func runChange(r *Runner) int {
 	baseline.runOwnedAnalysis("baseline", maintainabilityAnalyzer, true, map[string]any{"sourceOnly": true, "compilerRoot": r.root, "excludeTests": r.ftaExcludeTests})
 	if baseline.snapshot == nil || baseline.snapshot.UnresolvedImports > 0 || r.snapshot.UnresolvedImports > 0 {
 		for _, f := range baseline.result.Findings {
-			if f.Status == "execution_error" {
+			if f.Status == StatusExecutionError {
 				r.executionFailure("change", f.Category, "Baseline analysis: "+f.Evidence)
 			}
 		}
@@ -360,14 +360,14 @@ func (r *Runner) compareSnapshots(before, after *maintainabilitySnapshot, sha st
 	}
 	displaced := fileReduction && candidate.Branches >= base.Branches && candidate.Edges > base.Edges && (candidate.Depth > base.Depth || candidate.Wrappers > base.Wrappers || candidate.Cycles > base.Cycles)
 	if displaced {
-		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.POSSIBLE_COMPLEXITY_DISPLACEMENT", Status: "advisory", Severity: "warning", Category: "quality", Location: &Location{File: "."},
+		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.POSSIBLE_COMPLEXITY_DISPLACEMENT", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &Location{File: "."},
 			Evidence: fmt.Sprintf("Baseline %s: maximum per-file branches %d→%d, total branches %d→%d, runtime edges %d→%d, dependency depth %d→%d, unchanged forwarding functions %d→%d, cycles %d→%d.", sha, base.MaxFileBranches, candidate.MaxFileBranches, base.Branches, candidate.Branches, base.Edges, candidate.Edges, base.Depth, candidate.Depth, base.Wrappers, candidate.Wrappers, base.Cycles, candidate.Cycles) + nativeEvidence, Remediation: "Review the end-to-end workflow and behavior before claiming simplification; smaller file scores alone do not show reduced maintainability cost."})
 	}
 	if candidate.Cycles > base.Cycles {
-		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.NEW_DEPENDENCY_CYCLES", Status: "advisory", Severity: "warning", Category: "quality", Location: &Location{File: "."}, Evidence: fmt.Sprintf("Runtime dependency cycles increased from %d to %d against %s.", base.Cycles, candidate.Cycles, sha)})
+		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.NEW_DEPENDENCY_CYCLES", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &Location{File: "."}, Evidence: fmt.Sprintf("Runtime dependency cycles increased from %d to %d against %s.", base.Cycles, candidate.Cycles, sha)})
 	}
 	if candidate.CouplingHotspots > base.CouplingHotspots {
-		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.INCREASED_COUPLING", Status: "advisory", Severity: "warning", Category: "quality", Location: &Location{File: "."}, Evidence: fmt.Sprintf("Modules with at least 3 importers and 8 runtime dependencies increased from %d to %d against %s.", base.CouplingHotspots, candidate.CouplingHotspots, sha), Remediation: "Review the changed dependency surface and cohesion; these counts do not prescribe an architecture."})
+		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "tsguard.change.INCREASED_COUPLING", Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &Location{File: "."}, Evidence: fmt.Sprintf("Modules with at least 3 importers and 8 runtime dependencies increased from %d to %d against %s.", base.CouplingHotspots, candidate.CouplingHotspots, sha), Remediation: "Review the changed dependency surface and cohesion; these counts do not prescribe an architecture."})
 	}
 	return nil
 }

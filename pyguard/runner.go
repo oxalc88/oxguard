@@ -178,7 +178,7 @@ func (r *Runner) RunTool(spec toolSpec, name string, args ...string) Result {
 		}
 		for _, f := range r.result.Findings[before:] {
 			// A broken adapter cannot claim a successful run.
-			if f.Status == "execution_error" {
+			if f.Status == StatusExecutionError {
 				res.ok = false
 			}
 		}

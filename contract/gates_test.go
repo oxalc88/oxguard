@@ -10,30 +10,30 @@ import (
 func TestGateAssessment(t *testing.T) {
 	r := New("test", "check")
 	r.Plan("lint", "types", "coverage")
-	r.AddFinding(Finding{Gate: "types", Rule: "TS2322", Status: "blocking", Category: "quality"})
+	r.AddFinding(Finding{Gate: "types", Rule: "TS2322", Status: StatusBlocking, Category: "quality"})
 	r.RecordGate("lint", true, true)
 	r.RecordGate("types", false, true)
 	r.Finish(1)
-	if r.Assessment != "incomplete" || r.Gates[2].Status != "not_run" || r.Gates[1].Normalization != "complete" {
+	if r.Assessment != Incomplete || r.Gates[2].Status != StatusNotRun || r.Gates[1].Normalization != Complete {
 		t.Fatalf("bad fail-fast assessment: %+v", r)
 	}
 	r.RecordGate("coverage", true, false)
 	r.Finish(1)
-	if r.Assessment != "incomplete" {
+	if r.Assessment != Incomplete {
 		t.Fatal("partial result certified complete")
 	}
 	r = New("test", "audit")
 	r.Plan("unused")
-	r.AddFinding(Finding{Gate: "unused", Rule: "unused.function", Status: "advisory", Category: "quality"})
+	r.AddFinding(Finding{Gate: "unused", Rule: "unused.function", Status: StatusAdvisory, Category: "quality"})
 	r.RecordGate("unused", false, true)
 	r.RecordGate("unused", true, true)
 	r.Finish(0)
-	if r.Status != "advisory" || r.Assessment != "complete" || r.Gates[0].Status != "advisory" {
+	if r.Status != StatusAdvisory || r.Assessment != Complete || r.Gates[0].Status != StatusAdvisory {
 		t.Fatalf("advisory confused with blocking: %+v", r)
 	}
 	r.Execution("unused", "timeout", "Timed out")
 	r.Finish(0)
-	if r.Status != "error" || r.Assessment != "incomplete" || r.ExitCode != 0 {
+	if r.Status != StatusError || r.Assessment != Incomplete || r.ExitCode != 0 {
 		t.Fatal("execution failure hidden by advisory exit")
 	}
 }
@@ -54,7 +54,7 @@ func TestGateReporterBounds(t *testing.T) {
 	for i := 0; i < 300; i++ {
 		name := strings.Repeat("a", 300)
 		r.Plan(name)
-		r.AddFinding(Finding{Gate: name, Rule: name, Status: "blocking", Evidence: strings.Repeat("x\n", 1000)})
+		r.AddFinding(Finding{Gate: name, Rule: name, Status: StatusBlocking, Evidence: strings.Repeat("x\n", 1000)})
 	}
 	r.Finish(1)
 	var b bytes.Buffer

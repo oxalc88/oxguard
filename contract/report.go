@@ -15,13 +15,16 @@ const LineBytes = 240
 // Agent output has at most 26 lines and 6 KiB, regardless of analyzer log size.
 // Every dynamic line is sanitized and bounded. JSON never applies this reduction.
 func Report(w io.Writer, mode string, result *RunResult) error {
+	if err := result.Validate(); err != nil {
+		return err
+	}
 	if mode == "json" {
 		enc := json.NewEncoder(w)
 		enc.SetEscapeHTML(false)
 		return enc.Encode(result)
 	}
 	var b strings.Builder
-	fmt.Fprintln(&b, strings.ToUpper(result.Status))
+	fmt.Fprintln(&b, strings.ToUpper(result.Status.String()))
 	fmt.Fprintln(&b, "command: "+Text(result.Command))
 	gate := "none"
 	if len(result.Findings) > 0 {
@@ -29,10 +32,10 @@ func Report(w io.Writer, mode string, result *RunResult) error {
 	}
 	notRun, partial := 0, 0
 	for _, g := range result.Gates {
-		if g.Status == "not_run" {
+		if g.Status == StatusNotRun {
 			notRun++
 		}
-		if g.Normalization == "partial" {
+		if g.Normalization == Partial {
 			partial++
 		}
 	}
@@ -49,7 +52,7 @@ func Report(w io.Writer, mode string, result *RunResult) error {
 				location += fmt.Sprintf(":%d", f.Location.Line)
 			}
 		}
-		fmt.Fprintln(&b, Text(f.Rule+location+" ["+f.Category+"/"+f.Status+"]"))
+		fmt.Fprintln(&b, Text(f.Rule+location+" ["+f.Category+"/"+f.Status.String()+"]"))
 		fmt.Fprintln(&b, Text(f.Evidence))
 	}
 	if omitted := len(result.Findings) - FindingLimit; omitted > 0 {

@@ -31,7 +31,7 @@ func TestDelegationEvidenceAndFalsePositiveControls(t *testing.T) {
 				t.Fatalf("%+v", r.result.Findings)
 			}
 			for _, f := range r.result.Findings {
-				if f.Status != "advisory" || len(f.Related) < 3 {
+				if f.Status != StatusAdvisory || len(f.Related) < 3 {
 					t.Fatal(f)
 				}
 			}

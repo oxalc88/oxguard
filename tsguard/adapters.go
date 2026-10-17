@@ -31,9 +31,9 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	complete := spec.adapter != ""
 	defer func() { r.result.RecordGate(spec.gate, res.ok, complete) }()
 	start := len(r.result.Findings)
-	status := "blocking"
+	status := StatusBlocking
 	if spec.advisory {
-		status = "advisory"
+		status = StatusAdvisory
 	}
 	add := func(rule, severity, category, evidence string, location *Location) {
 		if severity != "error" && severity != "warning" {
@@ -41,10 +41,10 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 		}
 		findingStatus := status
 		if severity != "error" {
-			findingStatus = "advisory"
+			findingStatus = StatusAdvisory
 		}
 		if category != "quality" {
-			findingStatus = "execution_error"
+			findingStatus = StatusExecutionError
 		}
 		r.result.AddFinding(Finding{Gate: spec.gate, Rule: rule, Severity: severity,
 			Status: findingStatus, Category: category, Evidence: evidence, Location: location, Diagnostics: refs})
@@ -218,12 +218,12 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	if !res.ok && len(r.result.Findings) == start {
 		complete = false
 		// Unknown tool details are never confidently labelled source-code defects.
-		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".failed", Severity: "error", Status: "execution_error",
+		r.result.AddFinding(Finding{Gate: spec.gate, Rule: "tsguard." + spec.gate + ".failed", Severity: "error", Status: StatusExecutionError,
 			Category: "unclassified_failure", Evidence: "Analyzer failed; inspect diagnostics for this gate.", Diagnostics: refs})
 	}
 }
 
-func (r *Runner) addFTA(spec toolSpec, file string, value, threshold float64, refs []string, status string) {
+func (r *Runner) addFTA(spec toolSpec, file string, value, threshold float64, refs []string, status Status) {
 	location := Location{File: relativePath(r.root, filepath.Join(spec.subject, file))}
 	r.result.Measurements = append(r.result.Measurements, Measurement{Metric: "fta.score", Level: "code", Location: location, Value: value, Unit: "score", Threshold: threshold})
 	if value > threshold {

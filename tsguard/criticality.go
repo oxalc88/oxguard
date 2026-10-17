@@ -132,7 +132,7 @@ func (r *Runner) normalizeCriticality(stdout io.Reader, refs []string) error {
 		fmt.Fprintf(&report, "| %d | `%s` | %d |\n", selected, label, function.Callers)
 		observed := float64(function.Callers)
 		location := function.Location
-		r.result.AddFinding(Finding{Level: "structure", Gate: "criticality", Rule: "tsguard.criticality.ranked", Severity: "info", Status: "advisory", Category: "quality", Location: &location, Observed: &observed, Evidence: fmt.Sprintf("%s has %d distinct callers (rank %d).", function.Location.Symbol, function.Callers, selected), Diagnostics: refs})
+		r.result.AddFinding(Finding{Level: "structure", Gate: "criticality", Rule: "tsguard.criticality.ranked", Severity: "info", Status: StatusAdvisory, Category: "quality", Location: &location, Observed: &observed, Evidence: fmt.Sprintf("%s has %d distinct callers (rank %d).", function.Location.Symbol, function.Callers, selected), Diagnostics: refs})
 	}
 	if selected == 0 {
 		report.WriteString("\nNo functions with resolved callers in this scope.\n")
