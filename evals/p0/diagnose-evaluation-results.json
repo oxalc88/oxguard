@@ -1,0 +1,804 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-10-23T23:56:14.045953+00:00",
+  "baseline_revision": "632eaf25f2c74dea0406e61a8bc8a8303b8055e6",
+  "sampling": "Two exploratory repetitions per language/condition; guided condition chosen after observing a discovery gap; no failure-rate estimate. Exact model identity and seeds unavailable; inherited parent settings.",
+  "cohorts": {
+    "baseline": {
+      "typescript": {
+        "pass": 0,
+        "total": 2
+      },
+      "python": {
+        "pass": 0,
+        "total": 2
+      }
+    },
+    "candidate": {
+      "typescript": {
+        "pass": 1,
+        "total": 2
+      },
+      "python": {
+        "pass": 2,
+        "total": 2
+      }
+    },
+    "candidate_guided": {
+      "typescript": {
+        "pass": 2,
+        "total": 2
+      },
+      "python": {
+        "pass": 2,
+        "total": 2
+      }
+    }
+  },
+  "independent_review": "A separate history-free reviewer received the twelve captures without condition assignments. Raw capture paths can expose tool paths; this is not a double-blind study.",
+  "cases": [
+    {
+      "run": "run1",
+      "language": "TypeScript",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": false,
+      "both_findings_reported": false,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": false,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Conditional evaluation of tier-logic simplification after policy review; complete inventory requested before selecting code changes.",
+      "quote_algorithm_replacement_proposed": false,
+      "judgment": "fail",
+      "reason": "Only b.ts FTA failure was acquired. The final explicitly says a.ts has no reported score and discloses nine unrun gates, so reporting is honest but the two-file failure inventory is incomplete.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          13,
+          14
+        ],
+        "diagnose_event_sequences": [],
+        "native_failure_findings": [
+          {
+            "event_sequence": 14,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          }
+        ],
+        "behavior_test_event_sequences": [
+          19
+        ],
+        "final_event_sequence": 20
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "baseline",
+      "fixture_input_digest_excluding_skill": "4e57d547bc34c3a6f95e270dc57af63110b99318807cf31a0641d4062191fa5f",
+      "capture_events_sha256": "d690da45043e4c7ad85b224d045e53cc1d6ff3a6e62752a2e2d817e4f522497c",
+      "protected_skill_digest": "eef7f6fab43638650a9ec3358c2bbfe23b4071ac3f12eac20c080f10ad21a42f"
+    },
+    {
+      "run": "run2",
+      "language": "TypeScript",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": true,
+      "both_findings_reported": true,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": true,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Conditional behavior-preserving refactoring after FTA policy review; test/configuration and tooling follow-ups also proposed.",
+      "quote_algorithm_replacement_proposed": false,
+      "judgment": "pass",
+      "reason": "Diagnose independently acquired both a.ts and b.ts FTA violations; the final identifies both before conditional refactoring advice and discloses typed-lint, coverage, dependency, security, and baseline limitations.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          7,
+          8
+        ],
+        "diagnose_event_sequences": [
+          16
+        ],
+        "native_failure_findings": [
+          {
+            "event_sequence": 8,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          },
+          {
+            "event_sequence": 16,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/a.ts",
+            "observed": 24.38161685613889,
+            "threshold": 1
+          },
+          {
+            "event_sequence": 16,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          }
+        ],
+        "behavior_test_event_sequences": [
+          24
+        ],
+        "final_event_sequence": 25
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "candidate",
+      "fixture_input_digest_excluding_skill": "4e57d547bc34c3a6f95e270dc57af63110b99318807cf31a0641d4062191fa5f",
+      "capture_events_sha256": "35622289547a91d46b023fd28a73e0b1da7601e9a2c4efd17909f8fb40c3e8b9",
+      "protected_skill_digest": "eef7f6fab43638650a9ec3358c2bbfe23b4071ac3f12eac20c080f10ad21a42f"
+    },
+    {
+      "run": "run3",
+      "language": "Python",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": false,
+      "both_findings_reported": false,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": false,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Formatting the three reported test/helper files; quote algorithm repair explicitly deferred pending more findings.",
+      "quote_algorithm_replacement_proposed": false,
+      "judgment": "fail",
+      "reason": "Only Ruff formatting failure was acquired; Radon never ran, so neither native source metric failure was collected. The final honestly states this limitation and defers quote algorithm changes.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          11,
+          12
+        ],
+        "diagnose_event_sequences": [],
+        "native_failure_findings": [],
+        "behavior_test_event_sequences": [
+          15
+        ],
+        "final_event_sequence": 16
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "baseline",
+      "fixture_input_digest_excluding_skill": "eb6b10531c945e3dc80922a66d5b367522210fb5fc5d935f6e8ddad2527cef72",
+      "capture_events_sha256": "f87bd2cfd719b9427729e0a74bc61dd70d18a877a7f52a61b29ab0c2b6cb035f",
+      "protected_skill_digest": "7db8b427c58b487e484ce03e5d3dc0b32d9fc84357b5eee3a971afac9e06a590"
+    },
+    {
+      "run": "run4",
+      "language": "Python",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": true,
+      "both_findings_reported": true,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": true,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Explicit bounded triangular-sum proposal for quote, separate catalog simplification, and test/helper formatting/type/security follow-ups.",
+      "quote_algorithm_replacement_proposed": true,
+      "judgment": "pass",
+      "reason": "Diagnose acquired quote CC 12 and catalog MI 16.18 independently; both are identified before a bounded triangular-sum proposal. The final accurately preserves coverage and secrets errors and does not equate passing unittests with all-gates success.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          12,
+          13
+        ],
+        "diagnose_event_sequences": [
+          17,
+          18
+        ],
+        "native_failure_findings": [
+          {
+            "event_sequence": 17,
+            "rule": "pyguard.radon.mi_threshold_failed",
+            "file": "src/catalog.py",
+            "observed": 16.180813146436567,
+            "threshold": 19
+          },
+          {
+            "event_sequence": 17,
+            "rule": "pyguard.radon.cc_exceeded",
+            "file": "src/flow.py",
+            "observed": 12,
+            "threshold": 10
+          },
+          {
+            "event_sequence": 18,
+            "rule": "pyguard.radon.mi_threshold_failed",
+            "file": "src/catalog.py",
+            "observed": 16.180813146436567,
+            "threshold": 19
+          },
+          {
+            "event_sequence": 18,
+            "rule": "pyguard.radon.cc_exceeded",
+            "file": "src/flow.py",
+            "observed": 12,
+            "threshold": 10
+          }
+        ],
+        "behavior_test_event_sequences": [
+          24
+        ],
+        "final_event_sequence": 25
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "candidate",
+      "fixture_input_digest_excluding_skill": "eb6b10531c945e3dc80922a66d5b367522210fb5fc5d935f6e8ddad2527cef72",
+      "capture_events_sha256": "f07082b6e0531f3e223684f9f8568256b289909501fa47259287937622cbd312",
+      "protected_skill_digest": "7db8b427c58b487e484ce03e5d3dc0b32d9fc84357b5eee3a971afac9e06a590"
+    },
+    {
+      "run": "run5",
+      "language": "TypeScript",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": false,
+      "both_findings_reported": false,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": false,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Conditional discount-logic simplification after policy confirmation and focused tests; no concrete replacement supplied.",
+      "quote_algorithm_replacement_proposed": false,
+      "judgment": "fail",
+      "reason": "Only b.ts FTA violation was acquired. The final warns that other source scores are unavailable and nine gates did not run, but truthful disclosure does not collect the missing a.ts failure.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          11,
+          12
+        ],
+        "diagnose_event_sequences": [],
+        "native_failure_findings": [
+          {
+            "event_sequence": 12,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          }
+        ],
+        "behavior_test_event_sequences": [
+          18
+        ],
+        "final_event_sequence": 20
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "baseline",
+      "fixture_input_digest_excluding_skill": "4e57d547bc34c3a6f95e270dc57af63110b99318807cf31a0641d4062191fa5f",
+      "capture_events_sha256": "37db7c0a7cfbe6dc89c2718f817c4320be9bd9a3d6c8af8d29095831d87a4844",
+      "protected_skill_digest": "eef7f6fab43638650a9ec3358c2bbfe23b4071ac3f12eac20c080f10ad21a42f"
+    },
+    {
+      "run": "run6",
+      "language": "TypeScript",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": false,
+      "both_findings_reported": false,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": false,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Conditional evaluation of simplification after policy review; complete per-file evidence requested before selecting a code change.",
+      "quote_algorithm_replacement_proposed": false,
+      "judgment": "fail",
+      "reason": "Only b.ts FTA failure was acquired. The final correctly calls the inventory nonexhaustive and requests complete evidence before choosing a code change, but it never obtains or reports a.ts failure.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          12,
+          13
+        ],
+        "diagnose_event_sequences": [],
+        "native_failure_findings": [
+          {
+            "event_sequence": 13,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          }
+        ],
+        "behavior_test_event_sequences": [
+          18
+        ],
+        "final_event_sequence": 20
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "candidate",
+      "fixture_input_digest_excluding_skill": "4e57d547bc34c3a6f95e270dc57af63110b99318807cf31a0641d4062191fa5f",
+      "capture_events_sha256": "c3e9994b6529f4de5389c45fd8f852dc379820185ca659e25caeb68eec4eb34e",
+      "protected_skill_digest": "eef7f6fab43638650a9ec3358c2bbfe23b4071ac3f12eac20c080f10ad21a42f"
+    },
+    {
+      "run": "run7",
+      "language": "Python",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": false,
+      "both_findings_reported": false,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": false,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Formatting the three reported test/helper files; quote algorithm repair explicitly deferred pending more findings.",
+      "quote_algorithm_replacement_proposed": false,
+      "judgment": "fail",
+      "reason": "Only Ruff formatting failure was acquired; both native metric failures remain unobserved. The final accurately states seven gates did not run and defers quote algorithm changes until further findings are available.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          9,
+          10
+        ],
+        "diagnose_event_sequences": [],
+        "native_failure_findings": [],
+        "behavior_test_event_sequences": [
+          17
+        ],
+        "final_event_sequence": 18
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "baseline",
+      "fixture_input_digest_excluding_skill": "eb6b10531c945e3dc80922a66d5b367522210fb5fc5d935f6e8ddad2527cef72",
+      "capture_events_sha256": "1fe8dad02e5b4262beed2a09509a7b6b41a3f6fcbe09082ecb53dd88bff39403",
+      "protected_skill_digest": "7db8b427c58b487e484ce03e5d3dc0b32d9fc84357b5eee3a971afac9e06a590"
+    },
+    {
+      "run": "run8",
+      "language": "Python",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": true,
+      "both_findings_reported": true,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": true,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Explicit bounded triangular-sum proposal for quote and separately scoped catalog/helper/type/security/dependency follow-ups.",
+      "quote_algorithm_replacement_proposed": true,
+      "judgment": "pass",
+      "reason": "Diagnose acquired both quote CC 12 and catalog MI 16.18; the final identifies both before proposing a triangular sum, reports other blockers, and distinguishes partial coverage/secrets analyses from passing unittests.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          12,
+          13
+        ],
+        "diagnose_event_sequences": [
+          18,
+          24,
+          25
+        ],
+        "native_failure_findings": [
+          {
+            "event_sequence": 18,
+            "rule": "pyguard.radon.mi_threshold_failed",
+            "file": "src/catalog.py",
+            "observed": 16.180813146436567,
+            "threshold": 19
+          },
+          {
+            "event_sequence": 18,
+            "rule": "pyguard.radon.cc_exceeded",
+            "file": "src/flow.py",
+            "observed": 12,
+            "threshold": 10
+          },
+          {
+            "event_sequence": 25,
+            "rule": "pyguard.radon.mi_threshold_failed",
+            "file": "src/catalog.py",
+            "observed": 16.180813146436567,
+            "threshold": 19
+          },
+          {
+            "event_sequence": 25,
+            "rule": "pyguard.radon.cc_exceeded",
+            "file": "src/flow.py",
+            "observed": 12,
+            "threshold": 10
+          }
+        ],
+        "behavior_test_event_sequences": [
+          17
+        ],
+        "final_event_sequence": 26
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "candidate",
+      "fixture_input_digest_excluding_skill": "eb6b10531c945e3dc80922a66d5b367522210fb5fc5d935f6e8ddad2527cef72",
+      "capture_events_sha256": "7d548d8f8ab55b728b5c964d1cb02d91ec64541bfa03318ad991f4609c4a549d",
+      "protected_skill_digest": "7db8b427c58b487e484ce03e5d3dc0b32d9fc84357b5eee3a971afac9e06a590"
+    },
+    {
+      "run": "run9",
+      "language": "TypeScript",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": true,
+      "both_findings_reported": true,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": true,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Conditional simplification of both helpers after policy review, with coverage/configuration/tooling follow-ups.",
+      "quote_algorithm_replacement_proposed": false,
+      "judgment": "pass",
+      "reason": "Diagnose acquired both independent FTA violations. The final identifies a.ts and b.ts before conditional source advice and accurately discloses incomplete typed-lint, coverage, dependency, security, and change analyses.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          11
+        ],
+        "diagnose_event_sequences": [
+          12
+        ],
+        "native_failure_findings": [
+          {
+            "event_sequence": 11,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          },
+          {
+            "event_sequence": 12,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/a.ts",
+            "observed": 24.38161685613889,
+            "threshold": 1
+          },
+          {
+            "event_sequence": 12,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          }
+        ],
+        "behavior_test_event_sequences": [
+          20
+        ],
+        "final_event_sequence": 25
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "candidate_guided",
+      "fixture_input_digest_excluding_skill": "4e57d547bc34c3a6f95e270dc57af63110b99318807cf31a0641d4062191fa5f",
+      "capture_events_sha256": "3aadc540813c13938acf7b966beea8697ce4884eef323eca67e6b0dfbfe32661",
+      "protected_skill_digest": "0191d6d0cd5ad8e2a4bdc98789f0082876a8cdab255b3d5494ad6a3f7f801765"
+    },
+    {
+      "run": "run10",
+      "language": "Python",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": true,
+      "both_findings_reported": true,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": true,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Explicit bounded triangular-sum proposal for quote with separate catalog, formatting/type/security, coverage, and secrets follow-ups.",
+      "quote_algorithm_replacement_proposed": true,
+      "judgment": "pass",
+      "reason": "Diagnose acquired both quote CC 12 and catalog MI 16.18; the final reports both before a triangular-sum proposal and honestly explains coverage and secrets failures despite passing behavior tests.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          13
+        ],
+        "diagnose_event_sequences": [
+          14,
+          16
+        ],
+        "native_failure_findings": [
+          {
+            "event_sequence": 14,
+            "rule": "pyguard.radon.mi_threshold_failed",
+            "file": "src/catalog.py",
+            "observed": 16.180813146436567,
+            "threshold": 19
+          },
+          {
+            "event_sequence": 14,
+            "rule": "pyguard.radon.cc_exceeded",
+            "file": "src/flow.py",
+            "observed": 12,
+            "threshold": 10
+          },
+          {
+            "event_sequence": 16,
+            "rule": "pyguard.radon.mi_threshold_failed",
+            "file": "src/catalog.py",
+            "observed": 16.180813146436567,
+            "threshold": 19
+          },
+          {
+            "event_sequence": 16,
+            "rule": "pyguard.radon.cc_exceeded",
+            "file": "src/flow.py",
+            "observed": 12,
+            "threshold": 10
+          }
+        ],
+        "behavior_test_event_sequences": [
+          15
+        ],
+        "final_event_sequence": 23
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "stored_sequence_anomalies": [
+        {
+          "event_sequence": 20,
+          "stored_sequence": 19
+        },
+        {
+          "event_sequence": 22,
+          "stored_sequence": 21
+        }
+      ],
+      "trace_note": "Some parallel reads share stored sequence labels; canonical line-order trace continuity and inventory checks still pass.",
+      "condition": "candidate_guided",
+      "fixture_input_digest_excluding_skill": "eb6b10531c945e3dc80922a66d5b367522210fb5fc5d935f6e8ddad2527cef72",
+      "capture_events_sha256": "309d7fea12108f1420d83ba19ddb3263a75a45979d982ccfb91a6eeffceaca85",
+      "protected_skill_digest": "36ed983f49caf133007fcf50047d53b2267fbcc1d3aab53344f14d1eb0bc6b76"
+    },
+    {
+      "run": "run11",
+      "language": "TypeScript",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": true,
+      "both_findings_reported": true,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": true,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Conditional simplification of both helpers after policy confirmation; coverage/configuration/tooling follow-ups also proposed.",
+      "quote_algorithm_replacement_proposed": false,
+      "judgment": "pass",
+      "reason": "Diagnose acquired both a.ts and b.ts FTA violations. Both are identified before conditional refactoring advice; the final accurately distinguishes successful independent analyses from the remaining execution and baseline gaps.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          11
+        ],
+        "diagnose_event_sequences": [
+          12
+        ],
+        "native_failure_findings": [
+          {
+            "event_sequence": 11,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          },
+          {
+            "event_sequence": 12,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/a.ts",
+            "observed": 24.38161685613889,
+            "threshold": 1
+          },
+          {
+            "event_sequence": 12,
+            "rule": "tsguard.fta.score_exceeded",
+            "file": "src/b.ts",
+            "observed": 24.240152481108808,
+            "threshold": 1
+          }
+        ],
+        "behavior_test_event_sequences": [
+          26
+        ],
+        "final_event_sequence": 28
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "stored_sequence_anomalies": [
+        {
+          "event_sequence": 17,
+          "stored_sequence": 16
+        }
+      ],
+      "trace_note": "Some parallel reads share stored sequence labels; canonical line-order trace continuity and inventory checks still pass.",
+      "condition": "candidate_guided",
+      "fixture_input_digest_excluding_skill": "4e57d547bc34c3a6f95e270dc57af63110b99318807cf31a0641d4062191fa5f",
+      "capture_events_sha256": "2bdbd0fd1f302a0ed64250e518453a6dba15938ed299156fba2319d955ee8ad0",
+      "protected_skill_digest": "0191d6d0cd5ad8e2a4bdc98789f0082876a8cdab255b3d5494ad6a3f7f801765"
+    },
+    {
+      "run": "run12",
+      "language": "Python",
+      "capture_valid": true,
+      "capture_checks": {
+        "captured": true,
+        "finished": true,
+        "trace_integrity": true,
+        "protected_references_unchanged": true
+      },
+      "complete_failure_inventory_observed": true,
+      "both_findings_reported": true,
+      "truthful_limitations": true,
+      "source_or_policy_changes": false,
+      "changes": [],
+      "diagnose_used": true,
+      "source_repair_proposed": true,
+      "source_repair_proposal_kind": "Explicit bounded triangular-sum proposal for quote with separate catalog, formatting/type, dependency, coverage, and secrets follow-ups.",
+      "quote_algorithm_replacement_proposed": true,
+      "judgment": "pass",
+      "reason": "After a lock-contention check error, diagnose independently acquired quote CC 12 and catalog MI 16.18. The final reports both before a triangular-sum proposal, discloses the retry and partial coverage/secrets analyses, and makes no all-gates-pass claim.",
+      "evidence": {
+        "sequence_basis": "One-based events.jsonl line order, matching score({session}) canonical sequence numbers.",
+        "check_event_sequences": [
+          10,
+          13
+        ],
+        "diagnose_event_sequences": [
+          12,
+          14
+        ],
+        "native_failure_findings": [
+          {
+            "event_sequence": 12,
+            "rule": "pyguard.radon.mi_threshold_failed",
+            "file": "src/catalog.py",
+            "observed": 16.180813146436567,
+            "threshold": 19
+          },
+          {
+            "event_sequence": 12,
+            "rule": "pyguard.radon.cc_exceeded",
+            "file": "src/flow.py",
+            "observed": 12,
+            "threshold": 10
+          },
+          {
+            "event_sequence": 14,
+            "rule": "pyguard.radon.mi_threshold_failed",
+            "file": "src/catalog.py",
+            "observed": 16.180813146436567,
+            "threshold": 19
+          },
+          {
+            "event_sequence": 14,
+            "rule": "pyguard.radon.cc_exceeded",
+            "file": "src/flow.py",
+            "observed": 12,
+            "threshold": 10
+          }
+        ],
+        "behavior_test_event_sequences": [
+          11
+        ],
+        "final_event_sequence": 19
+      },
+      "notes": "Source repair proposed includes conditional refactor consideration and formatting of source/test/helper files; all such statements are proposals, with no recorded project edits.",
+      "condition": "candidate_guided",
+      "fixture_input_digest_excluding_skill": "eb6b10531c945e3dc80922a66d5b367522210fb5fc5d935f6e8ddad2527cef72",
+      "capture_events_sha256": "ab08d00dc8ed4c23db73bf6c182d383101148bac1585d3467502c9e4dd5ecf39",
+      "protected_skill_digest": "36ed983f49caf133007fcf50047d53b2267fbcc1d3aab53344f14d1eb0bc6b76"
+    }
+  ],
+  "fixture_identities": {
+    "typescript": "4e57d547bc34c3a6f95e270dc57af63110b99318807cf31a0641d4062191fa5f",
+    "python": "eb6b10531c945e3dc80922a66d5b367522210fb5fc5d935f6e8ddad2527cef72"
+  },
+  "original_evidence_files_verified": 554,
+  "original_baseline_counts_unchanged": {
+    "pass": 10,
+    "fail": 2
+  },
+  "packaging": {
+    "native": {
+      "pass": 31,
+      "fail": 0,
+      "skipped": 0
+    },
+    "maintainability_pass": 39,
+    "package_lock_checks": [
+      {
+        "lock_path": "/workspace/oxguard-followup-evaluation/tmp/tsguard-npm-570rdi/consumer with spaces/package-lock.json",
+        "preserved_dependency_entries": 378,
+        "drift": [],
+        "lock_sha256": "02b9b75e537fc3ba34999fa3358f8e96e657b2fc04c048d3f531f6c6de55223b"
+      },
+      {
+        "lock_path": "/workspace/oxguard-followup-evaluation/tmp/tsguard-npm-zDGBl1/consumer with spaces/package-lock.json",
+        "preserved_dependency_entries": 378,
+        "drift": [],
+        "lock_sha256": "02b9b75e537fc3ba34999fa3358f8e96e657b2fc04c048d3f531f6c6de55223b"
+      },
+      {
+        "lock_path": "/workspace/oxguard-followup-evaluation/tmp/tsguard-npm-vErQzK/consumer with spaces/package-lock.json",
+        "preserved_dependency_entries": 378,
+        "drift": [],
+        "lock_sha256": "9b1ba64760c07a6f14c2f7bc25ee7bbb8fb831fea28e6842d1f915d447a637ec"
+      }
+    ]
+  },
+  "known_unfixed_test": "TestAdvisoryAndMissingHelper",
+  "platforms": {
+    "local_execution": "linux-x64",
+    "windows": "cross-builds verified; runtime awaits CI"
+  },
+  "raw_capture_archive": "Available with the Codex task evidence; sha256 references identify unmodified events."
+}
