@@ -23,6 +23,25 @@ func Report(w io.Writer, mode string, result *RunResult) error {
 		enc.SetEscapeHTML(false)
 		return enc.Encode(result)
 	}
+	if mode == "human" && result.Command == "diagnose" {
+		fmt.Fprintf(w, "%s: assessment %s\n", strings.ToUpper(result.Status.String()), result.Assessment)
+		for _, a := range result.Analyses {
+			fmt.Fprintf(w, "  %s: %s (%s)", Text(a.Name), a.Status, a.Normalization)
+			if a.Reason != "" {
+				fmt.Fprint(w, " — "+Text(a.Reason))
+			}
+			fmt.Fprintln(w)
+		}
+		for _, f := range result.Findings {
+			location := ""
+			if f.Location != nil {
+				location = " " + Text(f.Location.File)
+			}
+			fmt.Fprintf(w, "  %s%s [%s]: %s\n", Text(f.Rule), location, f.Status, Text(f.Evidence))
+		}
+		_, err := fmt.Fprintln(w, "Full findings, analysis coverage and diagnostic paths: use --output json.")
+		return err
+	}
 	var b strings.Builder
 	fmt.Fprintln(&b, strings.ToUpper(result.Status.String()))
 	fmt.Fprintln(&b, "command: "+Text(result.Command))
@@ -39,7 +58,17 @@ func Report(w io.Writer, mode string, result *RunResult) error {
 			partial++
 		}
 	}
-	fmt.Fprintln(&b, Text(fmt.Sprintf("gate: %s; assessment: %s; not_run: %d; partial: %d", gate, result.Assessment, notRun, partial)))
+	coverage := fmt.Sprintf("gate: %s; assessment: %s; not_run: %d; partial: %d", gate, result.Assessment, notRun, partial)
+	if len(result.Analyses) > 0 {
+		incomplete := 0
+		for _, a := range result.Analyses {
+			if a.Status == StatusNotRun || a.Status == StatusError || a.Normalization != Complete {
+				incomplete++
+			}
+		}
+		coverage += fmt.Sprintf("; incomplete_analyses: %d (details: --output json)", incomplete)
+	}
+	fmt.Fprintln(&b, Text(coverage))
 	fmt.Fprintf(&b, "findings: %d\n", len(result.Findings))
 	for i, f := range result.Findings {
 		if i == FindingLimit {

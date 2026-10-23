@@ -72,8 +72,14 @@ func (r *Runner) RunTool(spec toolSpec, name string, args ...string) Result {
 		args = append([]string(nil), args...)
 		args[3] = trustedPath
 	}
+	if r.result != nil && r.result.Command == "diagnose" && len(args) >= 2 && args[0] == "uv" && args[1] == "run" {
+		args = append([]string{"uv", "run", "--no-sync"}, args[2:]...)
+	}
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 	cmd.Dir = r.root
+	if r.result != nil && r.result.Command == "diagnose" {
+		cmd.Env = append(os.Environ(), "UV_NO_SYNC=1", "UV_PYTHON_DOWNLOADS=never")
+	}
 	setSysProcAttr(cmd)
 
 	cbuf := newCappedBuf()

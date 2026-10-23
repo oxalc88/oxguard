@@ -120,6 +120,40 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 				}
 			}
 		}
+	case "fta-collection":
+		if !res.ok {
+			complete = false
+			add("tsguard.execution.analyzer_failure", "error", "analyzer_failure", "FTA measurement collection did not finish; the policy inventory is incomplete.", nil)
+			return
+		}
+		var entries []struct {
+			File  string   `json:"file_name"`
+			Score *float64 `json:"fta_score"`
+		}
+		decoder := json.NewDecoder(stdout)
+		adapterErr = decoder.Decode(&entries)
+		if adapterErr == nil && entries == nil {
+			adapterErr = fmt.Errorf("missing FTA measurement array")
+		}
+		if adapterErr == nil {
+			var trailing any
+			if decoder.Decode(&trailing) != io.EOF {
+				adapterErr = fmt.Errorf("unexpected trailing FTA output")
+			}
+		}
+		if adapterErr == nil {
+			for _, entry := range entries {
+				if strings.TrimSpace(entry.File) == "" || entry.Score == nil {
+					adapterErr = fmt.Errorf("incomplete FTA measurement")
+					break
+				}
+			}
+		}
+		if adapterErr == nil {
+			for _, entry := range entries {
+				r.addFTA(spec, entry.File, *entry.Score, spec.threshold, refs, status)
+			}
+		}
 	case "biome":
 		var report struct {
 			Diagnostics []struct {

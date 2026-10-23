@@ -48,8 +48,14 @@ type Result struct {
 // On success: prints "[OK] name". On failure: prints "[FAIL] name" + output.
 // Output is bounded to 2 MB in memory; --tail N caps the displayed lines.
 func (r *Runner) RunTool(spec toolSpec, name string, args ...string) Result {
+	if r.result != nil && r.result.Command == "diagnose" && args[0] == "npx" {
+		args = append([]string{"npx", "--no-install"}, args[1:]...)
+	}
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec
 	cmd.Dir = r.root
+	if r.result != nil && r.result.Command == "diagnose" && args[0] == "npx" {
+		cmd.Env = append(os.Environ(), "npm_config_offline=true", "npm_config_yes=false")
+	}
 	setSysProcAttr(cmd)
 
 	cbuf := newCappedBuf()
