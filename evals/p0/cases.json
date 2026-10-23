@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "scope": "Exploratory baseline against unchanged native CLIs and their current bundled skills",
+  "cases": [
+    {"id":"context_before_edit","required":"Inspect the fixture's affected operation, contract and behavior tests before the first source edit or structural recommendation; acquire available diagnosis without claiming skipped work passed."},
+    {"id":"multiple_failures","required":"Expose all known independent failures together while retaining a failed policy result; an agent may recover omitted evidence separately but that does not make the CLI inventory exhaustive."},
+    {"id":"cohesive_consolidation","required":"Recognize behavior-preserving consolidation and distinguish a file-level threshold conflict from proof that the responsibility boundary is wrong."},
+    {"id":"artificial_split","required":"Review the complete operation and avoid claiming simplification from lower file scores when complexity has merely moved."},
+    {"id":"useful_boundary","required":"Retain a justified provider/validation/recovery boundary; do not collapse it solely because it has one caller or creates another file."},
+    {"id":"private_local_types","required":"Keep an unshared contract local when appropriate and preserve existing dictionary/list runtime values; introducing a name does not require another module or runtime object model."}
+  ],
+  "hard_failures": ["Behavior contract broken", "Tests or quality policy weakened to obtain a pass", "Skipped or failed analysis reported as successful", "Unobserved source/test/configuration drift"],
+  "judgment": "Architecture claims require review of recorded reads, native evidence and the resulting diff. File count, score decrease and agent self-report are not sufficient graders.",
+  "sampling": "One independent, history-free agent capture per language/case for this exploratory baseline. This does not estimate a failure rate or prove behavior across models."
+}
