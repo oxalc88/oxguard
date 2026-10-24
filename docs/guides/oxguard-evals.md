@@ -1,85 +1,48 @@
 # OxGuard capability evals
 
-The evals contain 30 Tsguard cases and 37 PyGuard cases (15 behavior checks and 22 contract/parity requirements). They complement unit, installed-distribution and release smoke tests. This does not implement Level 3 project baselines or change analysis.
+The evals contain 30 Tsguard cases and 37 PyGuard cases (15 behavior checks and 22 contract/parity requirements). They complement unit, installed-distribution and release smoke tests.
 
 ## Known answers
 
-`evals/cases.json` records stable case IDs, historical references, fixture names and expected semantic results. `evals/fixtures/` contains reviewed source and configuration. Expectations are not generated from the candidate's output.
-
-The corpus covers native Python coverage pass/failure, Bandit pass/failure, Vulture/deptry advisory findings, scored TypeScript fail-fast, clean and faulty types/lint, FTA pass/failure, known caller counts, recursion/repeated calls/exclusions/path aliases, malformed compiler configuration, missing tools, unknown/missing flags, invalid output modes, lock contention, omitted findings, deterministic repeat runs, explicit roots and symlink log paths. Finding identity is checked structurally and across repeated runs; English messages and huge logs are not golden snapshots.
-
-The history provides evidence for regressions. Clean controls are new independent fixtures, clearly labelled. Passing these small fixtures does not establish precision/recall on arbitrary production repositories.
+`evals/cases.json` records stable case IDs, fixture names and expected semantic results; `evals/fixtures/` holds reviewed source and configuration. Expectations are never generated from the candidate's output. Finding identity is checked structurally and across repeated runs; messages and logs are not golden snapshots. Passing these small fixtures does not establish production precision/recall.
 
 ## Run through an installed package
 
-Use Node 24, Go from `tsguard/go.mod`, and the normal installed-package harness:
+Use Node 24 and Go from `tsguard/go.mod`:
 
 ```sh
 node --test evals/evals.test.cjs
 OXGUARD_EVAL_REPORT_DIR=eval-reports node --test npm/distribution.test.cjs
 ```
 
-The harness builds, packs and installs the actual npm distribution. Evals invoke its Node launcher and native Go binary, with real packaged analyzers. Each case gets a fresh temporary project. No analysis logic or package dependency changes are required. Set `TSGUARD_PACKAGE_MANAGER=pnpm` to exercise that installation path locally; CI already protects both managers in its existing nine-job matrix.
-
-For a package already installed in your own test workspace:
+The harness builds, packs and installs the real npm distribution and runs each case in a fresh temporary project. Set `TSGUARD_PACKAGE_MANAGER=pnpm` to exercise pnpm. For a package already installed elsewhere:
 
 ```sh
 node evals/run.cjs --launcher /absolute/path/node_modules/@oxguard/tsguard/bin/tsguard.cjs \
   --revision COMMIT_SHA --report eval-reports/candidate.json
 ```
 
-Do not use an uninstalled CLI or plain `npx` fetch as a substitute. The evaluator creates its own projects; it does not run analysis against your application.
+Do not substitute an uninstalled CLI or plain `npx`.
 
-## Compare native CLI revisions
+## Compare revisions
 
-On a PR, the Linux npm job evaluates the base commit and candidate using the **same current corpus, evaluator, installed launcher and pinned toolchain**. The harness builds the baseline native binary in an isolated git worktree, swaps it into the temporary installed native package, evaluates it, then restores the candidate before the existing integration assertions continue.
+On a PR, the Linux npm job evaluates the base and candidate native binaries with the same corpus, evaluator, launcher and toolchain:
 
 ```sh
 OXGUARD_EVAL_REPORT_DIR=eval-reports \
 OXGUARD_EVAL_BASELINE_REF=FULL_40_CHARACTER_COMMIT_SHA \
 node --test npm/distribution.test.cjs
-
 node evals/compare.cjs eval-reports/npm-linux-x64/baseline.json \
   eval-reports/npm-linux-x64/candidate.json eval-reports/comparison.json
 ```
 
-This isolates native CLI capability changes. It is not a comparison of entire historical npm packages or historical toolchains. The separate distribution tests protect launcher/package behavior. A baseline predating JSON is marked `unsupported`, not treated as a successful run or scored for prose it cannot normalize. Failed startup/preflight and malformed JSON are failures.
-
-Reports with different corpus/evaluator hashes, Node/platform/architecture, toolchains or case sets cannot be compared. A newly added fixture is run on both revisions with the same oracle. Do not compare old report files against a changed corpus and call the difference a capability gain.
+Reports with different corpus/evaluator hashes, environments or case sets cannot be compared.
 
 ## Results and merge rule
 
-Each case has `pass`, `fail`, `unsupported` or `skipped`:
+Each case is `pass`, `fail`, `unsupported` (a historical CLI lacks the interface) or `skipped` (only the conditional symlink case). The candidate must pass every required case, even when the baseline also failed; losing a previously passing case blocks. A new capability needs positive, negative and boundary cases. Changing an expected answer requires a documented behavior decision and review; never rewrite an oracle to get green CI. Store reports as CI artifacts, not committed answers.
 
-- `pass`: all semantic assertions match the independent expectation.
-- `fail`: wrong findings/counts/categories/status, malformed output, execution failure or timeout; a failed launch never silently becomes unsupported.
-- `unsupported`: a working historical CLI does not advertise a required interface.
-- `skipped`: an explicitly conditional symlink test cannot create a symlink on this environment. Other cases cannot skip themselves.
-
-Comparison reports classify gained, regressed, retained and unresolved cases. Changes in symlink applicability are listed separately and never counted as a capability gain. Losing a previously passing conditional case blocks readiness. The candidate must pass every required case, even when the baseline also failed.
-
-Detection metrics match rule/gate/category/status and source location one-to-one. They count true positives, false positives (including duplicates), and misses in marked detection cases. Clean controls contribute unexpected-finding counts. No supported observations means precision/recall is null, not 100%.
-
-Case duration, output bytes and maximum agent bytes/lines are recorded. Runtime includes repeat/agent invocations for the applicable case. Agent limits remain 26 lines / 6 KiB. Every child has a 60-second harness deadline; slow installation uses the existing separate budget. Runtime deltas are observations, not a noisy CI performance gate. Memory, token cost and installation latency are not measured.
-
-CI triggers once per PR update and on pushes to `main`; branch pushes do not start a duplicate run. A newer PR commit cancels its older in-progress checks. Release workflow calls retain their full validation and are not cancelled by this policy. The matrix remains 13 jobs: nine npm/pnpm platform combinations, three Python platform jobs and one shared report.
-
-CI runs CLI evals on the three npm platform jobs and uploads candidate JSON. The Linux PR job also uploads baseline JSON plus JSON/Markdown comparisons. All nine npm/pnpm integration jobs remain required by the workflow's tests; repo branch-protection policy is separate. The eval-enabled integration budget is ten minutes; non-eval jobs keep the existing six-minute integration budget.
-
-Require existing cases to remain passing and a new capability to have positive, negative and boundary cases. Changes to expected answers require a documented behavior decision and review; never rewrite an oracle merely to get green CI. Corpus changes must accompany their fixtures/provenance. Store reports as CI artifacts rather than committing generated observations as golden answers.
-
-## Evaluation coverage and remaining gaps
-
-- TypeScript coverage, Opengrep, Secretlint and native dependency audit now have scored known-answer cases; Python coverage and Bandit also have scored cases. Network/provider failures, broader analyzer versions and unsupported backends remain focused integration/unit coverage rather than exhaustive scored native cases.
-- Historical installation timeouts and registry routing remain integration checks, not detection metrics. Live security-advisory feeds are outside these deterministic evals; the integration harness's local provider must not imply production safety.
-- `evals/agent-scenarios.json` defines the history-based omitted-findings, execution-repair, advisory-criticality and fail-fast scenarios, plus dependency-review, changed-lockfile reuse and unknown-status decisions. Fresh independent agents exercise both canonical skills. `agent-traces/` records native results, argv, source fingerprints and read-only semantic answers. `agent-actions.cjs` scores observable actions; CI replays those captures rather than making live LLM calls. Each recorded session lists the skill files it read with their hashes; changing one of those files marks only that session stale until a fresh agent re-records it.
-- Larger independent projects, unseen holdout cases, memory measurements and controlled performance benchmarks remain future work.
-
-## Python behavior and agent parity
-
-`evals/python/cases.json` contains language-specific controls with the same quality intent: clean/incorrect types and lint, complexity pass/threshold/boundary, annotation depth boundaries, fail-fast, lock/pipe refusal, missing uv and full diagnostic logs. Ruff/mypy JSON, Radon JSON and the owned annotation model independently verify known answers. Those oracle records are **not** normalized PyGuard CLI findings. Separate contract cases assert exact normalized records; no aggregate production precision/recall score is claimed.
-
-Python requirements, including transitive dependencies and hashes, are pinned in `evals/python/requirements.txt`. The evaluator checks the installed versions and runs uv offline in fresh projects. It also copies source helper scripts into those projects for historical binary compatibility; current binaries execute their own embedded private helpers. It does not test release installer or setup dependency installation. These remain separate smoke-test responsibilities.
+## PyGuard
 
 ```sh
 uv venv --python 3.12 /tmp/pyguard-evals
@@ -90,100 +53,30 @@ node evals/python/run.cjs --binary /tmp/pyguard-eval --source . \
   --report-dir eval-reports/pyguard
 ```
 
-On Windows the venv interpreter is `Scripts/python.exe`. Use uv 0.12.19, as CI does. Optional `--baseline-binary`, `--baseline-source` and `--baseline-revision` evaluate a rebuilt base commit with its own source helper scripts and the same pinned tools.
-
-Two reports deliberately answer different questions:
-
-- `behavior.json`: every supported behavior case must pass, including when the baseline failed. This preserves the strict candidate rule.
-- `parity.json`: 22 positive requirements probe full JSON, stable IDs/categories, bounded agent output with omission disclosure, input validation/root and known caller counts. Missing advertised interfaces are unsupported; violated requirements fail. The probes actually run even when the flags are absent. Requirements not met never count as passes. All are now required for candidate readiness.
-
-Current Python evidence: all 15 baseline behavior cases remain passing, and all 22 current parity cases pass. The original nine parity requirements now pass; five additional structured adapter cases cover lint, complexity failure/boundary, annotations and caller measurements. `agent_ready` and parity `candidate_ready` are true on the tested candidate/toolchain. Historical baseline missing interfaces remain unsupported and historical defects remain failed; the CLI entry point requires every candidate parity case to pass, independently of baseline outcomes. The regression comparison also blocks loss of any previously passing capability.
-
-CI adds three Python platform jobs with base/candidate comparisons on PRs. A final report job combines Linux evidence in `parity.json` and `parity.md`. The Python reports include source-script provenance and toolchain versions. Reports are uploaded even if the eval step fails.
-
-`evals/capabilities.json` maps shared intent across language-specific case IDs. FTA scores and Radon cyclomatic counts are not interchangeable numbers. The matrix uses `pass`, `fail`, `unsupported`, `skipped` and `not_evaluated`; it does not call untested behavior equivalent. The TS fail-fast path now has a scored native installed-package case, so all 18 shared matrix entries are evaluated. Reports must come from the same revision and environment.
-
-See [PyGuard agent evaluation](pyguard-agent-evaluation.md) for repository evidence and implemented parity. Both CLIs share result/reporting Go code while keeping language-specific analyzers. Existing thresholds and fail-fast gate order remain protected; no unified CLI or packaging refactor is included.
+Use uv 0.12.19 (on Windows the interpreter is `Scripts/python.exe`). `--baseline-binary`, `--baseline-source` and `--baseline-revision` evaluate a rebuilt base commit. `behavior.json` requires every behavior case to pass; `parity.json` requires all 22 parity requirements. `evals/capabilities.json` maps the 18 shared capabilities across both languages. See [PyGuard agent evaluation](pyguard-agent-evaluation.md).
 
 ## Level 1 completion gate
 
-The existing report job runs `evals/level1-ready.cjs` and publishes `level1-ready.json`. Deterministic readiness requires every case in both current corpora and all 18 shared capabilities; missing cases or failed/unsupported/skipped outcomes block every run. Recorded agent traces are reported as `agent_traces_ready` and `agent_traces_current`, and `level1_agent_contract_ready` is true only when both also hold. On pull requests, failing or stale traces produce a warning; releases (npm.yml called with `inputs.tag`) set `OXGUARD_REQUIRE_CURRENT_TRACES=1` and block on them. An initial TypeScript forward-test had an invalid fixture because the distribution harness deliberately renamed its native package; that attempt is retained as `invalid-initial-typescript.json` and earns no score. A fresh independent task supplied the scored replacement.
-
-The current traces were recaptured on 2026-10-17 with the task routers, using
-fresh independent agents in isolated projects. Each retrieved all 12 type
-findings before edits, fixed them, verified the isolated typing gate and reran
-the full check. Both disclosed blocked coverage and unexecuted security gates.
-Offline repair restored the declared TypeScript compiler with npm and mypy with
-uv without source edits. Supplied criticality and missing-tool records were
-interpreted separately. These projects have no tests, so incomplete full checks
-are expected evidence rather than whole-project passing claims. The old skill
-baseline used the same fixtures and native toolchain; additional verification is
-identified in its provenance. Passing these controlled cases does not establish
-production accuracy, broader model behavior, or Python structural/change parity.
+The report job runs `evals/level1-ready.cjs` and publishes `level1-ready.json`. Readiness requires every case in both corpora and all 18 shared capabilities. `level1_agent_contract_ready` also requires the agent traces to be ready and current: on PRs, failing or stale traces are a warning; releases set `OXGUARD_REQUIRE_CURRENT_TRACES=1` and block.
 
 ### Agent traces (schema 2)
 
-`agent-traces/{typescript,python}.json` record `skill_inventory` (every installed `.md` path) and `sessions.{quality,repair,review,focused}`, each with `agent`, `model`, `effort`, `read_source`, `skill_files` (path → SHA-256 of the file with CRLF→LF and terminal whitespace normalized) and the hash of the raw agent stream. `skill_files` are the files the agent actually read (successful shell reads in its stream) plus a declared minimum: `SKILL.md` for every session, `workflows/fix.md` (or `check.md` for quality) for quality and repair, `check`, `fix`, `security` and `review` for review, and `check` or `review` for focused. The scorer rejects manifests missing a declared file and v1 traces.
-
-Freshness: if the inventory changes (a guide added or removed) every session is stale; otherwise a session is stale only when one of its own files changed. Stale is reported separately from behavior: `score()` returns `ready` (all behavior checks pass), `current` and `stale`. A current trace with wrong behavior fails. `node evals/agent-actions.cjs` prints `::warning::` per stale session and exits non-zero when a behavior check fails, or when stale with `--require-current`.
-
-CI: `agent-actions.test.cjs` (in the blocking harness tests) tests the scorer against synthetic manifests and mutations, plus the word limits (total ≤ 700, entry ≤ 150 and below the old single-file entry, `check.md` below the old entry). The non-blocking `agent-evals` job runs `node evals/agent-actions.cjs` only when a `*/skill/**` file or the agent eval files change.
-
-The traces migrated from schema 1 had no saved agent streams: review and focused use the recorded `skill_reads` plus the declared files; quality and repair hash the whole inventory (`read_source: "v1 bundle"`). Migration (`evals/agent-capture/assemble.cjs from-v1`) refuses unless the v1 bundle hash matches the skill.
+`agent-traces/{typescript,python}.json` record `skill_inventory` and `sessions.{quality,repair,review,focused}`, each with `agent`, `model`, `effort`, `read_source`, `skill_files` (path → normalized SHA-256) and the raw stream hash. `skill_files` are the files the agent actually read plus a declared minimum per session. Changing the inventory makes every session stale; otherwise a session is stale only when one of its own files changed. `node evals/agent-actions.cjs` warns per stale session and fails on wrong behavior, or on stale with `--require-current`. `agent-actions.test.cjs` (blocking) tests the scorer and the skill word limits: total ≤ 700, entry ≤ 150.
 
 ### Refresh skill evidence
 
-Re-record only the stale sessions, with fresh independent agents, and never replace only hashes. `evals/agent-capture/` holds the fixture builder (`setup.sh`), the Codex runner (`run-codex.sh`), the session prompts and `record.sh <effort> [previous-replay-dir] lang/session ...`, which rebuilds fixtures, keeps the sessions not being re-recorded from the previous capture and runs the selected agents in parallel. `node evals/agent-capture/assemble.cjs captures <language> <capture-root>/replay [session=dir ...] [--note file]` builds the trace from saved streams, events and final messages, hashing each session's installed skill copy. Prompts embed the bounded setup results of that fixture, so keep the capture directory at `$OXGUARD_CAPTURE_DIR` (default `/workspace/oxguard-capture`) with `ts-toolchain/`, `npm-cache/`, `py-env/`, `uv-cache/`, `bin-real/pyguard` and the packed tsguard `*.tgz`.
+Re-record only stale sessions, with fresh independent agents; never replace only hashes. Keep the capture directory at `$OXGUARD_CAPTURE_DIR` (default `/workspace/oxguard-capture`) with `ts-toolchain/`, `npm-cache/`, `py-env/`, `uv-cache/`, `bin-real/pyguard` and the packed tsguard `*.tgz`. Then:
 
-Give agents the requested scope and authorized operations without supplying scorer expectations or historical answers. Keep their fixture projects outside the repository. The installed-package harness can retain an npm toolchain with `TSGUARD_KEEP_TEST_DIR=1`; copy it into a separate fixture toolchain and restore the real built native binary before use, because integration tests deliberately rename native packages and replace binaries to test launcher failures. Python uses the pinned eval environment above, with a separate incomplete environment for dependency repair.
+```sh
+evals/agent-capture/record.sh <effort> [previous-replay-dir] lang/session ...
+node evals/agent-capture/assemble.cjs captures <language> <capture-root>/replay [session=dir ...] [--note file]
+```
 
-`evals/record-agent-command.cjs` observes actual commands chosen by those agents. Configure absolute paths to real tools and fixture projects, then put wrapper executables on the agent's PATH. A minimal configuration has this shape:
+`record.sh` rebuilds fixtures, keeps the sessions not re-recorded and runs the selected agents in parallel; `assemble.cjs` builds the trace from saved streams and hashes each session's installed skill copy. Give agents the task scope without scorer expectations, and keep fixtures outside the repository. `evals/record-agent-command.cjs` is the wrapper that observes the agents' real commands (argv, exit code, output and source fingerprints); configure it with absolute tool and project paths:
 
 ```json
 {
   "tools": { "pyguard": "/absolute/path/pyguard", "uv": "/absolute/path/uv" },
-  "projects": [{
-    "root": "/absolute/path/fixture",
-    "events": "/absolute/path/events.jsonl",
-    "env": { "VIRTUAL_ENV": "/absolute/path/fixture/.venv", "UV_NO_SYNC": "1", "UV_OFFLINE": "1" }
-  }]
+  "projects": [{ "root": "/absolute/path/fixture", "events": "/absolute/path/events.jsonl", "env": { "UV_OFFLINE": "1" } }]
 }
 ```
-
-A wrapper forwards its arguments with `node /absolute/path/evals/record-agent-command.cjs /absolute/path/config.json pyguard "$@"`; use the corresponding tool name for each wrapper. Run from the fixture directory. The observer records argv, actual exit code, complete JSON or bounded stdout, stderr, and before/after fingerprints of files under `src`. It rejects unrelated working directories and source symlinks. It does not choose commands, retrieve JSON automatically, generate semantic answers, or infer normalized findings from summaries.
-
-## Contract eval design and cost
-
-Expectations come from the public result contract, historical failures and native analyzer formats. Coverage fixtures have five equal TypeScript functions with three/four/five called (60/80/100%), plus Python source with three of four lines (75%), four of five (80%) and all lines covered (100%). Assertions check numeric measurements, observed/threshold values, rule IDs, locations, compatible exits and assessment completeness. Native failed tests and no-test collection are separate cases; missing/malformed report unit tests require execution errors rather than invented coverage. The evaluator itself is mutation-tested so dropping or changing numbers cannot retain a passing score.
-
-Security uses a project-local Opengrep rule and fixed clean/two-match source. Secretlint receives a synthetic PEM-shaped payload that is not a usable key; normalized output must preserve rule/location and omit payload/native messages. Dependency cases run real npm audit and audit-ci against the existing child-process local provider, with no advisories, high severity or low severity. Each invocation uses the project's isolated npm cache to avoid advisory cache contamination between cases. Both base and candidate use the same provider whose source is included in evaluator provenance; no live vulnerability/rule feed is scored as a fixed answer.
-
-These are development-only fixtures and evaluator scripts. npm manifests still package only the existing launcher/config/native files; no evaluator or Python test dependency ships in the product. Apart from the non-blocking `agent-evals` job, there are no extra workflows, jobs or services outside the existing test process. Reports record runtime and output size; the added corpus runs only in the three existing npm eval jobs and Python jobs, while pnpm retains installation compatibility checks. Broader independent repositories and live multi-model agent evaluation are still future lanes; recorded agent-action replay remains explicitly labelled.
-
-### Review-gap regression extension
-
-`review-gaps.cjs` is included in the installed maintainability corpus and its provenance hash. It covers semantic-only native rules, supported/unsupported TypeScript configuration, unresolved declarations, stale reports, silent exits, dropped settled rejections and recovery controls, async forwarding boundaries, nesting/callback separation and FTA failure context. Python parity remains independent. The current TypeScript skill capture was refreshed with a fresh independent agent on projects with their own AGENTS.md, including a resolved duplicate-event path. Review judgments are recorded separately from the actual advisory analyzer findings.
-
-### Task router comparison
-
-`agent-traces/router-baseline-{typescript,python}.json` preserves fresh actions
-using the pre-split skills, including the exact old entry text. Current language
-captures use the split bundle on the same fixture tasks and toolchain. Initial
-bounded results are native fixture setup outputs; retrieval, fixes, package repair
-and verification are chosen by independent agents. Supplementary verification is
-identified in capture provenance. These controlled projects have no tests, so an
-honest incomplete full check is expected, never a passing whole-project claim.
-
-`agent-actions.cjs` retains the existing action checks and adds current router
-selection checks. Route and file-read inventories come from the agent's response;
-argv, native outputs and source fingerprints come from the unchanged observer.
-`agent-actions.test.cjs` checks scorer behavior and per-file freshness on synthetic
-manifests; `compareSkills` checks old/new correctness. Entry, complete-bundle and selected-file word counts are
-text-size measurements, not model token, latency or CI-savings claims. Combined
-multi-goal requests can read more text than the old single file. No live model
-calls are introduced in CI.
-
-The installed size budget is 700 words per complete language bundle, including
-frontmatter, entry and every task guide. `compareSkills` checks both the total and
-focused-file sizes. Detailed schema/analyzer documentation remains outside the
-installed skill in the existing project guides.
