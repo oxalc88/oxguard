@@ -125,6 +125,8 @@ production accuracy, broader model behavior, or Python structural/change parity.
 
 Changing `SKILL.md` or any workflow invalidates its recorded bundle fingerprint. Run fresh independent agents with the current skill and realistic fixture tasks; do not replace only the old fingerprint. Give agents the requested scope and authorized operations without supplying scorer expectations or historical answers. Keep their fixture projects outside the repository. The installed-package harness can retain an npm toolchain with `TSGUARD_KEEP_TEST_DIR=1`; copy it into a separate fixture toolchain and restore the real built native binary before use, because integration tests deliberately rename native packages and replace binaries to test launcher failures. Python uses the pinned eval environment above, with a separate incomplete environment for dependency repair.
 
+The capture is agent-neutral. Any history-free agent CLI that can run shell commands works, for example `codex exec` in a new session; start each task without prior history or other skills, put the wrapper directory first on PATH, and keep the agent's raw session or JSON event stream next to the observer records. Record the actual agent, provider, model and reasoning effort in the trace provenance.
+
 `evals/record-agent-command.cjs` observes actual commands chosen by those agents. Configure absolute paths to real tools and fixture projects, then put wrapper executables on the agent's PATH. A minimal configuration has this shape:
 
 ```json
