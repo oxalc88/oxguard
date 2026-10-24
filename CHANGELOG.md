@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-10-24
+
+### Added
+
+- `tsguard diagnose` and `pyguard diagnose` continue independent analyses after a failure and report per-analysis execution coverage, so failure investigations see every finding at once. Existing fail-fast commands and thresholds are unchanged.
+
+### Changed
+
+- Failure investigations in the Tsguard and PyGuard skills route through `diagnose`, and omitted findings are re-run with `--output json` first. The skills are split into a short router plus task workflows (`check`, `fix`, `security`, `review`) within the existing 700-word bundle limit.
+- Agent-trace evidence uses schema 2 with per-session skill-file hashes: stale traces warn on pull requests and block releases (`OXGUARD_REQUIRE_CURRENT_TRACES`). Review and focused traces were re-recorded with fresh Codex agents.
+- `AGENTS.md` is the single entry point for the contributor process; obsolete plans, evaluation snapshots and release history were removed from the docs.
+
+### Fixed
+
+- `diagnose` guards empty tool argument lists and exports Radon excludes once.
+
+## [0.9.0] — 2026-10-16
+
+Changes released in 0.8.0 (2026-10-10), 0.8.1 (2026-10-15) and 0.9.0 (2026-10-16). They were not cut into separate sections at the time.
+
 ### Added
 
 - Release-tag version labels and `VERSION` metadata for packaged documentation
