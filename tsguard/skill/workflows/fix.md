@@ -2,6 +2,8 @@
 
 Read [Check](check.md) first. Retrieve omitted findings before edits.
 
+Failing workflow: `diagnose` → plan from all findings and `analyses` → repair → rerun the failed gate, then full `check`. Restore errored analyses within authorization.
+
 For quality findings, fix the reported rule and location. Preserve project architecture, validation and recovery policy. Do not lower thresholds or suppress findings to obtain a pass.
 
 For execution errors, inspect diagnostics and restore the analyzer or configuration within authorization. Use the project's package manager; keep source unchanged during tool repair. For missing npm-owned Opengrep, reinstall with optional dependencies. Keep the project compiler; full TypeScript 7 support is absent.

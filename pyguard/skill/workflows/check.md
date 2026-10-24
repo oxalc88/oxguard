@@ -8,12 +8,12 @@ pyguard check --root /absolute/project/path --output agent
 
 Use the requested command and flags. For supplied results, interpret without rerunning unless needed and authorized. Reuse earlier checks only when source, tests, configuration, dependencies, toolchain, environment and scope match. Changed lockfiles invalidate applicable checks.
 
-When investigating a failing workflow or collecting independent findings before proposing repairs, confirm `--help` lists `diagnose`, then run `diagnose --output json` with the same root, directories and exclusions. Read its `analyses` coverage, including separate CC, MI and Halstead results, as well as findings. A failed `check` can leave independent findings uncollected; gather the available evidence before choosing a repair. If `diagnose` is unavailable, run the relevant independent checks and disclose any remaining gaps.
+Before repairing a failing workflow, run `diagnose --output json` with the same root, directories and exclusions; `check` stops at the first blocker. It never installs tools (`uv run --no-sync`, no Python downloads). Read `analyses` (CC, MI and Halstead are separate); name `error`, `not_run` or `partial` ones. If unavailable, run independent checks and disclose gaps.
 
 Record semantic status and actual exit code. Exit zero alone is not success. Unknown, contradictory or malformed statuses are invalid evidence.
 
 If findings are omitted, retrieve the same invocation with `--output json` before edits or complete-inventory claims. Read schema-1 `findings`, `assessment` and `gates`. Name partial and not-run gates. Complete assessment means requested analysis ran, not that findings passed. Never invent findings from logs.
 
-Separate blocking quality findings, advisories and execution errors. Resolve diagnostic IDs through `diagnostics`; inspect only relevant streams. `check` stops after a blocking failure. Never report skipped gates as passed.
+Separate blocking quality findings, advisories and execution errors. Resolve diagnostic IDs through `diagnostics`; inspect only relevant streams. Never report skipped gates as passed.
 
 Report command/scope, status, exit code, unresolved findings, incomplete gates and next action.
