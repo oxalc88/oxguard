@@ -17,6 +17,7 @@ const usage = `pyguard — Python quality gate runner
 
 Quality gates (replaces make):
   pyguard check          full gate: ruff + mypy + radon + types + coverage + security
+  pyguard diagnose       collect independent analyses and report incomplete coverage
   pyguard fix            auto-format: ruff --fix + ruff format
   pyguard audit          informational: criticality + dead-code + deps
   pyguard security       security only: bandit + pip-audit + secrets
@@ -80,7 +81,7 @@ func main() {
 }
 
 var analysisCommands = map[string]bool{
-	"check": true, "fix": true, "audit": true, "security": true, "ruff": true, "mypy": true, "radon": true, "types": true, "coverage": true, "bandit": true, "pip-audit": true, "secrets": true, "criticality": true, "dead-code": true, "deps": true,
+	"check": true, "diagnose": true, "fix": true, "audit": true, "security": true, "ruff": true, "mypy": true, "radon": true, "types": true, "coverage": true, "bandit": true, "pip-audit": true, "secrets": true, "criticality": true, "dead-code": true, "deps": true,
 }
 
 func runCLI(cmd string, args []string) int {
@@ -99,7 +100,7 @@ func runCLI(cmd string, args []string) int {
 			fmt.Fprintln(os.Stderr, "invalid result contract:", err)
 			return exitUnknown
 		}
-		if cfg.output != "human" {
+		if cfg.output != "human" || cmd == "diagnose" {
 			if err := reportResult(os.Stdout, cfg.output, result); err != nil {
 				return 1
 			}
@@ -198,6 +199,8 @@ func dispatch(cmd string, args []string, cfg config, root string, result *RunRes
 
 	if cfg.output != "human" {
 		switch cmd {
+		case "diagnose":
+			// The diagnostic runner plans its independent analyses before execution.
 		case "check":
 			result.Plan("ruff", "mypy", "radon", "types", "coverage", "bandit", "pip-audit", "secrets")
 		case "security":
@@ -216,6 +219,8 @@ func dispatch(cmd string, args []string, cfg config, root string, result *RunRes
 	// Quality gates
 	case "check":
 		return runCheck(r, cfg.dirs)
+	case "diagnose":
+		return runDiagnose(r, cfg.dirs)
 	case "fix":
 		return runFix(r, cfg.dirs)
 	case "audit":
@@ -272,7 +277,7 @@ const (
 
 // heavyGates are long-running commands that refuse to run on a pipe unless --allow-pipe.
 var heavyGates = map[string]bool{
-	"check": true, "security": true, "coverage": true,
+	"check": true, "diagnose": true, "security": true, "coverage": true,
 }
 
 // config holds parsed flags.

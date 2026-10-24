@@ -366,6 +366,14 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   assert.equal(scoreFinding.threshold, 1);
   assert.ok(scoreFinding.observed > scoreFinding.threshold);
   assert.ok(ftaFailed.measurements.some(m => m.metric === 'fta.score'));
+  fs.copyFileSync(path.join(consumer, 'src/score/score.ts'), path.join(consumer, 'src/score/second.ts'));
+  const diagnosed = structured(['diagnose', '--dirs', 'src/score', '--max-fta-score', '1'], 1);
+  assert.deepEqual(diagnosed.findings.filter(f => f.rule === 'tsguard.fta.score_exceeded').map(f => f.location.file).sort(), ['src/score/score.ts', 'src/score/second.ts']);
+  assert.ok(diagnosed.findings.filter(f => f.rule === 'tsguard.fta.score_exceeded').every(f => f.threshold === 1));
+  assert.equal(diagnosed.analyses.find(a => a.name === 'fta').normalization, 'complete');
+  assert.ok(diagnosed.analyses.some(a => a.name === 'maintainability' && a.status !== 'not_run'));
+  assert.equal(diagnosed.analyses.find(a => a.name === 'change').status, 'not_run');
+  assert.match(diagnosed.analyses.find(a => a.name === 'change').reason, /baseline/i);
   fs.rmSync(path.join(consumer, 'src/score'), { recursive: true });
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export const broken: number = "not a number";\nexport const other: boolean = 123;\n');
   const typesFailed = structured(['types', '--tail', '1'], 1);

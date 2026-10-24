@@ -8,6 +8,8 @@ pyguard check --root /absolute/project/path --output agent
 
 Use the requested command and flags. For supplied results, interpret without rerunning unless needed and authorized. Reuse earlier checks only when source, tests, configuration, dependencies, toolchain, environment and scope match. Changed lockfiles invalidate applicable checks.
 
+When investigating a failing workflow or collecting independent findings before proposing repairs, confirm `--help` lists `diagnose`, then run `diagnose --output json` with the same root, directories and exclusions. Read its `analyses` coverage, including separate CC, MI and Halstead results, as well as findings. A failed `check` can leave independent findings uncollected; gather the available evidence before choosing a repair. If `diagnose` is unavailable, run the relevant independent checks and disclose any remaining gaps.
+
 Record semantic status and actual exit code. Exit zero alone is not success. Unknown, contradictory or malformed statuses are invalid evidence.
 
 If findings are omitted, retrieve the same invocation with `--output json` before edits or complete-inventory claims. Read schema-1 `findings`, `assessment` and `gates`. Name partial and not-run gates. Complete assessment means requested analysis ran, not that findings passed. Never invent findings from logs.

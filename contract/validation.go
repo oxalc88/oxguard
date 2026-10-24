@@ -58,6 +58,27 @@ func (r *RunResult) validateStates() error {
 			return fmt.Errorf("invalid finding status %s", f.Status)
 		}
 	}
+	analyses := make(map[string]bool)
+	for _, a := range r.Analyses {
+		if r.Command != "diagnose" || a.Name == "" || analyses[a.Name] || !names[a.Gate] {
+			return fmt.Errorf("invalid or duplicate diagnostic analysis %q", a.Name)
+		}
+		analyses[a.Name] = true
+		switch a.Status {
+		case StatusNotRun, StatusPassed, StatusAdvisory, StatusFailed, StatusError:
+		default:
+			return fmt.Errorf("invalid analysis status %s", a.Status)
+		}
+		if a.Normalization != NotRun && a.Normalization != Complete && a.Normalization != Partial {
+			return fmt.Errorf("invalid analysis normalization %s", a.Normalization)
+		}
+		if (a.Status == StatusNotRun) != (a.Normalization == NotRun) || (a.Status == StatusError && a.Normalization == Complete) {
+			return fmt.Errorf("inconsistent analysis execution/normalization")
+		}
+		if (a.Status == StatusNotRun || a.Normalization != Complete) && a.Reason == "" {
+			return fmt.Errorf("incomplete analysis requires a reason")
+		}
+	}
 	return nil
 }
 func (r *RunResult) semanticStatus(code int) Status {
@@ -65,6 +86,17 @@ func (r *RunResult) semanticStatus(code int) Status {
 		return StatusSkipped
 	}
 	status := StatusPass
+	for _, a := range r.Analyses {
+		if a.Status == StatusError {
+			return StatusError
+		}
+		if a.Status == StatusFailed {
+			status = StatusFail
+		}
+		if a.Status == StatusAdvisory && status == StatusPass {
+			status = StatusAdvisory
+		}
+	}
 	for _, g := range r.Gates {
 		if g.Status == StatusError {
 			return StatusError
@@ -128,7 +160,7 @@ func (r *RunResult) Validate() error {
 			}
 		}
 	}
-	if (r.Assessment == Complete) != complete {
+	if (r.Assessment == Complete) != (complete && r.analysesComplete()) {
 		return fmt.Errorf("assessment contradicts gate completion")
 	}
 	return nil

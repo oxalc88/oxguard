@@ -22,6 +22,7 @@ type RunResult struct {
 	Measurements  []Measurement `json:"measurements"`
 	Artifacts     []Artifact    `json:"artifacts"`
 	Diagnostics   []Diagnostic  `json:"diagnostics"`
+	Analyses      []Analysis    `json:"analyses,omitempty"`
 }
 
 type Location struct {
@@ -117,6 +118,9 @@ func (r *RunResult) Finish(code int) error {
 		if g.Status == StatusNotRun || g.Status == StatusError || g.Normalization != Complete {
 			r.Assessment = Incomplete
 		}
+	}
+	if !r.analysesComplete() {
+		r.Assessment = Incomplete
 	}
 
 	sort.SliceStable(r.Findings, func(i, j int) bool {

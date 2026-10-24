@@ -17,6 +17,7 @@ const usage = `tsguard — TypeScript quality gate runner
 
 Quality gates (replaces npm scripts):
   tsguard check          full quality gate + advisory maintainability/change
+  tsguard diagnose       collect independent analyses and report incomplete coverage
   tsguard fix            auto-format: ultracite fix
   tsguard lint           lint + format check (ultracite check)
   tsguard types          type checking (tsc --noEmit)
@@ -91,7 +92,7 @@ func runCLI(cmd string, args []string) int {
 			fmt.Fprintln(os.Stderr, "invalid result contract:", err)
 			return exitUnknown
 		}
-		if cliCfg.output == "agent" || cliCfg.output == "json" {
+		if cliCfg.output == "agent" || cliCfg.output == "json" || cmd == "diagnose" {
 			if err := reportResult(os.Stdout, cliCfg.output, result); err != nil {
 				return 1
 			}
@@ -157,7 +158,7 @@ func runCLI(cmd string, args []string) int {
 }
 
 var analysisCommands = map[string]bool{
-	"check": true, "fix": true, "lint": true, "types": true, "typed-lint": true, "complexity": true,
+	"check": true, "diagnose": true, "fix": true, "lint": true, "types": true, "typed-lint": true, "complexity": true,
 	"fta": true, "coverage": true, "security": true, "npm-audit": true,
 	"secrets": true, "dead-code": true, "duplicates": true, "audit": true, "criticality": true, "maintainability": true, "smells": true, "structure": true, "change": true,
 }
@@ -181,6 +182,8 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 
 	if cfg.output != "human" {
 		switch cmd {
+		case "diagnose":
+			// The diagnostic runner plans its independent analyses before execution.
 		case "check":
 			result.Plan("lint", "fta", "types", "typed-lint")
 			result.Plan("coverage", "secrets", "dependencies", "security", "maintainability", "duplicates", "change")
@@ -203,6 +206,8 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 	switch cmd {
 	case "check":
 		return runCheck(r, cfg.dirs, cfg.ftaScoreCap)
+	case "diagnose":
+		return runDiagnose(r, cfg.dirs, cfg.ftaScoreCap)
 	case "fix":
 		return runFix(r)
 	case "lint":
@@ -257,7 +262,7 @@ const (
 
 // heavyGates are long-running commands that refuse to run on a pipe unless --allow-pipe.
 var heavyGates = map[string]bool{
-	"check": true, "security": true, "coverage": true,
+	"check": true, "diagnose": true, "security": true, "coverage": true,
 }
 
 // config holds parsed flags.
