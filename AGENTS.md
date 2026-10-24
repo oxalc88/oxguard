@@ -5,12 +5,27 @@
 3. Before opening a PR, run the full gate: `go vet` and `go test` in `contract`, `tsguard` and `pyguard`; `node --test evals/evals.test.cjs` and the harness tests; `python3 scripts/test-identity-hooks.py`; `python3 scripts/test-release-docs.py`; `node --test npm/distribution.test.cjs`; and `node evals/agent-actions.cjs` (0 fail, 0 stale).
 4. Open the PR with `--base main`. Merge with a merge commit, and only when every CI check is green. If anything fails, fix it; do not merge.
 
-# Models (Codex only)
+# Model selection
 
-- Sol (`gpt-6.1-sol`) writes the change, at effort `medium`.
-- Luna (`gpt-6-luna`) reviews it in a separate session from the writer.
-- When verification fails, raise the effort one step: `medium` → `high` → `xhigh` → `max`.
+Select the model by role, not by provider.
+
+| Role | Model |
+|---|---|
+| Coordination, review, hard coding | Codex |
+| Scoped coding | `deepseek-v4-flash` or `glm5.3-flash` |
+| Verification, second opinion | `qwen3.8-flash` or `mimo-v2.6-flash` |
+| Mechanical tasks | `gemma4` or `qwen3.6` |
+
+- The writer and the reviewer must use different models, in separate sessions.
+- If a flash model fails verification two times, escalate the task to Codex.
+- In Codex, Sol (`gpt-6.1-sol`) writes, at effort `medium`, and Luna (`gpt-6-luna`) reviews. When verification fails, raise the effort one step: `medium` → `high` → `xhigh` → `max`.
 - Record the actual agent, provider, model and effort in trace provenance.
+
+## Transition on 2026-10-31
+
+- NaN Builders models (through `pi`) are available until 2026-10-30 only.
+- From 2026-10-31, use Codex only. Coding moves to Codex at effort `low` or `medium`. For a second opinion, use a separate Codex session or a different effort level.
+- From 2026-10-31, do not start `pi`, OMP, OpenCode or Grok routes that use NaN models. Do not set `NAN_API_KEY`.
 
 # Agent traces
 
