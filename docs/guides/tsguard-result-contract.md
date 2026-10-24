@@ -133,11 +133,11 @@ Scored native evals cover coverage thresholds, failed tests, no-test collection,
 
 ## Diagnose analyses
 
-`npx --no-install tsguard diagnose --output json` runs every independent analysis (lint, fta, types, typed-lint, coverage, secrets, dependencies, security, maintainability, duplicates, change) instead of stopping at the first failure; `check` and `fta` keep their fail-fast behavior. Diagnose never installs tools: analyzer invocations run as `npx --no-install` with `npm_config_offline=true`. In human mode it refuses a piped stdout unless `--allow-pipe`; prefer `--output json`.
+`npx --no-install tsguard diagnose --output json` runs every independent analysis (lint, fta, types, typed-lint, coverage, secrets, dependencies, security, maintainability, duplicates, change) instead of stopping at the first failure; `check` and `fta` keep their fail-fast behavior. Diagnose never installs tools: `npx` invocations add `--no-install` with `npm_config_offline=true`; `pnpm exec`, `yarn exec` and the packaged runtime use only installed tools. In human mode it refuses a piped stdout unless `--allow-pipe`; prefer `--output json`.
 
 JSON adds an `analyses` array alongside `gates`. Each entry has `name`, `gate`, `status` (`passed`, `advisory`, `failed`, `error` or `not_run`), `normalization` (`complete`, `partial` or `not_run`), a `reason` when incomplete, and `diagnostics` IDs. Any errored, not-run or partial analysis makes `assessment` `incomplete`. Exit 1 means blocking findings, execution failures or incomplete assessment.
 
-FTA collects scores with a separate ceiling recorded as the `fta.collection_score_cap` measurement, so every failing file is reported in one run. Findings and `fta.score` measurements still use the effective policy threshold (`--max-fta-score`, default 60).
+FTA collects scores with a separate ceiling recorded as the `fta.collection_score_cap` measurement, so every policy violation in successfully collected results is reported in one run; a failed collection marks the inventory incomplete. Findings and `fta.score` measurements still use the effective policy threshold (`--max-fta-score`, default 60).
 
 ## Dependency exposure reviews
 

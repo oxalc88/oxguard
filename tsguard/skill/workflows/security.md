@@ -1,11 +1,14 @@
-# Review security
+# Security
 
-Read [Check](check.md). Use `npx --no-install tsguard security --output agent`, preserving the requested root and scope.
+1. Run with the requested root and scope:
 
-Inspect every sub-gate: SAST, dependencies and secrets complete independently even when another fails. The outer check remains fail-fast. Missing engines or skipped audits are execution failures.
+   ```sh
+   npx --no-install tsguard security --output agent
+   ```
 
-Preserve native rule IDs, locations, package identity and fixed versions. Never expose secret values.
+2. Read every sub-gate: SAST, dependencies and secrets complete independently. Missing engines or skipped audits are execution errors.
+3. Keep native rule IDs, locations, package identity and fixed versions. Never expose secret values.
+4. Development-only use does not waive a vulnerability. Never add acceptance entries just to pass.
+5. Accept a `.oxguard-dependency-policy.json` review only when authorized and valid per [dependency exposure reviews](https://github.com/oxalc88/oxguard/blob/main/docs/guides/tsguard-result-contract.md#dependency-exposure-reviews).
 
-Development-only classification does not waive vulnerabilities. Without a valid explicit review, retain native blocking policy. Never create acceptance entries merely to pass.
-
-For an authorized `.oxguard-dependency-policy.json` review, require package/advisory identity, `scope: development_tool` or `ci`, `product_exposure: not_exposed`, `tooling_risk: accepted`, an evidence-backed reason, and SHA-256 bindings for the manifest and every existing supported lockfile. Stale or malformed reviews cannot waive findings. Accepted reviews stay visible. Hashes do not prove runtime reachability.
+Done: findings per sub-gate and any accepted reviews.

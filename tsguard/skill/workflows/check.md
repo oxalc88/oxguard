@@ -1,19 +1,15 @@
-# Run checks and read results
+# Check
 
-Use the project-local npm CLI; use `pnpm exec tsguard` for pnpm. Do not let plain `npx` fetch a version. Confirm `--help` supports `--root` and `--output`.
+1. Use the local CLI (`pnpm exec tsguard` with pnpm). Never let plain `npx` fetch a version.
+2. Run with the requested root and scope:
 
-```sh
-npx --no-install tsguard check --root /absolute/project/path --output agent
-```
+   ```sh
+   npx --no-install tsguard check --root /absolute/project/path --output agent
+   ```
 
-Use the requested command and flags. For supplied results, interpret without rerunning unless needed and authorized. Reuse earlier checks only when source, tests, configuration, dependencies, toolchain, environment and scope match. Changed lockfiles invalidate applicable checks.
+3. If findings are omitted, rerun with `--output json`.
+4. Record status and actual exit code. Exit 0 alone is not success.
+5. Name every partial or not-run gate in `gates`; `check` stops at the first blocker, and skipped gates never pass.
+6. Split blocking findings, advisories and execution errors. Never invent findings from logs.
 
-Before repairing a failing workflow, run `diagnose --output json` with the same root, directories, exclusions and baseline; `check` stops at the first blocker. It never installs tools (`npx --no-install`, offline). Read `analyses`; name `error`, `not_run` or `partial` ones. If unavailable, run independent checks and disclose gaps.
-
-Record semantic status and actual exit code. Exit zero alone is not success. Unknown, contradictory or malformed statuses are invalid evidence.
-
-If findings are omitted, retrieve the same invocation with `--output json` before edits or complete-inventory claims. Read schema-1 `findings`, `assessment` and `gates`. Name partial and not-run gates. Complete assessment means requested analysis ran, not that findings passed. Never invent findings from logs.
-
-Separate blocking quality findings, advisories and execution errors. Resolve diagnostic IDs through `diagnostics`; inspect only relevant streams. Never report skipped gates as passed.
-
-Report command/scope, status, exit code, unresolved findings, incomplete gates and next action.
+Done: report command, status, exit code, open findings, incomplete gates and next step.
