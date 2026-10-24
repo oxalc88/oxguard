@@ -3,10 +3,10 @@
 Collect every independent finding before repairing a failure.
 
 1. Confirm `pyguard --help` lists `diagnose`. If not, run the checks separately and disclose gaps.
-2. Run with the same root, directories, exclusions as the failing run:
+2. Keep the same root, `--dirs` and exclusions as the failing run; never widen the scope:
 
    ```sh
-   pyguard diagnose --root /absolute/project/path --output json
+   pyguard diagnose --root /absolute/project/path --dirs src --output json
    ```
 
 3. It never installs tools. It uses the current uv environment without syncing; select the intended synchronized environment first. Missing tools show up as `error` analyses.
