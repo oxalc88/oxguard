@@ -2,36 +2,101 @@
 const fs = require("node:fs"),
 	path = require("node:path"),
 	crypto = require("node:crypto");
-function readSkillBundle(directory) {
-	const normalize = (content) =>
-		Buffer.from(content.toString().replace(/\r\n/g, "\n").trimEnd() + "\n");
-	const entry = normalize(fs.readFileSync(path.join(directory, "SKILL.md")));
-	const parts = [entry];
+const normalize = (content) =>
+	Buffer.from(content.toString().replace(/\r\n/g, "\n").trimEnd() + "\n");
+const sha256 = (content) =>
+	crypto.createHash("sha256").update(content).digest("hex");
+// Skill files an agent can be routed to: the entry plus every reference and workflow guide.
+function skillInventory(directory) {
+	const files = ["SKILL.md"];
 	for (const folder of ["references", "workflows"]) {
 		const dir = path.join(directory, folder);
 		if (!fs.existsSync(dir)) continue;
-		for (const file of fs
-			.readdirSync(dir)
-			.filter((f) => f.endsWith(".md"))
-			.sort()) {
-			parts.push(Buffer.from("\0" + folder + "/" + file + "\0"));
-			parts.push(normalize(fs.readFileSync(path.join(dir, file))));
-		}
+		for (const file of fs.readdirSync(dir).filter((f) => f.endsWith(".md")))
+			files.push(folder + "/" + file);
+	}
+	return files.sort();
+}
+function skillFileHashes(directory, files = skillInventory(directory)) {
+	return Object.fromEntries(
+		files.map((file) => {
+			const target = path.join(directory, file);
+			return [
+				file,
+				fs.existsSync(target) ? sha256(normalize(fs.readFileSync(target))) : null,
+			];
+		}),
+	);
+}
+// Legacy v1 bundle: only historical snapshot baselines are still scored this way.
+function readSkillBundle(directory) {
+	const parts = [normalize(fs.readFileSync(path.join(directory, "SKILL.md")))];
+	for (const file of skillInventory(directory).filter((f) => f !== "SKILL.md")) {
+		parts.push(Buffer.from("\0" + file + "\0"));
+		parts.push(normalize(fs.readFileSync(path.join(directory, file))));
 	}
 	return Buffer.concat(parts);
+}
+// Minimum skill files each recorded session must declare, whatever else it read.
+const REQUIRED_SESSIONS = {
+	quality: [["SKILL.md"], ["workflows/check.md", "workflows/fix.md"]],
+	repair: [["SKILL.md"], ["workflows/fix.md"]],
+	review: [
+		["SKILL.md"],
+		["workflows/check.md"],
+		["workflows/fix.md"],
+		["workflows/security.md"],
+		["workflows/review.md"],
+	],
+	focused: [["SKILL.md"], ["workflows/check.md", "workflows/review.md"]],
+};
+// A session is stale when the inventory or any skill file it recorded has changed.
+function freshness(trace, directory) {
+	const inventory = skillInventory(directory);
+	const inventoryChanged =
+		JSON.stringify(trace.skill_inventory) !== JSON.stringify(inventory);
+	const stale = [];
+	for (const [session, record] of Object.entries(trace.sessions || {})) {
+		const recorded = record.skill_files || {};
+		const current = skillFileHashes(directory, Object.keys(recorded));
+		const files = Object.keys(recorded).filter(
+			(file) => recorded[file] !== current[file],
+		);
+		if (inventoryChanged || files.length)
+			stale.push({
+				session,
+				reason: inventoryChanged ? "skill inventory changed" : "skill files changed",
+				files,
+			});
+	}
+	return stale;
 }
 function score(trace, skill) {
 	const checks = [];
 	const check = (id, ok) => checks.push({ id, outcome: ok ? "pass" : "fail" });
-	check(
-		"skill.capture_current",
-		trace.skill_sha256 ===
-			crypto
-				.createHash("sha256")
-				.update(skill.toString().replace(/\r\n/g, "\n"))
-				.digest("hex"),
-	);
-	if (skill.includes(Buffer.from("\0workflows/"))) {
+	let stale = [],
+		router;
+	if (Buffer.isBuffer(skill)) {
+		check(
+			"skill.capture_current",
+			String(trace.schema_version) === "1" &&
+				typeof trace.skill_snapshot === "string" &&
+				trace.skill_sha256 === sha256(skill.toString().replace(/\r\n/g, "\n")),
+		);
+		router = skill.includes(Buffer.from("\0workflows/"));
+	} else {
+		check("trace.schema_v2", trace.schema_version === "2");
+		check(
+			"skill.manifest_declared",
+			Object.entries(REQUIRED_SESSIONS).every(([session, groups]) => {
+				const files = Object.keys(trace.sessions?.[session]?.skill_files || {});
+				return groups.every((group) => group.some((f) => files.includes(f)));
+			}),
+		);
+		stale = trace.schema_version === "2" ? freshness(trace, skill) : [];
+		router = skillInventory(skill).some((file) => file.startsWith("workflows/"));
+	}
+	if (router) {
 		check("skill.router_layout", trace.skill_layout === "router");
 		const response = trace.interpretation?.response;
 		const readNames =
@@ -203,6 +268,8 @@ function score(trace, skill) {
 	return {
 		language: trace.language,
 		ready: checks.every((c) => c.outcome === "pass"),
+		current: stale.length === 0,
+		stale,
 		checks,
 	};
 }
@@ -227,7 +294,7 @@ function compareSkills(root = path.join(__dirname, "..")) {
 		);
 		const directory = path.join(root, guard, "skill");
 		const previous = score(baseline, Buffer.from(baseline.skill_snapshot));
-		const candidate = score(current, readSkillBundle(directory));
+		const candidate = score(current, directory);
 		const selectedFiles = [
 			...new Set(
 				current.interpretation.response.skill_reads.map((file) =>
@@ -290,30 +357,53 @@ function compareSkills(root = path.join(__dirname, "..")) {
 	};
 }
 function evaluate(root = path.join(__dirname, "..")) {
-	const languages = [
+	const results = [
 		["typescript", "tsguard"],
 		["python", "pyguard"],
-	];
-	const results = languages.map(([name, guard]) =>
+	].map(([name, guard]) =>
 		score(
 			JSON.parse(
 				fs.readFileSync(path.join(root, "evals/agent-traces", name + ".json")),
 			),
-			readSkillBundle(path.join(root, guard, "skill")),
+			path.join(root, guard, "skill"),
 		),
 	);
 	const comparison = compareSkills(root);
 	return {
-		schema_version: "1",
+		schema_version: "2",
 		execution: "replay of recorded real agent actions; no live LLM calls in CI",
 		ready: results.every((r) => r.ready) && comparison.ready,
+		current: results.every((r) => r.current),
+		stale: results.flatMap((r) =>
+			r.stale.map((s) => ({ language: r.language, ...s })),
+		),
 		results,
 		comparison,
 	};
 }
 if (require.main === module) {
 	const report = evaluate();
+	const requireCurrent = process.argv.includes("--require-current");
 	console.log(JSON.stringify(report, null, 2));
-	process.exitCode = report.ready ? 0 : 1;
+	for (const s of report.stale)
+		console.log(
+			`::warning::stale agent trace ${s.language}.${s.session} (${s.reason}: ${s.files.join(", ") || "inventory"}); re-record before release`,
+		);
+	for (const r of report.results)
+		for (const c of r.checks.filter((c) => c.outcome === "fail"))
+			console.log(`::error::agent trace ${r.language} failed ${c.id}`);
+	console.error(
+		`agent-evals: ${report.results.flatMap((r) => r.checks).filter((c) => c.outcome === "fail").length} fail, ${report.stale.length} stale`,
+	);
+	process.exitCode = report.ready && (report.current || !requireCurrent) ? 0 : 1;
 }
-module.exports = { score, evaluate, readSkillBundle, compareSkills };
+module.exports = {
+	score,
+	evaluate,
+	freshness,
+	readSkillBundle,
+	skillInventory,
+	skillFileHashes,
+	compareSkills,
+	REQUIRED_SESSIONS,
+};

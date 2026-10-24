@@ -209,6 +209,34 @@ jobs:
           path: eval-reports/pyguard/
           if-no-files-found: error
 
+  # Recorded agent traces: informative on pull requests, never a merge blocker.
+  agent-evals:
+    name: Agent traces (non-blocking)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Detect skill or agent eval changes
+        id: changed
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD | grep -E '^[^/]+/skill/|^evals/(agent-|agent-traces/|agent-capture/)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Score recorded agent traces
+        if: steps.changed.outputs.run == 'true'
+        run: node evals/agent-actions.cjs > agent-evals.json
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.changed.outputs.run == 'true'
+        with:
+          name: oxguard-agent-evals
+          path: agent-evals.json
+
   parity:
     name: Report shared capabilities and outstanding gaps
     needs: [npm, pyguard]
@@ -232,7 +260,9 @@ jobs:
         run: |
           node evals/parity.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/parity.json
           node evals/maintainability-parity.cjs eval-reports/tsguard/maintainability.json > eval-reports/maintainability-parity.json
-      - name: Require Level 1 agent contract completion
+      - name: Require Level 1 contract completion (agent traces block releases only)
+        env:
+          OXGUARD_REQUIRE_CURRENT_TRACES: ${{ inputs.tag && '1' || '0' }}
         run: node evals/level1-ready.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/level1-ready.json
       - uses: actions/upload-artifact@v4
         with:

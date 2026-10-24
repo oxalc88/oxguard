@@ -72,7 +72,7 @@ Require existing cases to remain passing and a new capability to have positive, 
 
 - TypeScript coverage, Opengrep, Secretlint and native dependency audit now have scored known-answer cases; Python coverage and Bandit also have scored cases. Network/provider failures, broader analyzer versions and unsupported backends remain focused integration/unit coverage rather than exhaustive scored native cases.
 - Historical installation timeouts and registry routing remain integration checks, not detection metrics. Live security-advisory feeds are outside these deterministic evals; the integration harness's local provider must not imply production safety.
-- `evals/agent-scenarios.json` defines the history-based omitted-findings, execution-repair, advisory-criticality and fail-fast scenarios, plus dependency-review, changed-lockfile reuse and unknown-status decisions. Fresh independent agents exercise both canonical skills. `agent-traces/` records native results, argv, source fingerprints and read-only semantic answers. `agent-actions.cjs` scores observable actions; CI replays those captures rather than making live LLM calls. Skill content changes invalidate the corresponding capture until fresh forward-testing replaces it.
+- `evals/agent-scenarios.json` defines the history-based omitted-findings, execution-repair, advisory-criticality and fail-fast scenarios, plus dependency-review, changed-lockfile reuse and unknown-status decisions. Fresh independent agents exercise both canonical skills. `agent-traces/` records native results, argv, source fingerprints and read-only semantic answers. `agent-actions.cjs` scores observable actions; CI replays those captures rather than making live LLM calls. Each recorded session lists the skill files it read with their hashes; changing one of those files marks only that session stale until a fresh agent re-records it.
 - Larger independent projects, unseen holdout cases, memory measurements and controlled performance benchmarks remain future work.
 
 ## Python behavior and agent parity
@@ -107,7 +107,7 @@ See [PyGuard agent evaluation](pyguard-agent-evaluation.md) for repository evide
 
 ## Level 1 completion gate
 
-The existing report job runs `evals/level1-ready.cjs` and publishes `level1-ready.json`; no extra workflow or runner is added. Readiness requires every case in both current corpora, all 18 shared capabilities, and the recorded action scores for both current skills. Missing cases, failed/unsupported/skipped outcomes, stale skill captures, missing complete JSON retrieval or source changes during execution repair block readiness. An initial TypeScript forward-test had an invalid fixture because the distribution harness deliberately renamed its native package; that attempt is retained as `invalid-initial-typescript.json` and earns no score. A fresh independent task supplied the scored replacement.
+The existing report job runs `evals/level1-ready.cjs` and publishes `level1-ready.json`. Deterministic readiness requires every case in both current corpora and all 18 shared capabilities; missing cases or failed/unsupported/skipped outcomes block every run. Recorded agent traces are reported as `agent_traces_ready` and `agent_traces_current`, and `level1_agent_contract_ready` is true only when both also hold. On pull requests, failing or stale traces produce a warning; releases (npm.yml called with `inputs.tag`) set `OXGUARD_REQUIRE_CURRENT_TRACES=1` and block on them. An initial TypeScript forward-test had an invalid fixture because the distribution harness deliberately renamed its native package; that attempt is retained as `invalid-initial-typescript.json` and earns no score. A fresh independent task supplied the scored replacement.
 
 The current traces were recaptured on 2026-10-17 with the task routers, using
 fresh independent agents in isolated projects. Each retrieved all 12 type
@@ -121,9 +121,21 @@ baseline used the same fixtures and native toolchain; additional verification is
 identified in its provenance. Passing these controlled cases does not establish
 production accuracy, broader model behavior, or Python structural/change parity.
 
+### Agent traces (schema 2)
+
+`agent-traces/{typescript,python}.json` record `skill_inventory` (every installed `.md` path) and `sessions.{quality,repair,review,focused}`, each with `agent`, `model`, `effort`, `read_source`, `skill_files` (path → SHA-256 of the file with CRLF→LF and terminal whitespace normalized) and the hash of the raw agent stream. `skill_files` are the files the agent actually read (successful shell reads in its stream) plus a declared minimum: `SKILL.md` for every session, `workflows/fix.md` (or `check.md` for quality) for quality and repair, `check`, `fix`, `security` and `review` for review, and `check` or `review` for focused. The scorer rejects manifests missing a declared file and v1 traces.
+
+Freshness: if the inventory changes (a guide added or removed) every session is stale; otherwise a session is stale only when one of its own files changed. Stale is reported separately from behavior: `score()` returns `ready` (all behavior checks pass), `current` and `stale`. A current trace with wrong behavior fails. `node evals/agent-actions.cjs` prints `::warning::` per stale session and exits non-zero when a behavior check fails, or when stale with `--require-current`.
+
+CI: `agent-actions.test.cjs` (in the blocking harness tests) tests the scorer against synthetic manifests and mutations, plus the word limits (total ≤ 700, entry ≤ 150 and below the old single-file entry, `check.md` below the old entry). The non-blocking `agent-evals` job runs `node evals/agent-actions.cjs` only when a `*/skill/**` file or the agent eval files change.
+
+The traces migrated from schema 1 had no saved agent streams: review and focused use the recorded `skill_reads` plus the declared files; quality and repair hash the whole inventory (`read_source: "v1 bundle"`). Migration (`evals/agent-capture/assemble.cjs from-v1`) refuses unless the v1 bundle hash matches the skill.
+
 ### Refresh skill evidence
 
-Changing `SKILL.md` or any workflow invalidates its recorded bundle fingerprint. Run fresh independent agents with the current skill and realistic fixture tasks; do not replace only the old fingerprint. Give agents the requested scope and authorized operations without supplying scorer expectations or historical answers. Keep their fixture projects outside the repository. The installed-package harness can retain an npm toolchain with `TSGUARD_KEEP_TEST_DIR=1`; copy it into a separate fixture toolchain and restore the real built native binary before use, because integration tests deliberately rename native packages and replace binaries to test launcher failures. Python uses the pinned eval environment above, with a separate incomplete environment for dependency repair.
+Re-record only the stale sessions, with fresh independent agents, and never replace only hashes. `evals/agent-capture/` holds the fixture builder (`setup.sh`), the Codex runner (`run-codex.sh`), the session prompts and `record.sh <effort> [previous-replay-dir] lang/session ...`, which rebuilds fixtures, keeps the sessions not being re-recorded from the previous capture and runs the selected agents in parallel. `node evals/agent-capture/assemble.cjs captures <language> <capture-root>/replay [session=dir ...] [--note file]` builds the trace from saved streams, events and final messages, hashing each session's installed skill copy. Prompts embed the bounded setup results of that fixture, so keep the capture directory at `$OXGUARD_CAPTURE_DIR` (default `/workspace/oxguard-capture`) with `ts-toolchain/`, `npm-cache/`, `py-env/`, `uv-cache/`, `bin-real/pyguard` and the packed tsguard `*.tgz`.
+
+Give agents the requested scope and authorized operations without supplying scorer expectations or historical answers. Keep their fixture projects outside the repository. The installed-package harness can retain an npm toolchain with `TSGUARD_KEEP_TEST_DIR=1`; copy it into a separate fixture toolchain and restore the real built native binary before use, because integration tests deliberately rename native packages and replace binaries to test launcher failures. Python uses the pinned eval environment above, with a separate incomplete environment for dependency repair.
 
 `evals/record-agent-command.cjs` observes actual commands chosen by those agents. Configure absolute paths to real tools and fixture projects, then put wrapper executables on the agent's PATH. A minimal configuration has this shape:
 
@@ -138,9 +150,7 @@ Changing `SKILL.md` or any workflow invalidates its recorded bundle fingerprint.
 }
 ```
 
-A wrapper forwards its arguments with `node /absolute/path/evals/record-agent-command.cjs /absolute/path/config.json pyguard "$@"`; use the corresponding tool name for each wrapper. Run from the fixture directory. The observer records argv, actual exit code, complete JSON or bounded stdout, stderr, and before/after fingerprints of files under `src`. It rejects unrelated working directories and source symlinks. Configure the environment's PATH so analyzers use the intended fixture environment. It does not choose commands, retrieve JSON automatically, generate semantic answers, or infer normalized findings from summaries.
-
-Assemble `omitted_events` and `repair_events` from the resulting JSONL records, and attach the real native interpretation inputs and the agent's read-only response. Record the current skill hash, capture date and actual provenance in `agent-traces/{typescript,python}.json`. Finally run `node evals/agent-actions.cjs`, the harness regression tests and `level1-ready.cjs` against fresh CLI corpus reports. The existing behavioral checks remain required; the fingerprint covers the full bundle in deterministic path order, with line endings and terminal whitespace normalized. Instruction changes still invalidate evidence.
+A wrapper forwards its arguments with `node /absolute/path/evals/record-agent-command.cjs /absolute/path/config.json pyguard "$@"`; use the corresponding tool name for each wrapper. Run from the fixture directory. The observer records argv, actual exit code, complete JSON or bounded stdout, stderr, and before/after fingerprints of files under `src`. It rejects unrelated working directories and source symlinks. It does not choose commands, retrieve JSON automatically, generate semantic answers, or infer normalized findings from summaries.
 
 ## Contract eval design and cost
 
@@ -148,7 +158,7 @@ Expectations come from the public result contract, historical failures and nativ
 
 Security uses a project-local Opengrep rule and fixed clean/two-match source. Secretlint receives a synthetic PEM-shaped payload that is not a usable key; normalized output must preserve rule/location and omit payload/native messages. Dependency cases run real npm audit and audit-ci against the existing child-process local provider, with no advisories, high severity or low severity. Each invocation uses the project's isolated npm cache to avoid advisory cache contamination between cases. Both base and candidate use the same provider whose source is included in evaluator provenance; no live vulnerability/rule feed is scored as a fixed answer.
 
-These are development-only fixtures and evaluator scripts. npm manifests still package only the existing launcher/config/native files; no evaluator or Python test dependency ships in the product. There are no extra workflows, jobs or services outside the existing test process. Reports record runtime and output size; the added corpus runs only in the three existing npm eval jobs and Python jobs, while pnpm retains installation compatibility checks. Broader independent repositories and live multi-model agent evaluation are still future lanes; recorded agent-action replay remains explicitly labelled.
+These are development-only fixtures and evaluator scripts. npm manifests still package only the existing launcher/config/native files; no evaluator or Python test dependency ships in the product. Apart from the non-blocking `agent-evals` job, there are no extra workflows, jobs or services outside the existing test process. Reports record runtime and output size; the added corpus runs only in the three existing npm eval jobs and Python jobs, while pnpm retains installation compatibility checks. Broader independent repositories and live multi-model agent evaluation are still future lanes; recorded agent-action replay remains explicitly labelled.
 
 ### Review-gap regression extension
 
@@ -167,11 +177,11 @@ honest incomplete full check is expected, never a passing whole-project claim.
 `agent-actions.cjs` retains the existing action checks and adds current router
 selection checks. Route and file-read inventories come from the agent's response;
 argv, native outputs and source fingerprints come from the unchanged observer.
-`agent-actions.test.cjs` checks old/new correctness, current bundle identity and
-installed workflow integrity. Entry, complete-bundle and selected-file word counts are
+`agent-actions.test.cjs` checks scorer behavior and per-file freshness on synthetic
+manifests; `compareSkills` checks old/new correctness. Entry, complete-bundle and selected-file word counts are
 text-size measurements, not model token, latency or CI-savings claims. Combined
 multi-goal requests can read more text than the old single file. No live model
-calls or new workflow are introduced in CI.
+calls are introduced in CI.
 
 The installed size budget is 700 words per complete language bundle, including
 frontmatter, entry and every task guide. `compareSkills` checks both the total and
