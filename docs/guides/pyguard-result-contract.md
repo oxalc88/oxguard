@@ -67,7 +67,7 @@ Native report artifacts are refreshed under `.pyguard-cache/reports` before exec
 
 `pyguard diagnose` runs every independent analysis without stopping at the first failure, so a CC violation does not hide MI, Halstead or later gates. JSON adds an `analyses` array; each entry has `name`, parent `gate`, `status` (`passed`, `advisory`, `failed`, `error` or `not_run`), `normalization` (`complete`, `partial` or `not_run`), referenced diagnostic IDs, and a reason when normalization is incomplete. Any incomplete analysis makes the assessment `incomplete`, even when all executed gates passed. Python splits radon into `radon.cc`, `radon.mi` and `radon.halstead` analyses and ruff into `ruff.lint` and `ruff.format`.
 
-Diagnose never installs tooling: it runs via `uv run --no-sync` with `UV_PYTHON_DOWNLOADS=never`, so missing or unsynced environments surface as errors, not setup. In human mode it refuses a piped stdout unless `--allow-pipe`; use `--output json` for structured collection. Exit 1 covers blocking findings, execution failures and incomplete assessment. `check` and `radon` retain their fail-fast policy. Details in [diagnose.md](diagnose.md).
+Diagnose never installs tooling: it runs via `uv run --no-sync` with `UV_PYTHON_DOWNLOADS=never`, so missing tools surface as errors, not setup. It does not detect a stale environment; select the intended synchronized uv environment first. In human mode it refuses a piped stdout unless `--allow-pipe`; use `--output json` for structured collection. Exit 1 covers blocking findings, execution failures and incomplete assessment. `check` and `radon` retain their fail-fast policy. Details in [diagnose.md](diagnose.md).
 
 
 ## Dependency exposure reviews
