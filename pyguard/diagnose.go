@@ -17,7 +17,6 @@ func runDiagnose(r *Runner, dirs []string) int {
 		}},
 		{"mypy", "mypy", func(r *Runner) int { return runMypy(r, dirs) }},
 		{"radon.cc", "radon", func(r *Runner) int {
-			r.exportExcludeEnv()
 			return diagnosticTool(r, toolSpec{gate: "radon", adapter: "radon_cc"}, "radon cc", append(radonExcludeArgs(r, "cc", "--json"), dirs...))
 		}},
 		{"radon.mi", "radon", func(r *Runner) int {
@@ -33,6 +32,7 @@ func runDiagnose(r *Runner, dirs []string) int {
 		{"pip-audit", "pip-audit", runPipAudit},
 		{"secrets", "secrets", func(r *Runner) int { return runSecrets(r, config{}) }},
 	}
+	r.exportExcludeEnv()
 	for _, step := range steps {
 		r.result.PlanAnalyses(contract.Analysis{Name: step.name, Gate: step.gate})
 	}

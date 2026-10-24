@@ -48,6 +48,11 @@ type Result struct {
 // On success: prints "[OK] name". On failure: prints "[FAIL] name" + output.
 // Output is bounded to 2 MB in memory; --tail N caps the displayed lines.
 func (r *Runner) RunTool(spec toolSpec, name string, args ...string) Result {
+	if len(args) == 0 {
+		const message = "Cannot execute analyzer: no command arguments provided."
+		r.executionFailure(spec.gate, "startup_failure", message)
+		return Result{name: name, category: "startup_failure", message: message, output: message}
+	}
 	if r.result != nil && r.result.Command == "diagnose" && args[0] == "npx" {
 		args = append([]string{"npx", "--no-install"}, args[1:]...)
 	}
