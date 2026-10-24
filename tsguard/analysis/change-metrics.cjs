@@ -11,6 +11,7 @@ emitAnalysis(input => {
   const owned = createRequire(path.join(input.runtime || process.cwd(), input.runtime ? 'bin/tool.cjs' : 'package.json'));
   const ts = owned('typescript');
   const digest = value => crypto.createHash('sha256').update(value).digest('hex');
+  const ignoredSuppressionCategories = new Set(['suppressions/unused', 'suppressions/parse', 'suppressions/incorrect']);
   const compareText = (a,b) => a < b ? -1 : a > b ? 1 : 0;
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'tsguard-change-metrics-'));
   const policy = { fta_exclude_under: 0, duplicate_min_tokens: 50, duplicate_min_lines: 5,
@@ -88,13 +89,17 @@ emitAnalysis(input => {
       const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.JSX, text);
       let token;
       while ((token = scanner.scan()) !== ts.SyntaxKind.EndOfFileToken) {
-        if ((token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) && /biome-ignore(?:-all)?\s+(?:all|lint(?:\s|:|\/complexity(?:\s|:|\/noExcessiveCognitiveComplexity)))/.test(scanner.getTokenText())) suppressed.add(file);
+        if ((token === ts.SyntaxKind.SingleLineCommentTrivia || token === ts.SyntaxKind.MultiLineCommentTrivia) && /biome-ignore(?:-all|-start)?\s+(?:all|lint(?:\s|:|\/complexity(?:\s|:|\/noExcessiveCognitiveComplexity)))/.test(scanner.getTokenText())) suppressed.add(file);
       }
     }
     result.functions = snapshot.functions.map(f => ({ id: f.id, location: f.location, fingerprint: f.fingerprint,
       cognitive_min: 0, cognitive_max: suppressed.has(f.location.file) ? null : 1 }));
     result.cognitive_complete = suppressed.size === 0;
     for (const d of biome.diagnostics) {
+      // The isolated config disables every other rule, so user suppressions for
+      // those rules become unused, malformed or misplaced. They carry no
+      // cognitive measurement; cognitive-rule suppressions are handled above.
+      if (ignoredSuppressionCategories.has(d.category)) continue;
       if (d.category !== 'lint/complexity/noExcessiveCognitiveComplexity') throw new Error('Unexpected cognitive diagnostic');
       const match = /^Excessive complexity of (\d+) detected \(max: 1\)\.$/.exec(d.message);
       const module = aliases.get(path.basename(d.location?.path || ''));

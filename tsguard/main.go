@@ -219,7 +219,7 @@ func dispatchResult(cmd string, cfg config, root string, result *RunResult) int 
 	case "maintainability", "smells", "structure":
 		return runMaintainability(r, cmd)
 	case "change":
-		return runChange(r)
+		return changeExitCode(r, runChange(r))
 	case "complexity":
 		return runComplexity(r, cfg.dirs)
 	case "fta":

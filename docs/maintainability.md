@@ -15,7 +15,7 @@ npx tsguard change --baseline HEAD --output json
 |---|---|---|
 | 1 — Code | Ultracite/Biome lint, formatting and cognitive cap; FTA; TypeScript; native typed lint; coverage; secrets, dependency CVEs and SAST; unused code and duplication | Existing blocking check gates; Knip in audit; jscpd advisory in check/audit |
 | 2 — Structure | Resolved function/method and runtime module graphs; caller/callee counts, criticality, fan-in/out, SCC depth/cycles, coupling; forwarding chains, fragmented forwarding modules and handler policies | Advisory maintainability in check; focused smells/structure/criticality commands |
-| 3 — Change | Explicit inert Git baseline; native file FTA/cyclomatic/Halstead distribution, per-function cognitive bounds, clone/token changes, structural/coupling/delegation deltas; conservative file/symbol matching | Advisory change in check when a baseline is available; focused change command |
+| 3 — Change | Explicit inert Git baseline; native file FTA/cyclomatic/Halstead distribution, per-function cognitive bounds, clone/token changes, structural/coupling/delegation deltas; conservative file/symbol matching | Advisory change in check when a baseline is available; focused change command, which exits 1 when the comparison is incomplete |
 
 Python structural/change parity remains a later milestone. These levels describe supported deterministic analyses, not exhaustive type safety, runtime architecture inference or proof of behavioral equivalence. Single-use functions, recursion and file counts alone are not quality violations. No prescribed architecture/layer framework is required.
 

@@ -81,6 +81,42 @@ func TestAbsentBaselineIsNotEvaluatedAndNonBlocking(t *testing.T) {
 	}
 }
 
+func TestChangeExitCode(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		status  Status
+		partial bool
+		code    int
+		want    int
+	}{
+		{"complete gates", StatusPassed, false, 0, 0},
+		{"error gate", StatusError, false, 0, 1},
+		{"partial gate", StatusPassed, true, 0, 1},
+		{"nonzero code", StatusPassed, false, 7, 7},
+		{"nonzero code with partial gate", StatusPassed, true, 7, 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := contractRunner(t)
+			r.result.RecordGate("structure", true, true)
+			r.result.RecordGate("change", true, !tc.partial)
+			r.result.Gates[1].Status = tc.status
+			if got := changeExitCode(r, tc.code); got != tc.want {
+				t.Fatalf("changeExitCode = %d, want %d", got, tc.want)
+			}
+		})
+	}
+	t.Run("absent baseline", func(t *testing.T) {
+		r := contractRunner(t)
+		code := runChange(r)
+		if code != 0 || len(r.result.Gates) != 1 || r.result.Gates[0].Status != StatusNotRun {
+			t.Fatalf("code = %d, gates = %+v", code, r.result.Gates)
+		}
+		if got := changeExitCode(r, code); got != 1 {
+			t.Fatalf("changeExitCode = %d, want 1", got)
+		}
+	})
+}
+
 func TestNativeFTADisplacementStillRequiresUnreducedWorkAndStructure(t *testing.T) {
 	before := changeSnapshot([]int{4}, []moduleEdge{})
 	for _, branches := range [][]int{{4, 0}, {2, 0}} {

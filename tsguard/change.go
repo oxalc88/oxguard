@@ -197,6 +197,23 @@ func (r *Runner) comparisonUnavailable(rule, message string) {
 	r.printf("  change: not evaluated — %s\n", message)
 }
 
+// changeExitCode makes focused `change` fail when its evaluation is incomplete,
+// matching diagnose: an unevaluated, errored or partial gate is not success.
+func changeExitCode(r *Runner, code int) int {
+	if code != 0 {
+		return code
+	}
+	if r.result == nil || len(r.result.Gates) == 0 {
+		return 1
+	}
+	for _, g := range r.result.Gates {
+		if g.Status == StatusNotRun || g.Status == StatusError || g.Normalization != Complete {
+			return 1
+		}
+	}
+	return 0
+}
+
 func runChange(r *Runner) int {
 	if r.result == nil {
 		r.result = newRunResult("change")

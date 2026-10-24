@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Tsguard change: cognitive measurement no longer aborts with `Unexpected cognitive diagnostic` when user `biome-ignore` comments for other rules become unused, malformed or misplaced under the isolated cognitive config (`suppressions/unused`, `suppressions/parse`, `suppressions/incorrect`). User code and thresholds are untouched; other unexpected diagnostics still fail. `biome-ignore-start` cognitive suppressions now mark the measurement partial. Same failure existed in 0.9.0. (#27)
+
+### Changed
+
+- Tsguard `change` now exits 1 when its assessment is incomplete (missing/unresolvable baseline, analyzer error, partial measurement), consistent with `diagnose`. Advisory findings alone still exit 0; `check` is unaffected. (#27)
+
 ## [0.10.0] — 2026-10-24
 
 ### Added
