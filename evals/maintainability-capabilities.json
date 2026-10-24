@@ -127,6 +127,7 @@
     "change.native_duplication_and_move_control",
     "change.native_function_complexity_and_move_control",
     "change.cognitive_suppression_is_partial",
+    "change.unused_foreign_suppression_completes",
     "change.large_graph_input_and_generated_scope",
     "change.project_compiler_consistency",
     "typed.unsafe_assertion_condition_and_promises",
@@ -183,6 +184,7 @@
       "change.native_duplication_and_move_control",
       "change.native_function_complexity_and_move_control",
       "change.cognitive_suppression_is_partial",
+      "change.unused_foreign_suppression_completes",
       "change.large_graph_input_and_generated_scope",
       "change.project_compiler_consistency"
     ]

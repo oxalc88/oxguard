@@ -91,7 +91,7 @@ jobs:
         working-directory: tsguard
       - name: Eval harness regression tests
         if: steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm'
-        run: node --test scripts/verification-evidence.test.cjs evals/evals.test.cjs evals/python/evals.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs
+        run: node --test scripts/verification-evidence.test.cjs evals/evals.test.cjs evals/python/evals.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
       - name: Fresh distribution verification (unlocked npm transitive dependencies)
         run: |
           node -e "require('node:fs').rmSync('eval-reports', { recursive: true, force: true })"

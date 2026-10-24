@@ -181,7 +181,7 @@ function evaluate({ execute, structured, root }) {
       assert.ok(rules(result).includes('tsguard.structure.HIGH_MODULE_COUPLING'));
     });
     run('change.absent_baseline', () => {
-      const result = structured(args('change', legitimate));
+      const result = structured(args('change', legitimate), 1);
       assert.equal(result.assessment, 'incomplete');
       assert.ok(result.gates.some(g => g.name === 'change' && g.status === 'not_run'));
       assert.ok(rules(result).includes('tsguard.change.BASELINE_UNAVAILABLE'));
@@ -228,7 +228,7 @@ function evaluate({ execute, structured, root }) {
       assert.ok(!rules(structured(comparisonArgs)).includes('tsguard.change.POSSIBLE_COMPLEXITY_DISPLACEMENT'));
     });
     run('change.unavailable_ref', () => {
-      const result = structured(['change', '--root', comparison, '--dirs', '.', '--baseline', 'missing-reference']);
+      const result = structured(['change', '--root', comparison, '--dirs', '.', '--baseline', 'missing-reference'], 1);
       assert.equal(result.assessment, 'incomplete');
       assert.ok(result.gates.some(g => g.name === 'change' && g.status === 'not_run'));
     });
@@ -247,7 +247,7 @@ function evaluate({ execute, structured, root }) {
       };
       git(['init','-q']);git(['add','.']);git(['-c','user.name=Eval','-c','user.email=eval@example.invalid','commit','-qm','source baseline']);
       const sha=git(['rev-parse','HEAD']);
-      return {project,git,sha,compare:baseline=>structured(['change','--root',project,'--dirs','.','--baseline',baseline||sha])};
+      return {project,git,sha,compare:(baseline,expected=0)=>structured(['change','--root',project,'--dirs','.','--baseline',baseline||sha],expected)};
     };
     run('change.native_duplication_and_move_control', () => {
       const validation='export function validate(value: number) {\n  if (!Number.isFinite(value)) throw new Error("finite");\n  if (value < 0) throw new Error("negative");\n  if (value > 100) throw new Error("large");\n  if (value % 1 !== 0) throw new Error("integer");\n  return value;\n}\n';
@@ -287,12 +287,22 @@ function evaluate({ execute, structured, root }) {
     run('change.cognitive_suppression_is_partial', () => {
       const code='// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: intentional domain work\nexport function domain(x: number) { if (x > 0) { if (x > 1) return 2; return 1; } return 0; }\n';
       const fixture=revision('cognitive-suppressed',{'source.ts':code});
-      const result=fixture.compare();
+      const result=fixture.compare(undefined,1);
       assert.equal(result.assessment,'incomplete');
       assert.equal(result.gates.find(g=>g.name==='change').normalization,'partial');
       assert.ok(result.findings.some(f=>f.rule==='tsguard.change.not_evaluated'));
       assert.ok(!result.measurements.some(m=>m.metric==='change.candidate.total_cognitive_max'));
       assert.ok(result.measurements.some(m=>m.metric==='change.candidate.fta.score'));
+    });
+    run('change.unused_foreign_suppression_completes', () => {
+      // Issue #27: the isolated cognitive config leaves other-rule suppressions unused.
+      const fixture=revision('foreign-suppression',{'source.ts':'export const value = 1;\n'});
+      fs.writeFileSync(path.join(fixture.project,'publish.ts'),'export async function publishAll(items: number[]) {\n  for (const item of items) {\n    // biome-ignore lint/performance/noAwaitInLoops: Publications must be sequential.\n    await Promise.resolve(item);\n  }\n}\n');
+      const result=fixture.compare();
+      assert.equal(result.assessment,'complete');
+      assert.equal(result.exit_code,0);
+      assert.ok(!result.findings.some(f=>f.status==='execution_error'));
+      assert.ok(result.measurements.some(m=>m.metric==='change.candidate.total_cognitive_max'));
     });
     run('change.large_graph_input_and_generated_scope', () => {
       const files=Object.fromEntries(Array.from({length:160},(_,i)=>[`source${i}.ts`,`export function function${i}(value: number) { return value + ${i}; }\n`]));
