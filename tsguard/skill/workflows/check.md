@@ -1,19 +1,15 @@
-# Run checks and read results
+# Check
 
-Use the project-local npm CLI; use `pnpm exec tsguard` for pnpm. Do not let plain `npx` fetch a version. Confirm `--help` supports `--root` and `--output`.
+1. Use the local CLI (`pnpm exec tsguard` with pnpm). Never let plain `npx` fetch a version.
+2. Run with the requested root and scope:
 
-```sh
-npx --no-install tsguard check --root /absolute/project/path --output agent
-```
+   ```sh
+   npx --no-install tsguard check --root /absolute/project/path --output agent
+   ```
 
-Use the requested command and flags. For supplied results, interpret without rerunning unless needed and authorized. Reuse earlier checks only when source, tests, configuration, dependencies, toolchain, environment and scope match. Changed lockfiles invalidate applicable checks.
+3. If findings are omitted, rerun the same command and scope with `--output json` before any edit.
+4. Record status and actual exit code. Exit 0 alone is not success.
+5. Name every partial or not-run gate in `gates`; `check` stops at the first blocker, and skipped gates never pass.
+6. Split blocking findings, advisories and execution errors. Never invent findings from logs. For execution errors, name the finding `category` (for example `tool_missing`).
 
-When investigating a failing workflow or collecting independent findings before proposing repairs, confirm `--help` lists `diagnose`, then run `diagnose --output json` with the same root, directories, exclusions and Git baseline. Read its `analyses` coverage as well as findings. A failed `check` can leave independent findings uncollected; gather the available evidence before choosing a repair. If `diagnose` is unavailable, run the relevant independent checks and disclose any remaining gaps.
-
-Record semantic status and actual exit code. Exit zero alone is not success. Unknown, contradictory or malformed statuses are invalid evidence.
-
-If findings are omitted, retrieve the same invocation with `--output json` before edits or complete-inventory claims. Read schema-1 `findings`, `assessment` and `gates`. Name partial and not-run gates. Complete assessment means requested analysis ran, not that findings passed. Never invent findings from logs.
-
-Separate blocking quality findings, advisories and execution errors. Resolve diagnostic IDs through `diagnostics`; inspect only relevant streams. `check` stops after a blocking failure. Never report skipped gates as passed.
-
-Report command/scope, status, exit code, unresolved findings, incomplete gates and next action.
+Done: report command, status, exit code, open findings, incomplete gates and next step.

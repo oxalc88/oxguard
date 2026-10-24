@@ -1,9 +1,10 @@
-# Fix findings
+# Fix
 
-Read [Check](check.md) first. Retrieve omitted findings before edits.
+If findings are omitted, first rerun the same command and scope with `--output json`; use Diagnose only for findings outside that command.
 
-For quality findings, fix the reported rule and location. Preserve project architecture, validation and recovery policy. Do not lower thresholds or suppress findings to obtain a pass.
+1. Get all findings first via [Diagnose](diagnose.md).
+2. Quality findings: fix the reported rule at the reported location. Never lower thresholds or suppress findings.
+3. Execution errors: read the referenced diagnostics; restore the tool or config within authorization without editing source. For missing npm-owned Opengrep, reinstall with optional dependencies. Keep the project compiler; TypeScript 7 is unsupported.
+4. Rerun the failed gate, then the full `check` with the original scope.
 
-For execution errors, inspect diagnostics and restore the analyzer or configuration within authorization. Use the project's package manager; keep source unchanged during tool repair. For missing npm-owned Opengrep, reinstall with optional dependencies. Keep the project compiler; full TypeScript 7 support is absent.
-
-Rerun the failed gate, then the full requested command with its original scope. Verify complete results before claiming success. `fix`, `setup` and installation require authorization for those operations.
+Done: `check` exits 0 with a complete assessment, or remaining blockers are reported.

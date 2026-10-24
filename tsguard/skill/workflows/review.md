@@ -1,11 +1,12 @@
-# Review maintainability
+# Maintainability
 
-Read [Check](check.md). Select the question:
+1. Pick the command for the question:
 
-- `criticality`: advisory distinct static caller ranking, not runtime impact or a blocking threshold.
-- `maintainability`, `smells`, `structure`: supported delegation, failure-policy and graph observations.
-- `change --baseline <Git ref>`: compare with a supplied/configured baseline. Never invent one; preserve it during JSON retrieval.
+- `criticality`: advisory static caller ranking, not runtime impact.
+- `maintainability`, `smells`, `structure`: delegation, failure-policy and graph observations.
+- `change --baseline <ref>`: compare with a supplied or configured baseline. Never invent one.
 
-Inspect reported source locations and artifacts. Separate analyzer facts from review judgments. Preserve useful domain boundaries and intentional recovery. Smaller files or lower individual scores alone do not prove simplification.
+2. Run it with `--output json`.
+3. Inspect the reported locations. Separate analyzer facts from judgment. Smaller files or lower scores alone do not prove simplification. Static matches do not prove behavioral equivalence.
 
-Read native change profiles; preserve bounded versus exact cognitive scores. Static matches do not prove behavioral equivalence. Run isolated requested reviews if fail-fast skipped them.
+Done: report findings, advisories and judgments separately.

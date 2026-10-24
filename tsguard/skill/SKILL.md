@@ -1,19 +1,21 @@
 ---
 name: tsguard
-description: Use tsguard to check TypeScript quality, fix findings, review security or maintainability, and interpret existing results.
+description: Use tsguard to check TypeScript quality, investigate failures, fix findings, review security or maintainability, and set up the toolchain.
 ---
 
 # Use tsguard
 
-Read project `AGENTS.md`. Select a guide:
+Read project `AGENTS.md`, then only the workflow for the task:
 
-| Goal | Guide |
+| Task | Workflow |
 | --- | --- |
-| Run checks or explain results | [Check](workflows/check.md) |
-| Fix findings or tools | [Fix](workflows/fix.md) |
+| Run checks or read results | [Check](workflows/check.md) |
+| Investigate a failure before repair | [Diagnose](workflows/diagnose.md) |
+| Fix findings or broken tools | [Fix](workflows/fix.md) |
 | Review vulnerabilities or secrets | [Security](workflows/security.md) |
 | Review complexity or changes | [Maintainability](workflows/review.md) |
+| Install or verify the toolchain | [Setup](workflows/setup.md) |
 
-Read only relevant guides. Preserve scope and authorization. Default to `check` for general quality requests.
+Default to Check. Stay within the requested scope and authorization.
 
-Detailed formats: [result contract](https://github.com/oxalc88/oxguard/blob/main/docs/guides/tsguard-result-contract.md).
+Result format: [contract](https://github.com/oxalc88/oxguard/blob/main/docs/guides/tsguard-result-contract.md).
