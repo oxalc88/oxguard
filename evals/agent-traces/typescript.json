@@ -1,7 +1,53 @@
 {
-  "schema_version": 1,
+  "schema_version": "2",
   "language": "typescript",
-  "skill_sha256": "c8b5fd6377a42b0c5767d69553ca2d10cda43926d421d02e5791c9d3be3763a4",
+  "skill_inventory": [
+    "SKILL.md",
+    "workflows/check.md",
+    "workflows/fix.md",
+    "workflows/review.md",
+    "workflows/security.md"
+  ],
+  "sessions": {
+    "quality": {
+      "read_source": "v1 bundle (reads not recorded)",
+      "skill_files": {
+        "SKILL.md": "62b8c97d02a926abbc286de4a3b91a1bb2dc282c7049ba5bda6221710d4390a9",
+        "workflows/check.md": "f6bd97c59975b4f83a3735fa3ca70af44c4199afbd4665fc03a54d7234928d8c",
+        "workflows/fix.md": "1bdbf324b67f07c827137e3bd835bc02d7716ae2aa87c715cc42667227a04d9a",
+        "workflows/review.md": "9e2d67e0f733650ebdcfc38fba0d03b587fc3f3cef3d97c2d3f27dad24d90801",
+        "workflows/security.md": "8bcac884a8c8fff0ac345b8e03a2dac3cfe2e60b4ca9a8ff5bf82640438f5e8b"
+      }
+    },
+    "repair": {
+      "read_source": "v1 bundle (reads not recorded)",
+      "skill_files": {
+        "SKILL.md": "62b8c97d02a926abbc286de4a3b91a1bb2dc282c7049ba5bda6221710d4390a9",
+        "workflows/check.md": "f6bd97c59975b4f83a3735fa3ca70af44c4199afbd4665fc03a54d7234928d8c",
+        "workflows/fix.md": "1bdbf324b67f07c827137e3bd835bc02d7716ae2aa87c715cc42667227a04d9a",
+        "workflows/review.md": "9e2d67e0f733650ebdcfc38fba0d03b587fc3f3cef3d97c2d3f27dad24d90801",
+        "workflows/security.md": "8bcac884a8c8fff0ac345b8e03a2dac3cfe2e60b4ca9a8ff5bf82640438f5e8b"
+      }
+    },
+    "review": {
+      "read_source": "v1 recorded skill_reads+declared",
+      "skill_files": {
+        "SKILL.md": "62b8c97d02a926abbc286de4a3b91a1bb2dc282c7049ba5bda6221710d4390a9",
+        "workflows/check.md": "f6bd97c59975b4f83a3735fa3ca70af44c4199afbd4665fc03a54d7234928d8c",
+        "workflows/fix.md": "1bdbf324b67f07c827137e3bd835bc02d7716ae2aa87c715cc42667227a04d9a",
+        "workflows/security.md": "8bcac884a8c8fff0ac345b8e03a2dac3cfe2e60b4ca9a8ff5bf82640438f5e8b",
+        "workflows/review.md": "9e2d67e0f733650ebdcfc38fba0d03b587fc3f3cef3d97c2d3f27dad24d90801"
+      }
+    },
+    "focused": {
+      "read_source": "v1 recorded skill_reads+declared",
+      "skill_files": {
+        "SKILL.md": "62b8c97d02a926abbc286de4a3b91a1bb2dc282c7049ba5bda6221710d4390a9",
+        "workflows/check.md": "f6bd97c59975b4f83a3735fa3ca70af44c4199afbd4665fc03a54d7234928d8c"
+      }
+    }
+  },
+  "migrated_from_v1_skill_sha256": "c8b5fd6377a42b0c5767d69553ca2d10cda43926d421d02e5791c9d3be3763a4",
   "capture_date": "2026-10-23",
   "provenance": "Fresh history-free agents used the current skill in disposable projects. Setup supplied actual bounded quality, missing-tool, advisory and change results. Subsequent retrieval, edits, offline installation and verification were agent choices recorded by the P0 observer. Source fingerprints are SHA-256 of recorded src file inventories. Skill paths and routes are canonicalized from actual reads and response path strings; raw responses and unfiltered command records are retained. Scored quality events preserve the original --dirs src scope; wider exploratory invocations are recorded separately. Exact serving model identity was unavailable; inherited parent settings were used.",
   "additional_verification": "Initial offline repair attempts failed because this evaluation session omitted the preserved cache path. The coordinator supplied only the authorized cache location; successful explicit offline retries and verification were observed. Failed attempts remain in repair_events. This setup correction is not an autonomous repair success claim.",

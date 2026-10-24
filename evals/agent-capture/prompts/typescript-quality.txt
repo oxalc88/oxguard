@@ -1,0 +1,30 @@
+Use the tsguard skill in this project (.agents/skills/tsguard/SKILL.md). Setup already ran `tsguard types --dirs src --output agent` from this directory; the original scope is --dirs src. Its output:
+
+FAIL
+command: types
+gate: types; assessment: complete; not_run: 0; partial: 0
+findings: 12
+TS2322 src/index.ts:1 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:2 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:3 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:4 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:5 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:6 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:7 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:8 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:9 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+TS2322 src/index.ts:10 [quality/blocking]
+Type 'string' is not assignable to type 'number'.
+omitted: 2 (use --output json)
+diagnostics: node_modules/.cache/oxguard/diagnostics/diagnostic-001-types-stdout.log (paths in --output json)
+
+Fix every reported issue and verify the whole project. You may edit files under src/. Do not change configuration, thresholds, policies or the skill files, and do not install or download anything. When finished, reply with only a JSON object {"quality_summary": {...}} describing the initial result, the evidence you gathered, the changes, the rerun of the failed gate, the full check, and any next action.

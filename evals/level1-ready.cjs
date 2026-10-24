@@ -2,7 +2,9 @@
 const fs = require("node:fs");
 const { parity } = require("./parity.cjs");
 const { evaluate } = require("./agent-actions.cjs");
-function assess(ts, behavior, python) {
+// Agent traces are recorded evidence, not a deterministic gate: on pull requests
+// stale or failing traces only warn; releases (strict) require ready and current.
+function assess(ts, behavior, python, { strict = false } = {}) {
 	const expectedTs = require("./cases.json")
 		.cases.map((c) => c.id)
 		.sort();
@@ -28,11 +30,16 @@ function assess(ts, behavior, python) {
 		shared.shared_capabilities_ready &&
 		ts.cases.every((c) => c.outcome === "pass") &&
 		behavior.cases.every((c) => c.outcome === "pass") &&
-		python.cases.every((c) => c.outcome === "pass") &&
-		agents.ready;
+		python.cases.every((c) => c.outcome === "pass");
+	const complete = ready && agents.ready && agents.current;
 	return {
 		schema_version: "1",
-		level1_agent_contract_ready: ready,
+		level1_agent_contract_ready: complete,
+		deterministic_ready: ready,
+		agent_traces_ready: agents.ready,
+		agent_traces_current: agents.current,
+		strict,
+		blocking_ready: strict ? complete : ready,
 		shared_capabilities_ready: shared.shared_capabilities_ready,
 		agent_actions: agents,
 		level2_remaining: "Tsguard static module graph and advisory delegation are implemented; new PyGuard structural parity is not evaluated by this Level 1 report",
@@ -50,9 +57,14 @@ if (require.main === module) {
 		...process.argv
 			.slice(2, 5)
 			.map((file) => JSON.parse(fs.readFileSync(file))),
+		{ strict: process.env.OXGUARD_REQUIRE_CURRENT_TRACES === "1" },
 	);
+	if (!result.agent_traces_ready || !result.agent_traces_current)
+		console.log(
+			`::warning::agent traces ready=${result.agent_traces_ready} current=${result.agent_traces_current}; releases require both (re-record stale sessions)`,
+		);
 	fs.writeFileSync(process.argv[5], JSON.stringify(result, null, 2) + "\n");
 	console.log(JSON.stringify(result));
-	process.exitCode = result.level1_agent_contract_ready ? 0 : 1;
+	process.exitCode = result.blocking_ready ? 0 : 1;
 }
 module.exports = { assess };
