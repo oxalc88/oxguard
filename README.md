@@ -41,6 +41,7 @@ pyguard fix          # auto-format (ruff format + lint --fix)
 pyguard audit        # informational: criticality + dead code + deps
 pyguard security     # security gates only
 pyguard types        # type-annotation complexity only
+pyguard diagnose --output json  # collect all independent analyses before repair, no installs
 ```
 
 **Complexity gates — test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and
@@ -95,6 +96,7 @@ tsguard security     # security: secretlint + audit/audit-ci + opengrep SAST
 tsguard typed-lint   # focused native compiler-aware lint
 tsguard fta          # FTA score gate, with function context on structured failures
 tsguard complexity   # compatibility alias: complexity is enforced by ultracite check
+tsguard diagnose --output json  # collect all independent analyses before repair, no installs
 ```
 
 Key flags:

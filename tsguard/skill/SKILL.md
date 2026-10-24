@@ -14,6 +14,6 @@ Read project `AGENTS.md`. Select a guide:
 | Review vulnerabilities or secrets | [Security](workflows/security.md) |
 | Review complexity or changes | [Maintainability](workflows/review.md) |
 
-Read only relevant guides. Preserve scope and authorization. Default to `check` for general quality requests.
+Read only relevant guides. Preserve scope and authorization. Default to `check` for general quality requests; failure investigations start with `diagnose --output json`.
 
 Detailed formats: [result contract](https://github.com/oxalc88/oxguard/blob/main/docs/guides/tsguard-result-contract.md).
