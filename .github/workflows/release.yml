@@ -47,12 +47,20 @@ jobs:
           git merge-base --is-ancestor "$sha" origin/main || {
             echo "::error::Release tag is not part of main"; exit 1;
           }
-          echo "tag=$REQUESTED_TAG" >> "$GITHUB_OUTPUT"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "tag_object=$remote_object" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$REQUESTED_TAG"
+            echo "sha=$sha"
+            echo "tag_object=$remote_object"
+          } >> "$GITHUB_OUTPUT"
 
   npm-check:
     needs: validate-release
+    # The called npm.yml requests pull-requests: read; grant it here so the
+    # reusable workflow's permissions are never an elevation over this caller.
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
     uses: ./.github/workflows/npm.yml
     with:
       tag: ${{ needs.validate-release.outputs.tag }}
