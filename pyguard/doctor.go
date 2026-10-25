@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -15,7 +16,7 @@ func runDoctor(root string) int {
 
 	failures := 0
 
-	// Python >= 3.13
+	// Python >= 3.12 (3.14.1 excluded)
 	if !checkPython() {
 		failures++
 	}
@@ -80,7 +81,7 @@ func runDoctor(root string) int {
 	return 0
 }
 
-// checkPython verifies Python >= 3.13 is available.
+// checkPython verifies Python >= 3.12 is available (3.14.1 excluded).
 func checkPython() bool {
 	candidates := []string{"python3", "python"}
 	if runtime.GOOS == "windows" {
@@ -93,16 +94,16 @@ func checkPython() bool {
 			continue
 		}
 		version := strings.TrimSpace(out)
-		if isPython313OrNewer(version) {
+		if isSupportedPythonVersion(version) {
 			fmt.Printf("  [OK]   %s\n", version)
 			return true
 		}
-		fmt.Printf("  [FAIL] Python — found %s but need >= 3.13\n", version)
+		fmt.Printf("  [FAIL] Python — found %s but need >= 3.12 (not 3.14.1)\n", version)
 		printPythonInstallHint()
 		return false
 	}
 
-	fmt.Println("  [FAIL] Python 3.13 — not found")
+	fmt.Println("  [FAIL] Python 3.12 — not found")
 	printPythonInstallHint()
 	return false
 }
@@ -117,25 +118,58 @@ func checkUV() bool {
 	return true
 }
 
-// isPython313OrNewer parses "Python X.Y.Z" and checks >= 3.13.
-func isPython313OrNewer(version string) bool {
-	var major, minor int
-	_, err := fmt.Sscanf(version, "Python %d.%d", &major, &minor)
-	if err != nil {
+// isSupportedPythonVersion parses "Python X.Y.Z" and accepts >= 3.12,
+// rejecting exactly 3.14.1 (networkx 3.7 supports >= 3.12 but excludes 3.14.1).
+// Unparseable output is rejected.
+func isSupportedPythonVersion(version string) bool {
+	major, minor, patch, ok := parsePythonVersion(version)
+	if !ok {
 		return false
 	}
-	return major > 3 || (major == 3 && minor >= 13)
+	if major != 3 {
+		return major > 3
+	}
+	if minor < 12 {
+		return false
+	}
+	return !(minor == 14 && patch == 1)
+}
+
+// parsePythonVersion reads the leading "Python M.m.p" of a version banner.
+// The patch component is optional and defaults to 0.
+func parsePythonVersion(version string) (major, minor, patch int, ok bool) {
+	rest, found := strings.CutPrefix(strings.TrimSpace(version), "Python ")
+	if !found {
+		return 0, 0, 0, false
+	}
+	fields := strings.Fields(rest)
+	if len(fields) == 0 {
+		return 0, 0, 0, false
+	}
+	parts := strings.Split(fields[0], ".")
+	if len(parts) < 2 || len(parts) > 3 {
+		return 0, 0, 0, false
+	}
+	values := make([]int, 3)
+	for i, part := range parts {
+		value, err := strconv.Atoi(part)
+		if err != nil || value < 0 {
+			return 0, 0, 0, false
+		}
+		values[i] = value
+	}
+	return values[0], values[1], values[2], true
 }
 
 func printPythonInstallHint() {
 	switch runtime.GOOS {
 	case "windows":
-		fmt.Println("         Install: winget install Python.Python.3.13")
+		fmt.Println("         Install: winget install Python.Python.3.12")
 		fmt.Println("         Or download from: https://python.org/downloads/")
 	case "darwin":
-		fmt.Println("         Install: brew install python@3.13")
+		fmt.Println("         Install: brew install python@3.12")
 	default:
-		fmt.Println("         Install: sudo apt install python3.13")
+		fmt.Println("         Install: sudo apt install python3.12")
 		fmt.Println("         Or see: https://python.org/downloads/")
 	}
 }

@@ -20,7 +20,7 @@ func runSetup(root string, cfg config) int {
 	fmt.Println("─────────")
 
 
-	fmt.Println("  [1/8] Python 3.13...")
+	fmt.Println("  [1/8] Python 3.12...")
 	if !checkPython() {
 		return 2
 	}
