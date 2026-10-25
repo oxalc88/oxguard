@@ -7,25 +7,21 @@
 
 # Model selection
 
-Select the model by role, not by provider.
+Select the model by role, not by provider. The implementer and the reviewer must be separate sessions. Luna (`gpt-6-luna`) is not used.
 
-| Role | Model |
-|---|---|
-| Coordination, review, hard coding | Codex |
-| Scoped coding | `deepseek-v4-flash` or `glm5.3-flash` |
-| Verification, second opinion | `qwen3.8-flash` or `mimo-v2.6-flash` |
-| Mechanical tasks | `gemma4` or `qwen3.6` |
+| Period | Implements | Reviews |
+|---|---|---|
+| Until 2026-10-30 | `mimo-v2.6-flash` through `pi` | Codex Sol (`gpt-6.1-sol`) |
+| From 2026-10-31 | Codex Sol (`gpt-6.1-sol`) | Codex Sol, in a separate session |
 
-- The writer and the reviewer must use different models, in separate sessions.
-- If a flash model fails verification two times, escalate the task to Codex.
-- In Codex, Sol (`gpt-6.1-sol`) writes, at effort `medium`, and Luna (`gpt-6-luna`) reviews. When verification fails, raise the effort one step: `medium` → `high` → `xhigh` → `max`.
+- Until 2026-10-30, if `mimo-v2.6-flash` fails verification two times, escalate to `glm5.3-flash`; if that also fails two times, escalate to Sol.
+- Sol starts at effort `medium`. When verification fails, raise the effort one step: `medium` → `high` → `xhigh` → `max`.
 - Record the actual agent, provider, model and effort in trace provenance.
 
 ## Transition on 2026-10-31
 
 - NaN Builders models (through `pi`) are available until 2026-10-30 only.
-- From 2026-10-31, use Codex only. Coding moves to Codex at effort `low` or `medium`. For a second opinion, use a separate Codex session or a different effort level.
-- From 2026-10-31, do not start `pi`, OMP, OpenCode or Grok routes that use NaN models. Do not set `NAN_API_KEY`.
+- From 2026-10-31, use Codex only. Do not start `pi`, OMP, OpenCode or Grok routes that use NaN models. Do not set `NAN_API_KEY`.
 
 # Agent traces
 
