@@ -136,6 +136,9 @@ func isSupportedPythonVersion(version string) bool {
 }
 
 // parsePythonVersion reads the leading "Python M.m.p" of a version banner.
+// Every component takes its numeric prefix, so real banners such as
+// "3.12.15+", "3.13.0rc1" and "3.14.0b2" parse; only the last component may
+// carry such a suffix, and a component without any digit is garbage.
 // The patch component is optional and defaults to 0.
 func parsePythonVersion(version string) (major, minor, patch int, ok bool) {
 	rest, found := strings.CutPrefix(strings.TrimSpace(version), "Python ")
@@ -152,13 +155,32 @@ func parsePythonVersion(version string) (major, minor, patch int, ok bool) {
 	}
 	values := make([]int, 3)
 	for i, part := range parts {
-		value, err := strconv.Atoi(part)
-		if err != nil || value < 0 {
+		value, suffix, valid := splitVersionComponent(part)
+		if !valid || (suffix != "" && i != len(parts)-1) {
 			return 0, 0, 0, false
 		}
 		values[i] = value
 	}
 	return values[0], values[1], values[2], true
+}
+
+// splitVersionComponent splits one dot-separated component into its leading
+// digits and the non-digit tail that follows them ("15+" → 15, "+";
+// "0rc1" → 0, "rc1"). It reports false when the component has no leading
+// digit, so garbage such as "x", "rc1" or "." never parses.
+func splitVersionComponent(component string) (value int, suffix string, ok bool) {
+	end := 0
+	for end < len(component) && component[end] >= '0' && component[end] <= '9' {
+		end++
+	}
+	if end == 0 {
+		return 0, "", false
+	}
+	value, err := strconv.Atoi(component[:end])
+	if err != nil {
+		return 0, "", false
+	}
+	return value, component[end:], true
 }
 
 func printPythonInstallHint() {

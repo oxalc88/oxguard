@@ -62,8 +62,9 @@ def check_annotation(
 ) -> Violation | None:
     try:
         text = ast.unparse(node)
-    except (AttributeError, KeyError, TypeError, ValueError, NotImplementedError):
-        # Unparsable or malformed annotation nodes report no violation.
+    except (AttributeError, KeyError, NotImplementedError, RecursionError, TypeError, ValueError):
+        # Unparsable, malformed or too deeply nested annotation nodes are
+        # skipped: a pathological annotation must not crash the gate.
         return None
     depth = annotation_depth(node)
     length = len(text)
