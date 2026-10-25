@@ -7,15 +7,18 @@
 
 # Model selection
 
-Select the model by role, not by provider. The implementer and the reviewer must be separate sessions. Luna (`gpt-6-luna`) is not used.
+Select the model by role, not by provider. The implementer and the reviewer must be separate sessions.
 
-| Period | Implements | Reviews |
-|---|---|---|
-| Until 2026-10-30 | `mimo-v2.6-flash` through `pi` | Codex Sol (`gpt-6.1-sol`) |
-| From 2026-10-31 | Codex Sol (`gpt-6.1-sol`) | Codex Sol, in a separate session |
+| Period | Task | Implements | Reviews |
+|---|---|---|---|
+| Until 2026-10-30 | All | `mimo-v2.6-flash` through `pi` | Codex Sol (`gpt-6.1-sol`) |
+| From 2026-10-31 | Scoped (UI, presets, tests, repetitive) | Codex Luna (`gpt-6-luna`) | Codex Sol, effort `medium` |
+| From 2026-10-31 | Complex or long | Codex Sol (`gpt-6.1-sol`) | Codex Sol, effort `medium` |
 
 - Until 2026-10-30, if `mimo-v2.6-flash` fails verification two times, escalate to `glm5.3-flash`; if that also fails two times, escalate to Sol.
-- Sol starts at effort `medium`. When verification fails, raise the effort one step: `medium` → `high` → `xhigh` → `max`.
+- Luna never reviews.
+- Sol implements at effort `medium`. When verification fails, raise the effort one step: `medium` → `high` → `xhigh` → `max`.
+- For the first four Luna-implemented PRs, record tokens and the number of review rounds.
 - Record the actual agent, provider, model and effort in trace provenance.
 
 ## Transition on 2026-10-31
