@@ -33,6 +33,10 @@ func TestAnalyzerProcess(t *testing.T) {
 	case "invalid":
 		fmt.Fprintln(os.Stderr, "invalid config")
 		os.Exit(2)
+	case "mypy_exit2":
+		// mypy 2.x prints native JSON lines even when it aborts with exit 2.
+		fmt.Println(`{"file":"src/main.py","line":1,"column":7,"end_line":1,"end_column":8,"message":"Expected a parameter","hint":null,"code":"syntax","severity":"error"}`)
+		os.Exit(2)
 	case "unknown":
 		fmt.Fprintln(os.Stderr, "tool dialect")
 		os.Exit(1)
@@ -83,7 +87,7 @@ func TestProcessContract(t *testing.T) {
 	}
 }
 func TestExecutionCategories(t *testing.T) {
-	for _, tc := range []struct{ helper, adapter, category string }{{"missing", "mypy", "tool_missing"}, {"timeout", "mypy", "timeout"}, {"network", "mypy", "dependency_failure"}, {"spawn", "mypy", "tool_missing"}, {"invalid", "mypy", "invalid_configuration"}, {"broken", "ruff", "adapter_failure"}, {"unknown", "", "unclassified_failure"}} {
+	for _, tc := range []struct{ helper, adapter, category string }{{"missing", "mypy", "tool_missing"}, {"timeout", "mypy", "timeout"}, {"network", "mypy", "dependency_failure"}, {"spawn", "mypy", "tool_missing"}, {"invalid", "mypy", "invalid_configuration"}, {"mypy_exit2", "mypy", "invalid_configuration"}, {"broken", "ruff", "adapter_failure"}, {"unknown", "", "unclassified_failure"}} {
 		t.Run(tc.helper, func(t *testing.T) {
 			r := contractRunner(t)
 			r.timeout = 1
@@ -135,6 +139,47 @@ func TestAdapters(t *testing.T) {
 		t.Fatal("MI boundary changed", r.result)
 	}
 }
+
+// mypy 2.x --output json adds end_line/end_column/hint keys that mypy 1.x
+// omitted; the adapter must keep decoding the shared fields and drop notes.
+func TestMypyAdapterReadsMypy2JSONLines(t *testing.T) {
+	r := contractRunner(t)
+	data := strings.Join([]string{
+		`{"file":"src/main.py","line":1,"column":14,"end_line":1,"end_column":21,"message":"Incompatible types in assignment","hint":null,"code":"assignment","severity":"error"}`,
+		`{"file":"src/main.py","line":3,"column":0,"end_line":4,"end_column":1,"message":"Inferred type is int","hint":null,"code":"assignment","severity":"note"}`,
+		`{"file":"src/main.py","line":5,"column":7,"end_line":5,"end_column":12,"message":"Missing return statement","hint":"Add a return","code":"func-returns-value","severity":"error"}`,
+	}, "\n")
+	r.normalize(toolSpec{gate: "mypy", adapter: "mypy"}, Result{ok: true}, strings.NewReader(data), nil)
+	if len(r.result.Findings) != 2 {
+		t.Fatal(r.result.Findings)
+	}
+	want := []struct {
+		rule         string
+		line, column int
+	}{
+		{"assignment", 1, 15},
+		{"func-returns-value", 5, 8},
+	}
+	for i, f := range r.result.Findings {
+		if f.Gate != "mypy" || f.Rule != want[i].rule || f.Severity != "error" || f.Status != StatusBlocking || f.Category != "quality" {
+			t.Fatal(f)
+		}
+		if f.Location == nil || f.Location.File != "src/main.py" || f.Location.Line != want[i].line || f.Location.Column != want[i].column {
+			t.Fatal(f.Location)
+		}
+	}
+}
+
+// Non-JSON analyzer stdout is malformed structured output, never a silent pass.
+func TestMypyAdapterRejectsProseStdout(t *testing.T) {
+	r := contractRunner(t)
+	prose := "src/main.py:1: error: Invalid syntax  [syntax]\nFound 1 error in 1 file\n"
+	r.normalize(toolSpec{gate: "mypy", adapter: "mypy"}, Result{ok: true}, strings.NewReader(prose), nil)
+	if len(r.result.Findings) != 1 || r.result.Findings[0].Category != "adapter_failure" || r.result.Findings[0].Status != StatusExecutionError {
+		t.Fatal(r.result.Findings)
+	}
+}
+
 func TestStrictFlags(t *testing.T) {
 	for _, args := range [][]string{{"--timout", "30"}, {"--timeout"}, {"--timeout", "--tail", "1"}, {"--timeout", "30s"}, {"--timeout", "0"}, {"--tail", "-1"}, {"--output", "xml"}, {"--output"}, {"--root"}, {"--dirs", "src,"}, {"unexpected"}} {
 		if _, err := parseFlags(args); err == nil {
