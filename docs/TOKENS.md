@@ -19,6 +19,6 @@ For Codex sessions, read the last `token_count` event in `~/.codex/sessions/`. F
 
 #32: 2 implementation rounds, 2 review rounds (round 1 requested 3 fixes, round 2 approved). Per session: mimo 681,389 (44,670 not cached, 29,103 output) and 1,161,033 (52,078 / 17,755); Sol 155,916 (31,342 / 1,950) and 288,963 (35,629 / 2,326). Codex's own "tokens used" lines for the two reviews were 33,292 and 37,955. During review 2, Sol started a `gpt-6-luna` session (142,660 total) that was not requested; it is not counted as a review.
 
-#31 (model roles doc): no token data was recorded for its sessions, so it has no row.
+#31 (model roles doc): no token data was recorded for its sessions, so it has no row. After merging main, its docs-only CI run (40200327340) took 41 s.
 
 Values at 2026-10-25 08:40 Lima; #32 values are final.
