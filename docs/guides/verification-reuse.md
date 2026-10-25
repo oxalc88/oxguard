@@ -20,3 +20,4 @@ python scripts/release-smoke.py npm v1.2.3 dist/npm
 ```
 
 For agents: a green required check for the current commit is verification evidence; changed inputs still need their checks.
+<!-- docs-only CI fast-path test -->
