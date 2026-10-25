@@ -58,24 +58,56 @@ class ContractLocations(unittest.TestCase):
 
 
 class DeepAnnotationContract(unittest.TestCase):
-    def test_five_hundred_union_operators_are_skipped_not_crashing(self):
+    """Recursion-limit blowups are reported violations, never skipped passes."""
+
+    def run_types_gate(self, source_text, machine=True):
         with tempfile.TemporaryDirectory() as root:
             source = Path(root) / "source.py"
-            source.write_text("value: " + " | ".join(["int"] * 500) + "\n")
+            source.write_text(source_text)
+            argv = [sys.executable, str(ANALYSIS / "check_type_complexity.py")]
+            if machine:
+                argv.append("--json")
+            argv.append(str(source))
             run = subprocess.run(
-                [
-                    sys.executable,
-                    str(ANALYSIS / "check_type_complexity.py"),
-                    "--json",
-                    str(source),
-                ],
+                argv,
                 capture_output=True,
                 text=True,
                 check=False,
             )
-            self.assertNotIn("Traceback", run.stderr)
-            self.assertEqual(run.returncode, 0)
-            self.assertEqual(json.loads(run.stdout)["findings"], [])
+            return run, source
+
+    def test_five_hundred_union_operators_report_one_violation(self):
+        run, source = self.run_types_gate("value: " + " | ".join(["int"] * 500) + "\n")
+        self.assertNotIn("Traceback", run.stderr)
+        # Failing-gate convention: any violation exits 1.
+        self.assertEqual(run.returncode, 1)
+        findings = json.loads(run.stdout)["findings"]
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["rule"], "pyguard.types.annotation_complexity")
+        self.assertEqual(findings[0]["location"]["file"], source.as_posix())
+        self.assertIn("annotation too deeply nested to measure", findings[0]["evidence"])
+        self.assertGreater(findings[0]["observed"], findings[0]["threshold"])
+
+    def test_ten_thousand_union_operators_report_the_unparsable_file(self):
+        source_text = "value: " + " | ".join(["int"] * 10000) + "\n"
+        run, source = self.run_types_gate(source_text)
+        self.assertNotIn("Traceback", run.stderr)
+        self.assertEqual(run.returncode, 1)
+        findings = json.loads(run.stdout)["findings"]
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["location"]["file"], source.as_posix())
+        self.assertNotIn("line", findings[0]["location"])
+        self.assertIn("too deeply nested to parse", findings[0]["evidence"])
+
+    def test_ten_thousand_union_operators_fail_the_human_gate_output(self):
+        run, source = self.run_types_gate(
+            "value: " + " | ".join(["int"] * 10000) + "\n", machine=False
+        )
+        self.assertNotIn("Traceback", run.stderr)
+        self.assertEqual(run.returncode, 1)
+        self.assertIn("[FAIL] types", run.stdout)
+        self.assertIn(str(source), run.stdout)
+        self.assertIn("1 violation(s) found", run.stdout)
 
 
 class VultureReportContract(unittest.TestCase):
