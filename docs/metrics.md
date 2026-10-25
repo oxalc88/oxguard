@@ -105,21 +105,25 @@ gates combined into one normalized per-file score. It computes:
 - Cyclomatic complexity
 - Lines of code
 
-…and normalizes them into a single 0–100+ score. The tiers:
+…and normalizes them into a single 0–100+ score. The official
+[FTA scoring](https://ftaproject.dev/docs/scoring) assessments:
 
-| Score | Label |
-|-------|-------|
-| 0–24 | Low complexity |
-| 25–49 | Moderate |
-| 50–74 | High — gate fails at 60 |
-| 75+ | Very high |
+| FTA Score | Assessment |
+|-----------|------------|
+| < 50 | OK — considered maintainable |
+| 50–60 | Could be better — reasonably maintainable |
+| > 60 | Needs improvement — difficult to maintain |
 
-The threshold sits at 60 rather than 50 to allow real-world TypeScript files (which tend
+The default gate fails when a file scores above 60, matching the official
+"Needs improvement" boundary. It sits at 60 rather than 50 to allow real-world TypeScript files (which tend
 toward more boilerplate than Python) a little more headroom, while still blocking files
-that have grown genuinely hard to change safely.
+that have grown genuinely hard to change safely. Tune it per project with
+`--max-fta-score <n>` or `fta-score-cap = <n>` in `oxguard.toml`.
 
 Because FTA operates per-file, it catches the same class of problem as pyguard's MI — a
-file that accumulates too much responsibility over time.
+file that accumulates too much responsibility over time. The score is per file, so
+splitting a file only to lower its score does not reduce complexity; smaller files or
+lower scores alone do not prove simplification.
 
 **Test file exclusion:** `*.test.*` and `*.spec.*` files are excluded from FTA scoring by
 default — test files are intentionally repetitive (many similar test cases, property
