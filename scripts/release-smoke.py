@@ -1,13 +1,13 @@
 """Check the exact release archives and npm payloads before publication."""
 import hashlib
 import json
-from pathlib import Path
 import platform
 import subprocess
 import sys
 import tarfile
 import tempfile
 import zipfile
+from pathlib import Path
 
 
 def run(args):

@@ -72,7 +72,7 @@ def machine_main() -> int:
         baseline = json.loads(BASELINE.read_text())
         current = _scan()
         if not isinstance(baseline.get("results"), dict) or not isinstance(current.get("results"), dict):
-            raise ValueError("Missing scan results")
+            raise TypeError("Missing scan results")
         for filepath, secrets in sorted(current["results"].items()):
             known = {item["hashed_secret"] for item in baseline["results"].get(filepath, [])}
             for item in secrets:

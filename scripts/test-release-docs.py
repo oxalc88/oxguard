@@ -1,8 +1,8 @@
 """Exercise release documentation generation and pre-publication rejection."""
 import importlib.util
-from pathlib import Path
 import tempfile
 import unittest
+from pathlib import Path
 
 
 def load(name):

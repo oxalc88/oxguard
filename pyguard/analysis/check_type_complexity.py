@@ -62,7 +62,8 @@ def check_annotation(
 ) -> Violation | None:
     try:
         text = ast.unparse(node)
-    except Exception:
+    except (AttributeError, KeyError, TypeError, ValueError, NotImplementedError):
+        # Unparsable or malformed annotation nodes report no violation.
         return None
     depth = annotation_depth(node)
     length = len(text)

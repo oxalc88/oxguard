@@ -4,12 +4,12 @@ import gzip
 import hashlib
 import json
 import os
-from pathlib import Path
 import platform
 import re
 import subprocess
 import tempfile
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 
@@ -34,7 +34,7 @@ def write_report(path, data):
 def run(command, cwd=ROOT, env=None, timeout=600):
     start = time.perf_counter()
     p = subprocess.run(command, cwd=cwd, env=env, capture_output=True, text=True,
-                       encoding="utf-8", errors="replace", timeout=timeout)
+                       encoding="utf-8", errors="replace", timeout=timeout, check=False)
     return p, (time.perf_counter() - start) * 1000
 
 

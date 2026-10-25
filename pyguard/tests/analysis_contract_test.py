@@ -9,7 +9,7 @@ from pathlib import Path
 
 ANALYSIS = Path(__file__).resolve().parents[1] / "analysis"
 sys.path.insert(0, str(ANALYSIS))
-import check_halstead  # noqa: E402
+import check_halstead
 
 
 class ContractLocations(unittest.TestCase):
@@ -28,6 +28,7 @@ class ContractLocations(unittest.TestCase):
                 ],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             self.assertEqual(run.returncode, 1)
             findings = json.loads(run.stdout)["findings"]

@@ -1,8 +1,8 @@
 """Copy documentation into a release payload using its tag, without editing sources."""
-from pathlib import Path
 import re
 import shutil
 import sys
+from pathlib import Path
 
 
 def stamp_document(text, tag):

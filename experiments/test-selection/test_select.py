@@ -1,6 +1,7 @@
 import copy
 import unittest
-from compare_selection import select, metrics
+
+from compare_selection import metrics, select
 
 
 def row(name, coverage, duration=1, defects=(), protected=False):
