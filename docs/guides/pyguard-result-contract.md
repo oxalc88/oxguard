@@ -16,14 +16,14 @@ See the [Tsguard schema reference](tsguard-result-contract.md) for the common fi
 
 Agent output uses the same limits in both languages: ten findings, at most 26 lines and 6 KiB. It includes total findings and `omitted: N (use --output json)` when needed. Retrieve JSON with the same command/root/scope before claiming a complete inventory. Long individual evidence or source labels can be truncated in agent output; JSON retains them.
 
-Finding IDs hash gate, rule and project-relative location (including symbols and related duplicate locations when present), not analyzer prose or absolute roots. Ruff and mypy codes remain their native identifiers. Owned rules include `pyguard.radon.cc_exceeded`, `pyguard.radon.mi_threshold_failed`, `pyguard.halstead.<metric>_exceeded`, `pyguard.types.annotation_complexity`, `pyguard.criticality.ranked` and `pyguard.execution.<category>`. Moving a finding can change its ID; these IDs are not cross-revision baselines.
+Finding IDs hash gate, rule and project-relative location (including symbols and related duplicate locations when present), not analyzer prose or absolute roots. Ruff and mypy codes remain their native identifiers, except mypy diagnostics captured by an exit-2 syntax abort, which are namespaced as `pyguard.mypy.<code>`. Owned rules include `pyguard.radon.cc_exceeded`, `pyguard.radon.mi_threshold_failed`, `pyguard.halstead.<metric>_exceeded`, `pyguard.types.annotation_complexity`, `pyguard.criticality.ranked` and `pyguard.execution.<category>`. Moving a finding can change its ID; these IDs are not cross-revision baselines.
 
 ## Adapters and limits
 
 | Analyzer | Normalized data |
 |---|---|
 | Ruff | Native lint JSON: codes, locations, messages; formatting failure has the stable `pyguard.ruff.format_required` rule |
-| mypy | Native JSON lines: error codes, locations and messages |
+| mypy | Native JSON lines: error codes, locations and messages; an exit-2 syntax abort keeps those lines as `pyguard.mypy.<code>` findings and adds `pyguard.execution.analyzer_failure` |
 | Radon | Native CC/MI JSON: measurements and existing threshold failures |
 | Owned annotation/Halstead helpers | Versioned JSON findings with locations, observed values and thresholds; annotations include remediation |
 | pyan3 criticality | Versioned JSON with distinct caller measurements, advisory ranked findings and a generated CRITICALITY.md reference |
@@ -35,7 +35,7 @@ Finding IDs hash gate, rule and project-relative location (including symbols and
 | deptry | Native JSON `DEP` codes, modules and locations; advisory |
 | Unsupported details | Stable partial gate-level fallback with diagnostic references |
 
-Known executable/module absence, uv dependency transport failures, analyzer configuration exits, timeouts and malformed structured output have execution categories. A failed unsupported analyzer produces `pyguard.<gate>.failed` with `unclassified_failure`; do not assume it is a source defect. This deliberately incomplete normalization avoids delegating unlimited logs to the LLM. Analyzer versions must support the requested native structured formats; invalid output produces `adapter_failure`, not a false pass. Real evals pin Ruff 0.17.2, mypy 2.4.0, Radon 6.0.1 and pyan3 1.2.0.
+Known executable/module absence, uv dependency transport failures, analyzer configuration exits, timeouts and malformed structured output have execution categories. A failed unsupported analyzer produces `pyguard.<gate>.failed` with `unclassified_failure`; do not assume it is a source defect. This deliberately incomplete normalization avoids delegating unlimited logs to the LLM. Analyzer versions must support the requested native structured formats; invalid output produces `adapter_failure`, not a false pass. Real evals pin Ruff 0.17.2, mypy 2.4.0, Radon 6.0.1 and pyan3 1.2.0. mypy 2.x reports syntax errors as native JSON lines and exits 2 when errors prevent further checking; PyGuard normalizes those lines as blocking `pyguard.mypy.<code>` findings and records `pyguard.execution.analyzer_failure`, so the gate is `error`, the assessment `incomplete` and the process exits 1. Exit 2 without structured stdout remains `invalid_configuration`.
 
 Python-specific thresholds remain unchanged: CC above 10, Halstead effort above 50,000/difficulty above 30/bugs above 0.4, annotation depth above 2 or length above 40, and coverage below 80%. The existing `radon mi -n B` invocation rejects grades B/C, which Radon's actual rank function defines as MI at or below 19; structured output preserves that behavior despite the older human description “below grade B.”
 

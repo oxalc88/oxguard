@@ -99,7 +99,12 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
           const oracle = checked(invoke(argv, root), 'analyzer oracle'); entry.duration_ms += oracle.duration_ms;
           if (c.oracle === 'radon' || c.oracle === 'annotations') {
             if (oracle.status !== 0) throw new Error('Analyzer oracle failed');
-          } else if (oracle.status !== (c.expected.findings.length ? 1 : 0)) throw new Error('Analyzer oracle exit mismatch');
+          } else {
+            // Cases may pin the analyzer's own status (mypy aborts a syntax
+            // check with 2); otherwise findings imply a failing analyzer.
+            const expectedOracleExit = c.oracle_exit_code ?? (c.expected.findings.length ? 1 : 0);
+            if (oracle.status !== expectedOracleExit) throw new Error(`Analyzer oracle exit mismatch: expected ${expectedOracleExit}, got ${oracle.status}`);
+          }
           if (c.oracle === 'mypy' || c.oracle === 'ruff') {
             const rows = c.oracle === 'mypy' ? oracle.stdout.trim().split('\n').filter(Boolean).map(line => JSON.parse(line)) : JSON.parse(oracle.stdout);
             const findings = rows.map(f => ({ rule: f.code, file: relativeSource(root, f.file || f.filename), line: f.line || f.location.row }));

@@ -76,7 +76,20 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 			return
 		}
 	}
+	// mypy 2.x reports syntax errors as native JSON lines on stdout and aborts
+	// with exit 2. Those diagnostics are still source findings; the abort is an
+	// execution error, so an incomplete assessment can never pass. Exit 2
+	// without structured diagnostics remains an analyzer configuration failure.
 	if !res.ok && res.exitCode == 2 && (spec.adapter == "ruff" || spec.adapter == "ruff_format" || spec.adapter == "mypy") {
+		if spec.adapter == "mypy" {
+			if rows, structured := decodeMypyJSON(stdout); structured && len(rows) > 0 {
+				for _, d := range rows {
+					add("pyguard.mypy."+d.Code, d.Severity, "quality", d.Message, &Location{File: relativePath(r.root, d.File), Line: d.Line, Column: d.Column})
+				}
+				execution("analyzer_failure", "Type checking aborted after the analyzer reported diagnostics.")
+				return
+			}
+		}
 		execution("invalid_configuration", "Analyzer could not evaluate the configured project.")
 		return
 	}
@@ -109,25 +122,13 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 			add(d.Code, "error", "quality", d.Message, &Location{File: relativePath(r.root, d.Filename), Line: d.Location.Row, Column: d.Location.Column})
 		}
 	case "mypy":
-		dec := json.NewDecoder(stdout)
-		for {
-			var d struct {
-				File                    string `json:"file"`
-				Line, Column            int
-				Message, Code, Severity string
-			}
-			err := dec.Decode(&d)
-			if err == io.EOF {
-				break
-			}
-			if err == nil && d.Severity == "note" {
-				continue
-			}
-			if err != nil || d.File == "" || d.Code == "" || d.Line < 1 {
-				decodeFailed = true
-				break
-			}
-			add(d.Code, d.Severity, "quality", d.Message, &Location{File: relativePath(r.root, d.File), Line: d.Line, Column: d.Column + 1})
+		rows, structured := decodeMypyJSON(stdout)
+		if !structured {
+			decodeFailed = true
+			break
+		}
+		for _, d := range rows {
+			add(d.Code, d.Severity, "quality", d.Message, &Location{File: relativePath(r.root, d.File), Line: d.Line, Column: d.Column})
 		}
 	case "radon_cc":
 		var files map[string][]radonBlock
@@ -255,6 +256,44 @@ type ownedResult struct {
 		Category string `json:"category"`
 		Message  string `json:"message"`
 	} `json:"error"`
+}
+
+// mypyDiagnostic is one native mypy JSON line. Keys this contract does not
+// normalize (mypy 2.x emits end_line, end_column and hint) are ignored; notes
+// are not findings.
+type mypyDiagnostic struct {
+	File                    string `json:"file"`
+	Line, Column            int
+	Message, Code, Severity string
+}
+
+// decodeMypyJSON reads mypy JSON diagnostics and normalizes columns to the
+// contract's one-based convention: mypy emits zero-based columns for type
+// diagnostics but one-based columns for its syntax diagnostics. ok is false
+// when stdout is empty prose or otherwise not structured mypy output, which
+// callers must not treat as an analyzer report.
+func decodeMypyJSON(stdout io.Reader) (rows []mypyDiagnostic, ok bool) {
+	dec := json.NewDecoder(stdout)
+	for {
+		var d mypyDiagnostic
+		err := dec.Decode(&d)
+		if err == io.EOF {
+			return rows, true
+		}
+		if err == nil && d.Severity == "note" {
+			continue
+		}
+		if err != nil || d.File == "" || d.Code == "" || d.Line < 1 {
+			return nil, false
+		}
+		if d.Severity == "" {
+			d.Severity = "error"
+		}
+		if d.Code != "syntax" {
+			d.Column++
+		}
+		rows = append(rows, d)
+	}
 }
 
 type radonBlock struct {

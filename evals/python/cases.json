@@ -39,6 +39,26 @@
       "oracle": "mypy"
     },
     {
+      "id": "types.syntax_error",
+      "fixture": "syntax-error",
+      "command": "mypy",
+      "lane": "behavior",
+      "origin": "https://github.com/oxalc88/oxguard/pull/23",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "findings": [
+          {
+            "rule": "syntax",
+            "file": "src/main.py",
+            "line": 2
+          }
+        ]
+      },
+      "oracle": "mypy",
+      "oracle_exit_code": 2
+    },
+    {
       "id": "lint.clean",
       "fixture": "clean",
       "command": "ruff",
@@ -229,6 +249,44 @@
             "status": "blocking",
             "file": "src/main.py",
             "line": 2
+          }
+        ]
+      },
+      "json": true
+    },
+    {
+      "id": "contract.json.syntax_error",
+      "fixture": "syntax-error",
+      "command": "mypy",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/pull/23",
+      "basis": "independent_python_control",
+      "expected": {
+        "exit_code": 1,
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "mypy",
+            "status": "error",
+            "normalization": "complete"
+          }
+        ],
+        "findings": [
+          {
+            "gate": "mypy",
+            "rule": "pyguard.execution.analyzer_failure",
+            "category": "analyzer_failure",
+            "status": "execution_error"
+          },
+          {
+            "gate": "mypy",
+            "rule": "pyguard.mypy.syntax",
+            "category": "quality",
+            "status": "blocking",
+            "file": "src/main.py",
+            "line": 2,
+            "column": 23
           }
         ]
       },

@@ -35,7 +35,12 @@ func TestAnalyzerProcess(t *testing.T) {
 		os.Exit(2)
 	case "mypy_exit2":
 		// mypy 2.x prints native JSON lines even when it aborts with exit 2.
+		// Syntax columns are already one-based, unlike type diagnostics.
 		fmt.Println(`{"file":"src/main.py","line":1,"column":7,"end_line":1,"end_column":8,"message":"Expected a parameter","hint":null,"code":"syntax","severity":"error"}`)
+		os.Exit(2)
+	case "mypy_exit2_prose":
+		// Exit 2 with nothing structured on stdout is still a configuration failure.
+		fmt.Println("Found 1 error in 1 file")
 		os.Exit(2)
 	case "unknown":
 		fmt.Fprintln(os.Stderr, "tool dialect")
@@ -87,7 +92,7 @@ func TestProcessContract(t *testing.T) {
 	}
 }
 func TestExecutionCategories(t *testing.T) {
-	for _, tc := range []struct{ helper, adapter, category string }{{"missing", "mypy", "tool_missing"}, {"timeout", "mypy", "timeout"}, {"network", "mypy", "dependency_failure"}, {"spawn", "mypy", "tool_missing"}, {"invalid", "mypy", "invalid_configuration"}, {"mypy_exit2", "mypy", "invalid_configuration"}, {"broken", "ruff", "adapter_failure"}, {"unknown", "", "unclassified_failure"}} {
+	for _, tc := range []struct{ helper, adapter, category string }{{"missing", "mypy", "tool_missing"}, {"timeout", "mypy", "timeout"}, {"network", "mypy", "dependency_failure"}, {"spawn", "mypy", "tool_missing"}, {"invalid", "mypy", "invalid_configuration"}, {"mypy_exit2_prose", "mypy", "invalid_configuration"}, {"broken", "ruff", "adapter_failure"}, {"unknown", "", "unclassified_failure"}} {
 		t.Run(tc.helper, func(t *testing.T) {
 			r := contractRunner(t)
 			r.timeout = 1
@@ -140,8 +145,9 @@ func TestAdapters(t *testing.T) {
 	}
 }
 
-// mypy 2.x --output json adds end_line/end_column/hint keys that mypy 1.x
-// omitted; the adapter must keep decoding the shared fields and drop notes.
+// mypy 2.x --output json adds end_line/end_column keys that mypy 1.x omitted
+// (1.18.2 already emitted hint); the adapter keeps decoding the shared fields
+// and drops notes.
 func TestMypyAdapterReadsMypy2JSONLines(t *testing.T) {
 	r := contractRunner(t)
 	data := strings.Join([]string{
@@ -166,6 +172,52 @@ func TestMypyAdapterReadsMypy2JSONLines(t *testing.T) {
 		}
 		if f.Location == nil || f.Location.File != "src/main.py" || f.Location.Line != want[i].line || f.Location.Column != want[i].column {
 			t.Fatal(f.Location)
+		}
+	}
+}
+
+// A mypy 2.x syntax abort still emits native JSON lines: they stay source
+// findings and the aborted check is an execution error, so it never passes.
+func TestMypyExit2KeepsSyntaxFindingsAndFailsTheGate(t *testing.T) {
+	r := contractRunner(t)
+	t.Setenv("PYGUARD_CONTRACT_HELPER", "mypy_exit2")
+	if r.RunTool(toolSpec{gate: "mypy", adapter: "mypy"}, "mypy", os.Args[0], "-test.run=^TestAnalyzerProcess$").ok {
+		t.Fatal("aborted type check reported success")
+	}
+	if err := r.result.Finish(1); err != nil {
+		t.Fatal(err)
+	}
+	if r.result.Status != StatusError || r.result.Assessment != Incomplete || len(r.result.Gates) != 1 || r.result.Gates[0].Status != StatusError || r.result.Gates[0].Normalization != Complete {
+		t.Fatal(r.result.Status, r.result.Assessment, r.result.Gates)
+	}
+	if len(r.result.Findings) != 2 {
+		t.Fatal(r.result.Findings)
+	}
+	aborted, syntax := r.result.Findings[0], r.result.Findings[1]
+	if aborted.Rule != "pyguard.execution.analyzer_failure" || aborted.Status != StatusExecutionError || aborted.Category != "analyzer_failure" || aborted.Gate != "mypy" {
+		t.Fatal(aborted)
+	}
+	if syntax.Rule != "pyguard.mypy.syntax" || syntax.Status != StatusBlocking || syntax.Category != "quality" || syntax.Severity != "error" || syntax.Gate != "mypy" {
+		t.Fatal(syntax)
+	}
+	if syntax.Location == nil || syntax.Location.File != "src/main.py" || syntax.Location.Line != 1 || syntax.Location.Column != 7 {
+		t.Fatal(syntax.Location)
+	}
+	if syntax.Evidence != "Expected a parameter" || len(syntax.Diagnostics) != 2 {
+		t.Fatal(syntax)
+	}
+}
+
+// Exit 2 without structured stdout keeps the configuration-failure contract.
+func TestMypyExit2WithoutStructuredFindingsIsInvalidConfiguration(t *testing.T) {
+	for _, stdout := range []string{"", "Found 1 error in 1 file\n", `{"file":"src/main.py"}`} {
+		r := contractRunner(t)
+		r.normalize(toolSpec{gate: "mypy", adapter: "mypy"}, Result{exitCode: 2}, strings.NewReader(stdout), nil)
+		if err := r.result.Finish(1); err != nil {
+			t.Fatal(stdout, err)
+		}
+		if r.result.Status != StatusError || len(r.result.Findings) != 1 || r.result.Findings[0].Category != "invalid_configuration" {
+			t.Fatal(stdout, r.result.Findings)
 		}
 	}
 }
