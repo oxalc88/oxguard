@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Python evaluation toolchain pins mypy 2.4.0 (was 1.18.2). PyGuard's mypy integration is unchanged for the normal exit 0/1 paths: native `--output json` lines with native rule codes, exit 0 for a clean analysis and exit 1 for blocking findings. mypy 2.x adds `end_line` and `end_column` to each JSON line (`hint` was already emitted by 1.18.2), and its own defaults (`--local-partial-types`, `--strict-bytes`, native parser) can change which findings a project reports. (#23)
+
+### Fixed
+
+- PyGuard reports mypy syntax aborts as structured evidence instead of a configuration failure. mypy 2.x writes native JSON diagnostics and exits 2 when errors prevent further checking; PyGuard keeps those lines as blocking `pyguard.mypy.<code>` findings (for example `pyguard.mypy.syntax`) with file, line, column and message, and adds a `pyguard.execution.analyzer_failure` execution error. The mypy gate is `error`, the assessment `incomplete`, and the run exits 1, so an aborted check can never pass. Exit 2 with empty or non-JSON stdout still reports `invalid_configuration`. (#23)
+
 ## [0.10.1] — 2026-10-24
 
 **Upgrade note:** `tsguard change` now exits 1 when its assessment is incomplete. CI jobs that previously passed with an incomplete `change` assessment will now fail; see Changed below.

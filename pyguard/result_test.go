@@ -33,6 +33,15 @@ func TestAnalyzerProcess(t *testing.T) {
 	case "invalid":
 		fmt.Fprintln(os.Stderr, "invalid config")
 		os.Exit(2)
+	case "mypy_exit2":
+		// mypy 2.x prints native JSON lines even when it aborts with exit 2.
+		// Like type diagnostics, parser syntax columns are zero-based.
+		fmt.Println(`{"file":"src/main.py","line":1,"column":7,"end_line":1,"end_column":8,"message":"Expected a parameter","hint":null,"code":"syntax","severity":"error"}`)
+		os.Exit(2)
+	case "mypy_exit2_prose":
+		// Exit 2 with nothing structured on stdout is still a configuration failure.
+		fmt.Println("Found 1 error in 1 file")
+		os.Exit(2)
 	case "unknown":
 		fmt.Fprintln(os.Stderr, "tool dialect")
 		os.Exit(1)
@@ -83,7 +92,7 @@ func TestProcessContract(t *testing.T) {
 	}
 }
 func TestExecutionCategories(t *testing.T) {
-	for _, tc := range []struct{ helper, adapter, category string }{{"missing", "mypy", "tool_missing"}, {"timeout", "mypy", "timeout"}, {"network", "mypy", "dependency_failure"}, {"spawn", "mypy", "tool_missing"}, {"invalid", "mypy", "invalid_configuration"}, {"broken", "ruff", "adapter_failure"}, {"unknown", "", "unclassified_failure"}} {
+	for _, tc := range []struct{ helper, adapter, category string }{{"missing", "mypy", "tool_missing"}, {"timeout", "mypy", "timeout"}, {"network", "mypy", "dependency_failure"}, {"spawn", "mypy", "tool_missing"}, {"invalid", "mypy", "invalid_configuration"}, {"mypy_exit2_prose", "mypy", "invalid_configuration"}, {"broken", "ruff", "adapter_failure"}, {"unknown", "", "unclassified_failure"}} {
 		t.Run(tc.helper, func(t *testing.T) {
 			r := contractRunner(t)
 			r.timeout = 1
@@ -135,6 +144,94 @@ func TestAdapters(t *testing.T) {
 		t.Fatal("MI boundary changed", r.result)
 	}
 }
+
+// mypy 2.x --output json adds end_line/end_column keys that mypy 1.x omitted
+// (1.18.2 already emitted hint); the adapter keeps decoding the shared fields
+// and drops notes.
+func TestMypyAdapterReadsMypy2JSONLines(t *testing.T) {
+	r := contractRunner(t)
+	data := strings.Join([]string{
+		`{"file":"src/main.py","line":1,"column":14,"end_line":1,"end_column":21,"message":"Incompatible types in assignment","hint":null,"code":"assignment","severity":"error"}`,
+		`{"file":"src/main.py","line":3,"column":0,"end_line":4,"end_column":1,"message":"Inferred type is int","hint":null,"code":"assignment","severity":"note"}`,
+		`{"file":"src/main.py","line":5,"column":7,"end_line":5,"end_column":12,"message":"Missing return statement","hint":"Add a return","code":"func-returns-value","severity":"error"}`,
+	}, "\n")
+	r.normalize(toolSpec{gate: "mypy", adapter: "mypy"}, Result{ok: true}, strings.NewReader(data), nil)
+	if len(r.result.Findings) != 2 {
+		t.Fatal(r.result.Findings)
+	}
+	want := []struct {
+		rule         string
+		line, column int
+	}{
+		{"assignment", 1, 15},
+		{"func-returns-value", 5, 8},
+	}
+	for i, f := range r.result.Findings {
+		if f.Gate != "mypy" || f.Rule != want[i].rule || f.Severity != "error" || f.Status != StatusBlocking || f.Category != "quality" {
+			t.Fatal(f)
+		}
+		if f.Location == nil || f.Location.File != "src/main.py" || f.Location.Line != want[i].line || f.Location.Column != want[i].column {
+			t.Fatal(f.Location)
+		}
+	}
+}
+
+// A mypy 2.x syntax abort still emits native JSON lines: they stay source
+// findings and the aborted check is an execution error, so it never passes.
+func TestMypyExit2KeepsSyntaxFindingsAndFailsTheGate(t *testing.T) {
+	r := contractRunner(t)
+	t.Setenv("PYGUARD_CONTRACT_HELPER", "mypy_exit2")
+	if r.RunTool(toolSpec{gate: "mypy", adapter: "mypy"}, "mypy", os.Args[0], "-test.run=^TestAnalyzerProcess$").ok {
+		t.Fatal("aborted type check reported success")
+	}
+	if err := r.result.Finish(1); err != nil {
+		t.Fatal(err)
+	}
+	if r.result.Status != StatusError || r.result.Assessment != Incomplete || len(r.result.Gates) != 1 || r.result.Gates[0].Status != StatusError || r.result.Gates[0].Normalization != Complete {
+		t.Fatal(r.result.Status, r.result.Assessment, r.result.Gates)
+	}
+	if len(r.result.Findings) != 2 {
+		t.Fatal(r.result.Findings)
+	}
+	aborted, syntax := r.result.Findings[0], r.result.Findings[1]
+	if aborted.Rule != "pyguard.execution.analyzer_failure" || aborted.Status != StatusExecutionError || aborted.Category != "analyzer_failure" || aborted.Gate != "mypy" {
+		t.Fatal(aborted)
+	}
+	if syntax.Rule != "pyguard.mypy.syntax" || syntax.Status != StatusBlocking || syntax.Category != "quality" || syntax.Severity != "error" || syntax.Gate != "mypy" {
+		t.Fatal(syntax)
+	}
+	if syntax.Location == nil || syntax.Location.File != "src/main.py" || syntax.Location.Line != 1 || syntax.Location.Column != 8 {
+		t.Fatal(syntax.Location)
+	}
+	if syntax.Evidence != "Expected a parameter" || len(syntax.Diagnostics) != 2 {
+		t.Fatal(syntax)
+	}
+}
+
+// Exit 2 without structured stdout keeps the configuration-failure contract.
+func TestMypyExit2WithoutStructuredFindingsIsInvalidConfiguration(t *testing.T) {
+	for _, stdout := range []string{"", "Found 1 error in 1 file\n", `{"file":"src/main.py"}`} {
+		r := contractRunner(t)
+		r.normalize(toolSpec{gate: "mypy", adapter: "mypy"}, Result{exitCode: 2}, strings.NewReader(stdout), nil)
+		if err := r.result.Finish(1); err != nil {
+			t.Fatal(stdout, err)
+		}
+		if r.result.Status != StatusError || len(r.result.Findings) != 1 || r.result.Findings[0].Category != "invalid_configuration" {
+			t.Fatal(stdout, r.result.Findings)
+		}
+	}
+}
+
+// Non-JSON analyzer stdout is malformed structured output, never a silent pass.
+func TestMypyAdapterRejectsProseStdout(t *testing.T) {
+	r := contractRunner(t)
+	prose := "src/main.py:1: error: Invalid syntax  [syntax]\nFound 1 error in 1 file\n"
+	r.normalize(toolSpec{gate: "mypy", adapter: "mypy"}, Result{ok: true}, strings.NewReader(prose), nil)
+	if len(r.result.Findings) != 1 || r.result.Findings[0].Category != "adapter_failure" || r.result.Findings[0].Status != StatusExecutionError {
+		t.Fatal(r.result.Findings)
+	}
+}
+
 func TestStrictFlags(t *testing.T) {
 	for _, args := range [][]string{{"--timout", "30"}, {"--timeout"}, {"--timeout", "--tail", "1"}, {"--timeout", "30s"}, {"--timeout", "0"}, {"--tail", "-1"}, {"--output", "xml"}, {"--output"}, {"--root"}, {"--dirs", "src,"}, {"unexpected"}} {
 		if _, err := parseFlags(args); err == nil {
