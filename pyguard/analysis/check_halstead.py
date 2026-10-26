@@ -21,14 +21,13 @@ Exit 0 on success, 1 on any violation or missing path.
 from __future__ import annotations
 
 import ast
-import sys
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from radon.metrics import h_visit
-
 from _paths import collect_paths
+from radon.metrics import h_visit
 
 MAX_EFFORT: float = 50_000.0
 MAX_DIFFICULTY: float = 30.0

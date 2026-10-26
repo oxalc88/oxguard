@@ -1,11 +1,11 @@
 """Exercise identity hooks through real Git commits and local pushes."""
 
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 
 SOURCE = Path(__file__).resolve().parent.parent
 NAME = "Personal User"
@@ -31,7 +31,7 @@ class IdentityHooksTest(unittest.TestCase):
     def git(self, *args, ok=True, env=None):
         result = subprocess.run(
             ["git", *args], cwd=self.root, env={**self.env, **(env or {})},
-            capture_output=True, text=True,
+            capture_output=True, text=True, check=False,
         )
         if ok:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -43,6 +43,7 @@ class IdentityHooksTest(unittest.TestCase):
         result = subprocess.run(
             ["sh", str(SOURCE / "scripts/install-identity-hooks.sh"), NAME, EMAIL],
             cwd=self.root, env=self.env, capture_output=True, text=True,
+            check=False,
         )
         self.assertEqual(result.returncode == 0, ok, result.stdout + result.stderr)
         return result

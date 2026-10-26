@@ -44,6 +44,8 @@ Each case is `pass`, `fail`, `unsupported` (a historical CLI lacks the interface
 
 ## PyGuard
 
+Requires Python >=3.12 (3.14.1 is not supported).
+
 ```sh
 uv venv --python 3.12 /tmp/pyguard-evals
 uv pip install --python /tmp/pyguard-evals/bin/python --require-hashes -r evals/python/requirements.txt

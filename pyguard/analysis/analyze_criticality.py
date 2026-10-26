@@ -4,6 +4,7 @@ import ast
 import json
 import sys
 from pathlib import Path
+
 from _paths import collect_paths
 
 # Analyzer scripts may run from a private directory; artifacts belong to the project.
@@ -110,7 +111,21 @@ def main() -> int:
         result["artifacts"].append({"kind": "criticality", "path": str(OUTPUT)})
     except SystemExit as error:
         return int(error.code or 1)
-    except Exception as error:
+    except (
+        AttributeError,
+        IndexError,
+        KeyError,
+        NotImplementedError,
+        OSError,
+        RecursionError,
+        RuntimeError,
+        SyntaxError,
+        TypeError,
+        ValueError,
+    ) as error:
+        # Expected source or graph failures: unreadable or malformed files and
+        # analyzer API drift. Anything else propagates and pyguard normalizes
+        # the crashing helper into the same adapter_failure gate error.
         return failure("adapter_failure", f"Criticality analysis failed: {error}")
     if machine:
         print(json.dumps(result, sort_keys=True))

@@ -210,6 +210,8 @@ tsguard setup    # TypeScript
 pyguard setup    # Python
 ```
 
+pyguard needs **Python >=3.12 (3.14.1 is not supported)** on the machine that runs the gate; `pyguard doctor` verifies it.
+
 `setup` adds all required dev dependencies to `package.json` / `pyproject.toml`,
 runs `npm install` / `uv sync`, deploys pyguard's analysis helper scripts to
 `tools/analysis/`, creates `.secrets.baseline`, and offers to configure your AI

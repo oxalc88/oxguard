@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -15,7 +16,7 @@ func runDoctor(root string) int {
 
 	failures := 0
 
-	// Python >= 3.13
+	// Python >= 3.12 (3.14.1 excluded)
 	if !checkPython() {
 		failures++
 	}
@@ -80,7 +81,7 @@ func runDoctor(root string) int {
 	return 0
 }
 
-// checkPython verifies Python >= 3.13 is available.
+// checkPython verifies Python >= 3.12 is available (3.14.1 excluded).
 func checkPython() bool {
 	candidates := []string{"python3", "python"}
 	if runtime.GOOS == "windows" {
@@ -93,16 +94,16 @@ func checkPython() bool {
 			continue
 		}
 		version := strings.TrimSpace(out)
-		if isPython313OrNewer(version) {
+		if isSupportedPythonVersion(version) {
 			fmt.Printf("  [OK]   %s\n", version)
 			return true
 		}
-		fmt.Printf("  [FAIL] Python — found %s but need >= 3.13\n", version)
+		fmt.Printf("  [FAIL] Python — found %s but need >= 3.12 (not 3.14.1)\n", version)
 		printPythonInstallHint()
 		return false
 	}
 
-	fmt.Println("  [FAIL] Python 3.13 — not found")
+	fmt.Println("  [FAIL] Python 3.12 — not found")
 	printPythonInstallHint()
 	return false
 }
@@ -117,25 +118,80 @@ func checkUV() bool {
 	return true
 }
 
-// isPython313OrNewer parses "Python X.Y.Z" and checks >= 3.13.
-func isPython313OrNewer(version string) bool {
-	var major, minor int
-	_, err := fmt.Sscanf(version, "Python %d.%d", &major, &minor)
-	if err != nil {
+// isSupportedPythonVersion parses "Python X.Y.Z" and accepts >= 3.12,
+// rejecting exactly 3.14.1 (networkx 3.7 supports >= 3.12 but excludes 3.14.1).
+// Unparseable output is rejected.
+func isSupportedPythonVersion(version string) bool {
+	major, minor, patch, ok := parsePythonVersion(version)
+	if !ok {
 		return false
 	}
-	return major > 3 || (major == 3 && minor >= 13)
+	if major != 3 {
+		return major > 3
+	}
+	if minor < 12 {
+		return false
+	}
+	return !(minor == 14 && patch == 1)
+}
+
+// parsePythonVersion reads the leading "Python M.m.p" of a version banner.
+// Every component takes its numeric prefix, so real banners such as
+// "3.12.15+", "3.13.0rc1" and "3.14.0b2" parse; only the last component may
+// carry such a suffix, and a component without any digit is garbage.
+// The patch component is optional and defaults to 0.
+func parsePythonVersion(version string) (major, minor, patch int, ok bool) {
+	rest, found := strings.CutPrefix(strings.TrimSpace(version), "Python ")
+	if !found {
+		return 0, 0, 0, false
+	}
+	fields := strings.Fields(rest)
+	if len(fields) == 0 {
+		return 0, 0, 0, false
+	}
+	parts := strings.Split(fields[0], ".")
+	if len(parts) < 2 || len(parts) > 3 {
+		return 0, 0, 0, false
+	}
+	values := make([]int, 3)
+	for i, part := range parts {
+		value, suffix, valid := splitVersionComponent(part)
+		if !valid || (suffix != "" && i != len(parts)-1) {
+			return 0, 0, 0, false
+		}
+		values[i] = value
+	}
+	return values[0], values[1], values[2], true
+}
+
+// splitVersionComponent splits one dot-separated component into its leading
+// digits and the non-digit tail that follows them ("15+" → 15, "+";
+// "0rc1" → 0, "rc1"). It reports false when the component has no leading
+// digit, so garbage such as "x", "rc1" or "." never parses.
+func splitVersionComponent(component string) (value int, suffix string, ok bool) {
+	end := 0
+	for end < len(component) && component[end] >= '0' && component[end] <= '9' {
+		end++
+	}
+	if end == 0 {
+		return 0, "", false
+	}
+	value, err := strconv.Atoi(component[:end])
+	if err != nil {
+		return 0, "", false
+	}
+	return value, component[end:], true
 }
 
 func printPythonInstallHint() {
 	switch runtime.GOOS {
 	case "windows":
-		fmt.Println("         Install: winget install Python.Python.3.13")
+		fmt.Println("         Install: winget install Python.Python.3.12")
 		fmt.Println("         Or download from: https://python.org/downloads/")
 	case "darwin":
-		fmt.Println("         Install: brew install python@3.13")
+		fmt.Println("         Install: brew install python@3.12")
 	default:
-		fmt.Println("         Install: sudo apt install python3.13")
+		fmt.Println("         Install: sudo apt install python3.12")
 		fmt.Println("         Or see: https://python.org/downloads/")
 	}
 }

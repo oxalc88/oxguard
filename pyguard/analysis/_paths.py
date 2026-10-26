@@ -6,11 +6,11 @@ import fnmatch
 import json
 import os
 import sys
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 
-@lru_cache(maxsize=None)
+@cache
 def _test_exclude_patterns() -> tuple[str, ...]:
     """Return file-name glob patterns to exclude, driven by Go-set env vars.
 

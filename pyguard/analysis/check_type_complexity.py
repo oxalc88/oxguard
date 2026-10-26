@@ -25,6 +25,11 @@ from _paths import collect_paths
 MAX_NESTING_DEPTH: int = 2
 MAX_TYPE_LENGTH: int = 40
 
+# Recursion failures prove the source is deeper than these thresholds can
+# express, so they are reported as violations instead of skipped.
+UNMEASURABLE_ANNOTATION = "annotation too deeply nested to measure"
+UNPARSEABLE_SOURCE = "source too deeply nested to parse; type complexity not measured"
+
 
 @dataclass
 class Violation:
@@ -36,6 +41,8 @@ class Violation:
     depth: int
     length: int
     suggestion: str
+    # False when neither depth nor length could be measured (unparsable file).
+    measured: bool = True
 
 
 def annotation_depth(node: ast.expr) -> int:
@@ -55,16 +62,92 @@ def suggest_fix(text: str) -> str:
     return "Extract into a TypeAlias"
 
 
+def source_segment(source: str, node: ast.expr) -> str:
+    """Raw source text for node.
+
+    ast.get_source_segment only reads character offsets, so it stays available
+    when ast.unparse cannot render the node because it ran out of stack.
+    """
+    try:
+        return ast.get_source_segment(source, node) or ""
+    except (AttributeError, TypeError, ValueError):
+        return ""
+
+
+def unmeasurable_annotation(
+    node: ast.expr,
+    context: str,
+    file: Path,
+    source: str,
+) -> Violation:
+    """Report an annotation ast.unparse or annotation_depth could not measure.
+
+    Reaching the recursion limit is itself an over-limit result, so the
+    violation is always reported and its measurements are floored above the
+    thresholds when the raw source cannot prove the breach.
+    """
+    segment = source_segment(source, node)
+    try:
+        depth = annotation_depth(node)
+    except RecursionError:
+        # The depth walk exhausted the stack: nesting is over the limit.
+        depth = MAX_NESTING_DEPTH + 1
+    length = len(segment)
+    if length <= MAX_TYPE_LENGTH:
+        length = MAX_TYPE_LENGTH + 1
+    return Violation(
+        file=file,
+        line=node.lineno,
+        column=node.col_offset + 1,
+        context=context,
+        annotation=UNMEASURABLE_ANNOTATION,
+        depth=depth,
+        length=length,
+        suggestion=suggest_fix(segment or context),
+    )
+
+
+def unparsable_file(path: Path) -> Violation:
+    """Report a file ast.parse could not build instead of skipping it."""
+    return Violation(
+        file=path,
+        line=0,
+        column=0,
+        context="file",
+        annotation=UNPARSEABLE_SOURCE,
+        depth=0,
+        length=0,
+        suggestion="Split deeply nested annotations into TypeAliases",
+        measured=False,
+    )
+
+
+def variable_context(target: ast.expr) -> str:
+    try:
+        return f"variable '{ast.unparse(target)}'"
+    except (AttributeError, KeyError, NotImplementedError, RecursionError, TypeError, ValueError):
+        # The assignment target is malformed or too deep to render; the
+        # annotation itself is still checked.
+        return "variable"
+
+
 def check_annotation(
     node: ast.expr,
     context: str,
     file: Path,
+    source: str,
 ) -> Violation | None:
     try:
         text = ast.unparse(node)
-    except Exception:
+        depth = annotation_depth(node)
+    except RecursionError:
+        # Rendering or walking the annotation exhausted the stack, so it is
+        # over any nesting/length limit: report it rather than skipping it.
+        return unmeasurable_annotation(node, context, file, source)
+    except (AttributeError, KeyError, NotImplementedError, TypeError, ValueError):
+        # Malformed annotation nodes are skipped: a malformed annotation must
+        # not crash the gate.
         return None
-    depth = annotation_depth(node)
     length = len(text)
     if depth > MAX_NESTING_DEPTH or length > MAX_TYPE_LENGTH:
         return Violation(
@@ -90,6 +173,10 @@ def check_file(path: Path) -> list[Violation]:
         tree = ast.parse(source, filename=str(path))
     except SyntaxError:
         return []
+    except RecursionError:
+        # A file the parser cannot build is not a clean pass: report it as an
+        # explicit violation instead of silently skipping it.
+        return [unparsable_file(path)]
 
     violations: list[Violation] = []
 
@@ -97,8 +184,9 @@ def check_file(path: Path) -> list[Violation]:
         if isinstance(node, ast.AnnAssign) and node.annotation:
             v = check_annotation(
                 node.annotation,
-                f"variable '{ast.unparse(node.target)}'",
+                variable_context(node.target),
                 path,
+                source,
             )
             if v:
                 violations.append(v)
@@ -110,6 +198,7 @@ def check_file(path: Path) -> list[Violation]:
                         arg.annotation,
                         f"argument '{arg.arg}' in {node.name}()",
                         path,
+                        source,
                     )
                     if v:
                         violations.append(v)
@@ -118,6 +207,7 @@ def check_file(path: Path) -> list[Violation]:
                     node.returns,
                     f"return type of {node.name}()",
                     path,
+                    source,
                 )
                 if v:
                     violations.append(v)
@@ -137,27 +227,32 @@ def main() -> None:
     if machine:
         findings = []
         for v in all_violations:
-            observed, threshold = (
-                (v.depth, MAX_NESTING_DEPTH)
-                if v.depth > MAX_NESTING_DEPTH
-                else (v.length, MAX_TYPE_LENGTH)
-            )
-            findings.append(
-                {
-                    "rule": "pyguard.types.annotation_complexity",
-                    "severity": "error",
-                    "location": {
-                        "file": v.file.as_posix(),
-                        "line": v.line,
-                        "column": v.column,
-                        "symbol": v.context,
-                    },
-                    "observed": observed,
-                    "threshold": threshold,
-                    "evidence": f"Annotation depth {v.depth}, length {v.length}: {v.annotation}",
-                    "remediation": v.suggestion,
-                }
-            )
+            location: dict[str, str | int] = {"file": v.file.as_posix()}
+            if v.line:
+                location["line"] = v.line
+            if v.column:
+                location["column"] = v.column
+            location["symbol"] = v.context
+            finding: dict[str, object] = {
+                "rule": "pyguard.types.annotation_complexity",
+                "severity": "error",
+                "location": location,
+                "evidence": (
+                    f"Annotation depth {v.depth}, length {v.length}: {v.annotation}"
+                    if v.measured
+                    else v.annotation
+                ),
+                "remediation": v.suggestion,
+            }
+            if v.measured:
+                observed, threshold = (
+                    (v.depth, MAX_NESTING_DEPTH)
+                    if v.depth > MAX_NESTING_DEPTH
+                    else (v.length, MAX_TYPE_LENGTH)
+                )
+                finding["observed"] = observed
+                finding["threshold"] = threshold
+            findings.append(finding)
         print(
             json.dumps(
                 {
@@ -177,9 +272,11 @@ def main() -> None:
 
     print("  [FAIL] types — annotation complexity violations:")
     for v in all_violations:
-        print(f"         {v.file}:{v.line}  {v.context}")
+        location = f"{v.file}:{v.line}" if v.line else str(v.file)
+        print(f"         {location}  {v.context}")
         print(f"           annotation: {v.annotation}")
-        print(f"           depth={v.depth}  length={v.length}")
+        if v.measured:
+            print(f"           depth={v.depth}  length={v.length}")
         print(f"           -> {v.suggestion}")
     print(f"\n  {len(all_violations)} violation(s) found")
     sys.exit(1)

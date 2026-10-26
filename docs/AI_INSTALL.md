@@ -76,6 +76,7 @@ Report a concise summary: gates passed, gates failed, any install issues.
 
 ```
 You are setting up pyguard (Python quality gate) for this project.
+Prerequisite: Python >=3.12 (3.14.1 is not supported).
 Follow these steps exactly, stopping and reporting if any step fails:
 
 1. Install pyguard by running:
