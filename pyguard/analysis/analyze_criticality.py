@@ -11,6 +11,14 @@ from _paths import collect_paths
 OUTPUT = Path.cwd() / "CRITICALITY.md"
 
 
+def display_path(path: str) -> str:
+    """Shorten analyzer paths in messages; keep absolute when outside cwd."""
+    try:
+        return str(Path(path).relative_to(Path.cwd()))
+    except ValueError:
+        return path
+
+
 def main() -> int:
     machine = "--json" in sys.argv[1:]
     targets = [arg for arg in sys.argv[1:] if arg != "--json"] or ["functions", "cdk"]
@@ -45,6 +53,17 @@ def main() -> int:
                 "No Python source files found in the requested scope.",
             )
         visitor = CallGraphVisitor(files)
+        # pyan3 2.x drops files it cannot compile from its filename set instead
+        # of failing the run (the drop is only logged to stderr). A partial
+        # graph must stay an explicit analysis failure, never a quiet pass with
+        # functions missing from the ranking.
+        skipped = sorted(set(files) - set(visitor.filenames))
+        if skipped:
+            return failure(
+                "adapter_failure",
+                "Criticality analysis failed: unparsable source skipped by pyan3: "
+                + ", ".join(display_path(path) for path in skipped),
+            )
         functions = {
             n
             for group in visitor.nodes.values()

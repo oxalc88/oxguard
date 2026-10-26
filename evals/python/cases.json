@@ -401,6 +401,101 @@
       ]
     },
     {
+      "id": "criticality.cross_module_callers",
+      "fixture": "criticality-cross",
+      "command": "criticality",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/issues/23",
+      "basis": "independent_python_control",
+      "json": true,
+      "expected": {
+        "exit_code": 0,
+        "status": "advisory",
+        "callers": {
+          "lib__helper__assist": 1,
+          "src__main__Runner__go": 1
+        },
+        "findings": [
+          {
+            "gate": "criticality",
+            "rule": "pyguard.criticality.ranked",
+            "category": "quality",
+            "status": "advisory",
+            "file": "lib/helper.py",
+            "line": 1,
+            "observed": 1
+          },
+          {
+            "gate": "criticality",
+            "rule": "pyguard.criticality.ranked",
+            "category": "quality",
+            "status": "advisory",
+            "file": "src/main.py",
+            "line": 5,
+            "observed": 1
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "criticality.in_degree",
+            "file": "lib/helper.py",
+            "symbol": "lib.helper.assist",
+            "value": 1
+          },
+          {
+            "metric": "criticality.in_degree",
+            "file": "src/main.py",
+            "symbol": "src.main.Runner.go",
+            "value": 1
+          },
+          {
+            "metric": "criticality.in_degree",
+            "file": "src/main.py",
+            "symbol": "src.main.run",
+            "value": 0
+          }
+        ]
+      },
+      "args": [
+        "--dirs",
+        "src,lib"
+      ]
+    },
+    {
+      "id": "criticality.syntax_error",
+      "fixture": "syntax-error",
+      "command": "criticality",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/issues/23",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "expected": {
+        "exit_code": 0,
+        "status": "error",
+        "assessment": "incomplete",
+        "gates": [
+          {
+            "name": "criticality",
+            "status": "error",
+            "normalization": "complete"
+          }
+        ],
+        "findings": [
+          {
+            "gate": "criticality",
+            "rule": "pyguard.execution.adapter_failure",
+            "category": "adapter_failure",
+            "status": "execution_error"
+          }
+        ],
+        "measurements": []
+      },
+      "args": [
+        "--dirs",
+        "src"
+      ]
+    },
+    {
       "fixture": "complexity-boundary",
       "lane": "behavior",
       "origin": "https://github.com/oxalc88/oxguard/pull/5",

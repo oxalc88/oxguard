@@ -991,9 +991,9 @@ py-serializable==2.1.0 \
     # via
     #   -r evals/python/requirements.in
     #   cyclonedx-python-lib
-pyan3==1.2.0 \
-    --hash=sha256:36b49b678820e882de7271fb8a18789d57cd1e284f0314bdecd587f02c049a19 \
-    --hash=sha256:89b4d7b3003b794fb9b041b08da91bcbd1dde4c82ec4af039b1e6b8f418efab1
+pyan3==2.9.0 \
+    --hash=sha256:59a23071f083a121f609ccfbea607af16f8d549991696c7bc59db67619ad4c63 \
+    --hash=sha256:de505a0f5e9229b05c51544190bfc835ba23b62322bd21b49cf83cd51247b20a
     # via -r evals/python/requirements.in
 pydot==4.0.1 \
     --hash=sha256:869c0efadd2708c0be1f916eb669f3d664ca684bc57ffb7ecc08e70d5e93fee6 \

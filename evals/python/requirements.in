@@ -33,7 +33,7 @@ pip_audit==2.10.1
 platformdirs==4.12.3
 pluggy==1.6.0
 py-serializable==2.1.0
-pyan3==1.2.0
+pyan3==2.9.0
 pydot==4.0.1
 Pygments==2.21.0
 pyparsing==3.3.3
