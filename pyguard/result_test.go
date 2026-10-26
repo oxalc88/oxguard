@@ -35,7 +35,7 @@ func TestAnalyzerProcess(t *testing.T) {
 		os.Exit(2)
 	case "mypy_exit2":
 		// mypy 2.x prints native JSON lines even when it aborts with exit 2.
-		// Syntax columns are already one-based, unlike type diagnostics.
+		// Like type diagnostics, parser syntax columns are zero-based.
 		fmt.Println(`{"file":"src/main.py","line":1,"column":7,"end_line":1,"end_column":8,"message":"Expected a parameter","hint":null,"code":"syntax","severity":"error"}`)
 		os.Exit(2)
 	case "mypy_exit2_prose":
@@ -200,7 +200,7 @@ func TestMypyExit2KeepsSyntaxFindingsAndFailsTheGate(t *testing.T) {
 	if syntax.Rule != "pyguard.mypy.syntax" || syntax.Status != StatusBlocking || syntax.Category != "quality" || syntax.Severity != "error" || syntax.Gate != "mypy" {
 		t.Fatal(syntax)
 	}
-	if syntax.Location == nil || syntax.Location.File != "src/main.py" || syntax.Location.Line != 1 || syntax.Location.Column != 7 {
+	if syntax.Location == nil || syntax.Location.File != "src/main.py" || syntax.Location.Line != 1 || syntax.Location.Column != 8 {
 		t.Fatal(syntax.Location)
 	}
 	if syntax.Evidence != "Expected a parameter" || len(syntax.Diagnostics) != 2 {

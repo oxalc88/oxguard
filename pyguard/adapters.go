@@ -268,10 +268,14 @@ type mypyDiagnostic struct {
 }
 
 // decodeMypyJSON reads mypy JSON diagnostics and normalizes columns to the
-// contract's one-based convention: mypy emits zero-based columns for type
-// diagnostics but one-based columns for its syntax diagnostics. ok is false
-// when stdout is empty prose or otherwise not structured mypy output, which
-// callers must not treat as an analyzer report.
+// contract's one-based convention. mypy emits zero-based columns for every
+// diagnostic: its own renderers treat the JSON column as zero-based (human
+// output prints 1 + column, and --pretty places the caret at that offset),
+// including all syntax diagnostics — both parser errors on exit 2 and
+// semantic/version syntax errors on exit 1 (e.g. "type" statements under
+// --python-version < 3.12, which mypy reports at column 0). ok is false when
+// stdout is empty prose or otherwise not structured mypy output, which callers
+// must not treat as an analyzer report.
 func decodeMypyJSON(stdout io.Reader) (rows []mypyDiagnostic, ok bool) {
 	dec := json.NewDecoder(stdout)
 	for {
@@ -289,9 +293,7 @@ func decodeMypyJSON(stdout io.Reader) (rows []mypyDiagnostic, ok bool) {
 		if d.Severity == "" {
 			d.Severity = "error"
 		}
-		if d.Code != "syntax" {
-			d.Column++
-		}
+		d.Column++
 		rows = append(rows, d)
 	}
 }

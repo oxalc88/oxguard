@@ -286,7 +286,7 @@
             "status": "blocking",
             "file": "src/main.py",
             "line": 2,
-            "column": 23
+            "column": 24
           }
         ]
       },
