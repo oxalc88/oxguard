@@ -787,6 +787,36 @@
           }
         ]
       }
+    },
+    {
+      "id": "coverage.pytest9_config",
+      "fixture": "coverage-pytest-toml",
+      "command": "coverage",
+      "lane": "parity",
+      "origin": "https://github.com/oxalc88/oxguard/issues/23",
+      "basis": "native_analyzer_contract",
+      "json": true,
+      "expected": {
+        "status": "pass",
+        "exit_code": 0,
+        "findings": [],
+        "assessment": "complete",
+        "gates": [
+          {
+            "name": "coverage",
+            "status": "passed",
+            "normalization": "complete"
+          }
+        ],
+        "measurements": [
+          {
+            "metric": "coverage.lines",
+            "file": "",
+            "value": 100,
+            "threshold": 80
+          }
+        ]
+      }
     }
   ]
 }

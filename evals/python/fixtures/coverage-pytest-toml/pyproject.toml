@@ -1,0 +1,18 @@
+[project]
+name = "oxguard-python-eval"
+version = "0.0.0"
+requires-python = ">=3.12"
+[tool.uv]
+managed = false
+[tool.ruff.lint]
+select = ["F"]
+[tool.mypy]
+strict = true
+
+# pytest 9 reads native TOML configuration from [tool.pytest]; tests live in
+# spec/ so only this table identifies the runner.
+[tool.pytest]
+addopts = ["-q"]
+pythonpath = ["."]
+[tool.coverage.run]
+source = ["src"]

@@ -186,7 +186,8 @@ func detectPythonTestRunner(root string) string {
 			if dg, ok := raw["dependency-groups"].(map[string]interface{}); ok {
 				collectDepGroup(dg, "dev", declared)
 			}
-			if tool, ok := raw["tool"].(map[string]interface{}); ok {
+			tool, hasTool := raw["tool"].(map[string]interface{})
+			if hasTool {
 				if uvSec, ok := tool["uv"].(map[string]interface{}); ok {
 					if devList, ok := uvSec["dev-dependencies"].([]interface{}); ok {
 						for _, v := range devList {
@@ -200,11 +201,20 @@ func detectPythonTestRunner(root string) string {
 			if declared["pytest"] {
 				return "pytest"
 			}
+			// pytest 9 reads native TOML configuration from [tool.pytest] in
+			// pyproject.toml; the legacy [tool.pytest.ini_options] table stays
+			// supported. Either table marks a pytest project.
+			if hasTool {
+				if _, ok := tool["pytest"]; ok {
+					return "pytest"
+				}
+			}
 		}
 	}
 
-	// Config file fallback.
-	for _, f := range []string{"pytest.ini", "conftest.py"} {
+	// Config file fallback. pytest 9 discovers pytest.toml/.pytest.toml before
+	// pytest.ini, so the dedicated config files of both generations count.
+	for _, f := range []string{"pytest.ini", "pytest.toml", ".pytest.toml", "conftest.py"} {
 		if _, err := os.Stat(filepath.Join(root, f)); err == nil {
 			return "pytest"
 		}
