@@ -1,6 +1,6 @@
 # OxGuard capability evals
 
-The evals contain 30 Tsguard cases and 40 PyGuard cases (16 behavior checks and 24 contract/parity requirements). They complement unit, installed-distribution and release smoke tests.
+The evals contain 30 Tsguard cases and 42 PyGuard cases (16 behavior checks and 26 contract/parity requirements). They complement unit, installed-distribution and release smoke tests.
 
 ## Known answers
 
@@ -55,7 +55,7 @@ node evals/python/run.cjs --binary /tmp/pyguard-eval --source . \
   --report-dir eval-reports/pyguard
 ```
 
-Use uv 0.12.19 (on Windows the interpreter is `Scripts/python.exe`). `--baseline-binary`, `--baseline-source` and `--baseline-revision` evaluate a rebuilt base commit. `behavior.json` requires every behavior case to pass; `parity.json` requires all 24 parity requirements. `evals/python/cases.json` holds the PyGuard corpus; a case pins the analyzer's own exit status with `oracle_exit_code` when findings do not imply it (mypy exits 2 on a syntax abort). `evals/capabilities.json` maps the 18 shared capabilities across both languages. See [PyGuard agent evaluation](pyguard-agent-evaluation.md).
+Use uv 0.12.19 (on Windows the interpreter is `Scripts/python.exe`). `--baseline-binary`, `--baseline-source` and `--baseline-revision` evaluate a rebuilt base commit. `behavior.json` requires every behavior case to pass; `parity.json` requires all 26 parity requirements. `evals/python/cases.json` holds the PyGuard corpus; a case pins the analyzer's own exit status with `oracle_exit_code` when findings do not imply it (mypy exits 2 on a syntax abort). `evals/capabilities.json` maps the 18 shared capabilities across both languages. See [PyGuard agent evaluation](pyguard-agent-evaluation.md).
 
 ## Level 1 completion gate
 

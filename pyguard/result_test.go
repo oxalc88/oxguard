@@ -296,6 +296,36 @@ func TestAdvisoryAndMissingHelper(t *testing.T) {
 	}
 }
 
+// pyan3 2.x drops files it cannot compile instead of failing the run, and
+// analyze_criticality reports that drop as an owned error payload. The
+// advisory criticality gate must surface it as an explicit execution error,
+// with an incomplete assessment and no registered CRITICALITY.md artifact —
+// a partial call graph is never a quiet pass.
+func TestCriticalitySkippedSourceFailsExplicitly(t *testing.T) {
+	r := contractRunner(t)
+	payload := `{"schema_version":"1","findings":[],"measurements":[],"artifacts":[],"error":{"category":"adapter_failure","message":"Criticality analysis failed: unparsable source skipped by pyan3: src/main.py"}}`
+	r.normalize(toolSpec{gate: "criticality", adapter: "owned", advisory: true}, Result{ok: false, exitCode: 1}, strings.NewReader(payload), nil)
+	if err := r.result.Finish(0); err != nil {
+		t.Fatal(err)
+	}
+	if r.result.Status != StatusError || r.result.ExitCode != 0 || r.result.Assessment != Incomplete {
+		t.Fatal(r.result.Status, r.result.ExitCode, r.result.Assessment)
+	}
+	if len(r.result.Gates) != 1 || r.result.Gates[0].Status != StatusError || r.result.Gates[0].Normalization != Complete {
+		t.Fatal(r.result.Gates)
+	}
+	if len(r.result.Artifacts) != 0 {
+		t.Fatal("analysis failure must not register a criticality artifact", r.result.Artifacts)
+	}
+	if len(r.result.Findings) != 1 {
+		t.Fatal(r.result.Findings)
+	}
+	f := r.result.Findings[0]
+	if f.Gate != "criticality" || f.Rule != "pyguard.execution.adapter_failure" || f.Category != "adapter_failure" || f.Status != StatusExecutionError {
+		t.Fatal(f)
+	}
+}
+
 func TestOwnedFindingStatusCannotBeMaskedByAdvisoryPolicy(t *testing.T) {
 	for _, status := range []string{"unknown", "pass", "execution_error"} {
 		r := contractRunner(t)
