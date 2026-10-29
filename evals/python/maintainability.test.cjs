@@ -54,8 +54,8 @@ function standInInvoke(binary, env = {}) {
   };
 }
 
-function cli(args, env = {}) {
-  return spawnSync(process.execPath, [harness, ...args], { encoding: 'utf8', env: { ...process.env, ...env }, timeout: 120000 });
+function cli(args, { env = {}, cwd } = {}) {
+  return spawnSync(process.execPath, [harness, ...args], { encoding: 'utf8', env: { ...process.env, ...env }, cwd, timeout: 120000 });
 }
 
 test('harness cases match the capability spec exactly', () => {
@@ -117,7 +117,7 @@ test('the CLI writes the report and exits 0 on passes, 1 on a failing case', t =
   assert.equal(report.suite, 'maintainability.python');
   assert.ok(report.cases.every(c => c.outcome === 'pass'));
   const failing = path.join(root, 'failing.json');
-  const failed = cli(['--binary', binary, '--python', process.execPath, '--output', failing], { PYGUARD_EVAL_MOCK_WRONG_CASE: 'criticality.self_recursion_counts_once' });
+  const failed = cli(['--binary', binary, '--python', process.execPath, '--output', failing], { env: { PYGUARD_EVAL_MOCK_WRONG_CASE: 'criticality.self_recursion_counts_once' } });
   assert.equal(failed.status, 1, failed.stderr || failed.stdout);
   const failedReport = JSON.parse(fs.readFileSync(failing, 'utf8'));
   assert.deepEqual(failedReport.cases.filter(c => c.outcome === 'fail').map(c => c.id), ['criticality.self_recursion_counts_once']);
@@ -127,9 +127,11 @@ test('the CLI resolves a relative --binary path against the invocation cwd', t =
   const binary = standInBinary(t);
   const root = temporary(t);
   const passing = path.join(root, 'relative.json');
-  const relative = path.relative(process.cwd(), binary);
-  assert.ok(!path.isAbsolute(relative));
-  const response = cli(['--binary', relative, '--python', process.execPath, '--output', passing]);
+  // The temp dir may live on a different drive than the checkout (e.g. C: vs
+  // D: on Windows), so run the CLI from the stand-in's directory and pass a
+  // sibling-relative path that is guaranteed to resolve against the invocation cwd.
+  const relative = path.join('.', path.basename(binary));
+  const response = cli(['--binary', relative, '--python', process.execPath, '--output', passing], { cwd: path.dirname(binary) });
   assert.equal(response.status, 0, response.stderr || response.stdout);
   const report = JSON.parse(fs.readFileSync(passing, 'utf8'));
   assert.ok(report.cases.every(c => c.outcome === 'pass'));
