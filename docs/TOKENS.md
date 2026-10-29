@@ -30,6 +30,9 @@ For Codex sessions, read the last `token_count` event in `~/.codex/sessions/`. F
 | 2026-10-28 | Deps: certifi 2026.10.23 and filelock 4.2.4 (security) | pi | review | nan/deepseek-v4-flash | default | 1 | 684,522 | 47,523 | 15,431 | pi session dir (depA review) |
 | 2026-10-28 | Deps: golang.org/x/sys v0.49.0 and x/term v0.47.0 | pi | write | nan/deepseek-v4-flash | default | 1 | 1,639,154 | 69,846 | 11,036 | pi session dir (depB) |
 | 2026-10-28 | Deps: golang.org/x/sys v0.49.0 and x/term v0.47.0 | pi | review | nan/deepseek-v4-flash | default | 1 | 696,481 | 35,702 | 15,659 | pi session dir (depB review) |
+| 2026-10-29 | P1 Python maintainability harness (#23) | pi | write | nan/mimo-v2.6-flash | default | 2 | 5,309,991 | 156,333 | 83,322 | pi session dir (p1) |
+| 2026-10-29 | P1 Python maintainability harness (#23) | pi | write (escalation) | nan/glm5.3-flash | default | 1 | 150,533 | 16,852 | 4,081 | pi session dir (p1) |
+| 2026-10-29 | P1 Python maintainability harness (#23) | Codex CLI | review | gpt-6.1-sol | medium | 3 | 732,827 | 134,992 | 3,275 | ~/.codex/sessions (p1) |
 
 #32: 2 implementation rounds, 2 review rounds (round 1 requested 3 fixes, round 2 approved). Per session: mimo 681,389 (44,670 not cached, 29,103 output) and 1,161,033 (52,078 / 17,755); Sol 155,916 (31,342 / 1,950) and 288,963 (35,629 / 2,326). Codex's own "tokens used" lines for the two reviews were 33,292 and 37,955. During review 2, Sol started a `gpt-6-luna` session (142,660 total) that was not requested; it is not counted as a review.
 
@@ -40,6 +43,8 @@ P0b: per session, pi mimo 1: 4,898,230 total (103,958 not cached, 37,536 output)
 P0c: 1 mimo session, no escalation; 1 Sol review round, which approved with no findings (Codex "tokens used" line: 96,620). Sol ran with multi-agent disabled and reported using no other model.
 
 P0d: per session, pi mimo 1: 6,545,273 total (161,478 not cached, 62,259 output), which hit the 40-minute timeout with the work partly done; mimo 2: 1,026,859 (51,933 / 18,894), which finished it and passed verification; glm5.3-flash (escalation at session 3, after mimo's 2-session cap): 99,643 (9,395 / 2,696), which fixed the round-1 changelog findings. Sol review 1: 476,003 (45,691 / 4,584); review 2: 379,824 (46,046 / 3,666). Codex's "tokens used" lines were 50,275 and 49,712. 2 review rounds: round 1 asked for 2 P3 changelog fixes (the CLI exit code, and the false claim that the call graph was unchanged); round 2 approved. Sol ran with multi-agent disabled and reported using no other model.
+
+P1 (#23 Python maintainability harness): per session, pi mimo 1: 5,165,624 total (138,160 not cached, 78,472 output), which implemented the harness, parity changes, CI wiring, tests and docs and passed the gate; mimo 2: 144,367 (18,173 / 4,850), which fixed the round-1 findings, but those edits (and its session files) were lost when the box state rolled back; glm5.3-flash (escalation after mimo's 2-session cap): 150,533 (16,852 / 4,081), which reapplied the round-1 fixes. Sol review 1: 288,252 (54,685 / 1,503); review 2 of the lost edits: 224,448 (43,398 / 954), approved; review 2 repeated on the reapplied fixes: 220,127 (36,909 / 818), approved. Codex's "tokens used" lines were 56,188, 44,352 and 37,727. Round 1 asked for 2 P2 fixes (implemented readiness must explicitly require non-empty positive, negative and boundary arrays; resolve a relative `--binary` against the invocation cwd). Sol ran with multi-agent disabled and reported using no other model.
 
 #31 (model roles doc): no token data was recorded for its sessions, so it has no row. After merging main, its docs-only CI run (40200327340) took 41 s.
 
