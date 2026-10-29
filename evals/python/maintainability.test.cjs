@@ -30,12 +30,34 @@ const ANSWERS = {
   'criticality.self_recursion_counts_once': [['src/recursion.py', 'recursion.countdown', 1, 1]],
 };
 
+// Score-verified against complexipy 8.3.0 by the real-binary test: 0 flat,
+// 21 chain-of-six, 36 chain-of-eight, 20 two-chains-of-four, 21 in boundary.
+const COMPLEXIPI = {
+  'complexipy.cognitive.exceeded_is_advisory_warning': [['src/complexity.py', 'flat', 0], ['src/complexity.py', 'above', 21]],
+  'complexipy.cognitive.flat_function_no_finding': [['src/flat.py', 'flat', 0]],
+  'complexipy.cognitive.nested_never_blocking': [['src/nested.py', 'deeply_nested', 36]],
+  'complexipy.cognitive.test_files_excluded': [['src/main.py', 'flat', 0]],
+  'complexipy.cognitive.nested_function_folds_into_outer': [['src/nested_function.py', 'outer', 36]],
+  'complexipy.cognitive.threshold_boundary': [['src/boundary.py', 'boundary', 20], ['src/boundary.py', 'above', 21]],
+};
+
 function standInBinary(t) {
   const file = path.join(temporary(t), 'pyguard-stand-in.cjs');
   fs.writeFileSync(file, `'use strict';
 const path = require('node:path');
 const answers = ${JSON.stringify(ANSWERS)};
+const cognitive = ${JSON.stringify(COMPLEXIPI)};
 const caseId = path.basename(path.dirname(process.cwd()));
+const variant = path.basename(process.cwd());
+if (variant === 'baseline' || cognitive[caseId]) {
+  const rows = variant === 'baseline' ? [] : cognitive[caseId];
+  const measurements = rows.map(([file, symbol, value]) => ({ metric: 'complexipy.cognitive', level: 'code', location: { file, symbol }, value, unit: 'score', threshold: 20 }));
+  const findings = rows.filter(([, , value]) => value > 20).map(([file, symbol, value]) => ({ level: 'code', gate: 'radon', rule: 'pyguard.complexipy.cognitive_exceeded', severity: 'warning', status: 'advisory', category: 'quality', location: { file, symbol }, observed: value, threshold: 20, evidence: 'Cognitive complexity exceeds 20.', diagnostics: [] }));
+  const status = findings.length ? 'advisory' : 'pass';
+  const gateStatus = findings.length ? 'advisory' : 'passed';
+  process.stdout.write(JSON.stringify({ schema_version: '1', status, assessment: 'complete', gates: [{ name: 'radon', status: gateStatus, normalization: 'complete' }], exit_code: 0, findings, measurements, artifacts: [], diagnostics: [] }));
+  process.exit(0);
+}
 const rows = answers[caseId];
 if (!rows) { process.stdout.write('unexpected project ' + caseId); process.exit(0); }
 const wrong = process.env.PYGUARD_EVAL_MOCK_WRONG_CASE;
@@ -67,7 +89,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['structure.function_graph']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['structure.function_graph', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 

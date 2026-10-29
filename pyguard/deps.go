@@ -27,11 +27,13 @@ var requiredUvDevDeps = []string{
 	"deptry",
 	"pyan3",
 	"networkx",
+	"complexipy==8.3.0",
 }
 
-// missingUvDevDeps reads pyproject.toml and returns deps from manifest that are
-// absent from [dependency-groups].dev (PEP 735) or [tool.uv.dev-dependencies].
-func missingUvDevDeps(root string, manifest []string) ([]string, error) {
+// declaredUvDevDeps reads pyproject.toml and returns the declared PEP 508
+// specifier for each package in [dependency-groups].dev (PEP 735) or the legacy
+// [tool.uv.dev-dependencies], keyed by normalized package name.
+func declaredUvDevDeps(root string) (map[string]string, error) {
 	data, err := os.ReadFile(filepath.Join(root, "pyproject.toml"))
 	if err != nil {
 		return nil, nil // no pyproject yet — let uv sync fail naturally
@@ -42,7 +44,7 @@ func missingUvDevDeps(root string, manifest []string) ([]string, error) {
 		return nil, fmt.Errorf("parsing pyproject.toml: %w", err)
 	}
 
-	declared := map[string]bool{}
+	declared := map[string]string{}
 
 	// PEP 735: [dependency-groups].dev (what `uv add --group dev` writes)
 	if dg, ok := raw["dependency-groups"].(map[string]interface{}); ok {
@@ -55,26 +57,81 @@ func missingUvDevDeps(root string, manifest []string) ([]string, error) {
 			if devList, ok := uvSection["dev-dependencies"].([]interface{}); ok {
 				for _, v := range devList {
 					if s, ok := v.(string); ok {
-						declared[normPkgName(s)] = true
+						declared[normPkgName(s)] = s
 					}
 				}
 			}
 		}
 	}
+	return declared, nil
+}
+
+// missingUvDevDeps returns deps from manifest absent from the project's dev
+// groups. Version specifiers are deliberately not compared here so a range can
+// satisfy the package requirement; exact-pin mismatches are reported separately.
+func missingUvDevDeps(root string, manifest []string) ([]string, error) {
+	declared, err := declaredUvDevDeps(root)
+	if err != nil {
+		return nil, err
+	}
+	if declared == nil {
+		return nil, nil // no pyproject yet — let uv sync fail naturally
+	}
 
 	var missing []string
 	for _, dep := range manifest {
-		if !declared[normPkgName(dep)] {
+		if _, ok := declared[normPkgName(dep)]; !ok {
 			missing = append(missing, dep)
 		}
 	}
 	return missing, nil
 }
 
-// collectDepGroup populates declared with package names from a PEP 735 dependency group.
+// uvDevDepMismatches reports manifest entries that require an exact version
+// while the project declares a different one (or no exact pin). Tools without a
+// manifest pin, such as radon, are left to doctor's installed-version report.
+func uvDevDepMismatches(root string, manifest []string) ([]string, error) {
+	declared, err := declaredUvDevDeps(root)
+	if err != nil {
+		return nil, err
+	}
+	var mismatches []string
+	for _, dep := range manifest {
+		expected, pinned := exactUvDevVersion(dep)
+		if !pinned {
+			continue
+		}
+		name := normPkgName(dep)
+		declaredSpec, ok := declared[name]
+		if !ok {
+			continue // missingUvDevDeps already reports absent packages.
+		}
+		if actual, actualPinned := exactUvDevVersion(declaredSpec); actualPinned && actual == expected {
+			continue
+		}
+		mismatches = append(mismatches, fmt.Sprintf("%s — pyproject.toml declares %q, pyguard expects %q", name, strings.TrimSpace(declaredSpec), strings.TrimSpace(dep)))
+	}
+	return mismatches, nil
+}
+
+// exactUvDevVersion returns the version of an exact == pin. Ranges, markers,
+// extras and other constraints are intentionally not treated as exact pins.
+func exactUvDevVersion(spec string) (string, bool) {
+	idx := strings.Index(spec, "==")
+	if idx == -1 {
+		return "", false
+	}
+	version := strings.TrimSpace(spec[idx+2:])
+	if version == "" || strings.ContainsAny(version, ",; <>=!~\t") {
+		return "", false
+	}
+	return version, true
+}
+
+// collectDepGroup populates declared with package specifiers from a PEP 735 dependency group.
 // Entries are either bare strings ("ruff>=0.4") or inline-table group references
 // ({include-group = "extra-dev"}), which are recursively followed.
-func collectDepGroup(groups map[string]interface{}, name string, declared map[string]bool) {
+func collectDepGroup(groups map[string]interface{}, name string, declared map[string]string) {
 	list, ok := groups[name].([]interface{})
 	if !ok {
 		return
@@ -82,7 +139,7 @@ func collectDepGroup(groups map[string]interface{}, name string, declared map[st
 	for _, v := range list {
 		switch entry := v.(type) {
 		case string:
-			declared[normPkgName(entry)] = true
+			declared[normPkgName(entry)] = entry
 		case map[string]interface{}:
 			if ref, ok := entry["include-group"].(string); ok {
 				collectDepGroup(groups, ref, declared)
@@ -109,12 +166,24 @@ func normPkgName(s string) string {
 // ensureUvDevDeps checks for missing dev-group packages, prompts if any are absent,
 // and runs uv add --group dev for the gap. Skips silently if nothing is missing.
 func ensureUvDevDeps(root string, cfg config) error {
+	mismatches, err := uvDevDepMismatches(root, requiredUvDevDeps)
+	if err != nil {
+		return err
+	}
+	for _, mismatch := range mismatches {
+		fmt.Printf("  [WARN] %s\n", mismatch)
+	}
+
 	missing, err := missingUvDevDeps(root, requiredUvDevDeps)
 	if err != nil {
 		return err
 	}
 	if len(missing) == 0 {
-		fmt.Println("  [OK]   all required dev-group packages present")
+		if len(mismatches) == 0 {
+			fmt.Println("  [OK]   all required dev-group packages present")
+		} else {
+			fmt.Println("  [WARN] pinned dev-group versions differ; align them with the versions above")
+		}
 		return nil
 	}
 
@@ -182,7 +251,7 @@ func detectPythonTestRunner(root string) string {
 	if err == nil {
 		var raw map[string]interface{}
 		if toml.Unmarshal(data, &raw) == nil {
-			declared := map[string]bool{}
+			declared := map[string]string{}
 			if dg, ok := raw["dependency-groups"].(map[string]interface{}); ok {
 				collectDepGroup(dg, "dev", declared)
 			}
@@ -192,13 +261,13 @@ func detectPythonTestRunner(root string) string {
 					if devList, ok := uvSec["dev-dependencies"].([]interface{}); ok {
 						for _, v := range devList {
 							if s, ok := v.(string); ok {
-								declared[normPkgName(s)] = true
+								declared[normPkgName(s)] = s
 							}
 						}
 					}
 				}
 			}
-			if declared["pytest"] {
+			if _, ok := declared["pytest"]; ok {
 				return "pytest"
 			}
 			// pytest 9 reads native TOML configuration from [tool.pytest] in

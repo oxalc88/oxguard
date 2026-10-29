@@ -80,10 +80,12 @@ concepts crammed into one place — even if the control flow is linear, the cogn
 makes mistakes likely.
 
 **Test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and the `tests/`
-directory are excluded from all three radon gates (cc, mi, hal) and from the Halstead
-script by default. Test files are intentionally repetitive — many similar cases,
-parameterized fixtures — so complexity metrics don't apply meaningfully. Ruff and coverage
-still gate test code. Configure in `pyproject.toml`:
+directory are excluded from the radon gates (cc, mi, hal), the Halstead script and
+complexipy by default. For complexipy, which has no directory `--ignore`, the exclusion
+globs also cover root-level matches and whole `tests/` or `test/` directories at any
+depth. Test files are intentionally repetitive — many similar cases, parameterized
+fixtures — so complexity metrics don't apply meaningfully. Ruff and coverage still gate
+test code. Configure in `pyproject.toml`:
 
 ```toml
 [tool.pyguard]
@@ -93,12 +95,43 @@ exclude = ["*/fixtures/*"]     # add project-specific patterns without touching 
 
 ---
 
+## Cognitive Complexity (pyguard, advisory)
+
+**Tool:** complexipy 8.3.0  
+**Threshold:** 20 per function (advisory in this release)
+
+Cognitive complexity counts how much a reader has to keep in mind while following a
+function: nesting, breaks in the linear flow, boolean operator sequences, recursion and
+nested callback boundaries. Unlike cyclomatic complexity it penalizes deeply nested code
+more than a flat sequence of independent branches, because nesting makes the same number
+of paths harder to hold in working memory.
+
+Each function produces one `complexipy.cognitive` measurement at level `code` with unit
+`score`. A score above 20 yields the warning `pyguard.complexipy.cognitive_exceeded`;
+exactly 20 is clean. In this release the warning never changes the exit code or the
+gate/overall pass–fail status, even under strict gate expectations. The next release makes
+it blocking, so extract helpers or flatten nesting now for functions above 20.
+
+complexipy folds nested functions into their enclosing function: a nested `def` has no
+separate report row, and its complexity is counted toward the outer function's score.
+PyGuard keeps exactly one measurement per complexipy-reported function (normally the outer
+symbol), so a complex nested helper warns against the function that contains it rather
+than disappearing or appearing twice. Extract the nested definition to a top-level
+function when the folded score exceeds 20.
+
+The analyzer is pinned exactly at 8.3.0 and is managed like radon and pyan3: it is in the
+PyGuard dev-dependency manifest, the hash-locked Python evaluation toolchain, and
+`pyguard doctor` reports its version. `pyguard diagnose` exposes it as a separate
+`complexipy.cognitive` analysis.
+
+---
+
 ## FTA Score (tsguard)
 
 **Tool:** `fta` (from the `fta-cli` package)  
 **Threshold:** ≤ 60 per file
 
-FTA (Fast TypeScript Analyzer) is the TypeScript equivalent of pyguard's three complexity
+FTA (Fast TypeScript Analyzer) is the TypeScript equivalent of pyguard's blocking complexity
 gates combined into one normalized per-file score. It computes:
 
 - Halstead volume

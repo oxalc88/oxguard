@@ -26,6 +26,9 @@ func runDiagnose(r *Runner, dirs []string) int {
 			args := append([]string{"uv", "run", "python", "tools/analysis/check_halstead.py", "--json"}, dirs...)
 			return diagnosticTool(r, toolSpec{gate: "radon", adapter: "owned"}, "halstead", args)
 		}},
+		{"complexipy.cognitive", "radon", func(r *Runner) int {
+			return runComplexipy(r, dirs)
+		}},
 		{"types", "types", func(r *Runner) int { return runTypes(r, dirs) }},
 		{"coverage", "coverage", runCoverage},
 		{"bandit", "bandit", func(r *Runner) int { return runBandit(r, dirs) }},

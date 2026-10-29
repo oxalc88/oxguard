@@ -47,7 +47,9 @@ func runRadon(r *Runner, dirs []string) int {
 	if code := r.Run("halstead", halArgs...); !code.ok {
 		return 1
 	}
-	return 0
+	// Cognitive complexity is advisory: scores above 20 print warnings and
+	// never change the exit code (only analyzer failures can fail here).
+	return runComplexipy(r, dirs)
 }
 
 // radonExcludeArgs builds the uv+radon base args with --exclude/--ignore when test exclusion is on.
@@ -100,5 +102,7 @@ func runRadonMachine(r *Runner, dirs []string) int {
 	if !r.RunTool(toolSpec{gate: "radon", adapter: "owned"}, "halstead", args...).ok {
 		return 1
 	}
-	return 0
+	// Cognitive complexity runs last so its advisory warnings never mask radon
+	// evidence, and only execution failures (never a warning) can return 1.
+	return runComplexipy(r, dirs)
 }

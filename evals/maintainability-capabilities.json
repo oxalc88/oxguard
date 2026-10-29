@@ -216,6 +216,28 @@
         }
       },
       "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+    },
+    {
+      "id": "quality.cognitive_complexity",
+      "tsguard": "complexity.function_nesting_and_callback_boundaries",
+      "pyguard": {
+        "status": "implemented",
+        "cases": {
+          "positive": [
+            "complexipy.cognitive.exceeded_is_advisory_warning"
+          ],
+          "negative": [
+            "complexipy.cognitive.flat_function_no_finding",
+            "complexipy.cognitive.nested_never_blocking",
+            "complexipy.cognitive.test_files_excluded"
+          ],
+          "boundary": [
+            "complexipy.cognitive.nested_function_folds_into_outer",
+            "complexipy.cognitive.threshold_boundary"
+          ]
+        }
+      },
+      "python_candidate": "complexipy cognitive complexity (advisory, threshold 20)"
     }
   ],
   "deferred_tsguard_capabilities": [],

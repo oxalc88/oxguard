@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -48,6 +49,51 @@ func TestDetectPythonTestRunner(t *testing.T) {
 			}
 			if got := detectPythonTestRunner(root); got != c.want {
 				t.Fatalf("detectPythonTestRunner() = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+// A different exact complexipy pin is still "present" for the missing check,
+// but setup/doctor report it as a warning instead of silently accepting it.
+// Unpinned tools such as radon keep the existing package-only behavior.
+func TestUvDevDepMismatchesReportsDifferentExactPins(t *testing.T) {
+	cases := []struct {
+		name, dev, want string
+	}{
+		{name: "matching pin", dev: `["complexipy==8.3.0"]`},
+		{name: "different pin", dev: `["complexipy==8.2.0"]`, want: `complexipy — pyproject.toml declares "complexipy==8.2.0", pyguard expects "complexipy==8.3.0"`},
+		{name: "unpinned dependency", dev: `["complexipy"]`, want: `complexipy — pyproject.toml declares "complexipy", pyguard expects "complexipy==8.3.0"`},
+		{name: "version range", dev: `["complexipy>=8.0"]`, want: `complexipy — pyproject.toml declares "complexipy>=8.0", pyguard expects "complexipy==8.3.0"`},
+		{name: "unpinned radon ignored", dev: `["radon>=6"]`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("[dependency-groups]\ndev = "+c.dev+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			warnings, err := uvDevDepMismatches(root, requiredUvDevDeps)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.want == "" {
+				if len(warnings) != 0 {
+					t.Fatalf("unexpected warnings: %v", warnings)
+				}
+				return
+			}
+			if len(warnings) != 1 || warnings[0] != c.want {
+				t.Fatalf("warnings = %v, want [%q]", warnings, c.want)
+			}
+			missing, err := missingUvDevDeps(root, requiredUvDevDeps)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, dep := range missing {
+				if strings.HasPrefix(dep, "complexipy") {
+					t.Fatalf("mismatched pin must stay present for the missing check: %v", missing)
+				}
 			}
 		})
 	}
