@@ -157,7 +157,7 @@ jobs:
         working-directory: tsguard
       - name: Eval harness regression tests
         if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm')
-        run: node --test scripts/verification-evidence.test.cjs evals/evals.test.cjs evals/python/evals.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
+        run: node --test scripts/verification-evidence.test.cjs evals/evals.test.cjs evals/python/evals.test.cjs evals/python/maintainability.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
       - name: Fresh distribution verification (unlocked npm transitive dependencies)
         if: needs.scope.outputs.docs_only != 'true'
         run: |
@@ -278,6 +278,11 @@ jobs:
             ARGS+=(--baseline-binary "$RUNNER_TEMP/pyguard-baseline.exe" --baseline-source "$RUNNER_TEMP/pyguard-baseline" --baseline-revision "$EVAL_BASELINE")
           fi
           node evals/python/run.cjs "${ARGS[@]}"
+      - name: Evaluate Python maintainability parity
+        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true')
+        shell: bash
+        run: |
+          node evals/python/maintainability.cjs --binary "$RUNNER_TEMP/pyguard-eval.exe" --python "$EVAL_PY" --output eval-reports/pyguard/maintainability.json
       - name: Record successful verification inputs
         if: needs.scope.outputs.docs_only != 'true'
         run: node scripts/verification-evidence.cjs record eval-reports/pyguard
@@ -348,7 +353,7 @@ jobs:
         if: needs.scope.outputs.docs_only != 'true'
         run: |
           node evals/parity.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/parity.json
-          node evals/maintainability-parity.cjs eval-reports/tsguard/maintainability.json > eval-reports/maintainability-parity.json
+          node evals/maintainability-parity.cjs eval-reports/tsguard/maintainability.json eval-reports/pyguard/maintainability.json > eval-reports/maintainability-parity.json
       - name: Require Level 1 contract completion (agent traces block releases only)
         if: needs.scope.outputs.docs_only != 'true'
         env:

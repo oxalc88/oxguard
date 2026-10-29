@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Python maintainability parity eval harness (#23): `evals/python/maintainability.cjs` runs seeded `criticality` cases through the built PyGuard binary against fixtures it writes to a temp directory and emits the `maintainability.python` report (case set, capability and kind mirrored by `evals/maintainability-capabilities.json`). Every capability now carries a `pyguard` slot with status `planned`, `implemented` or `deferred`; `structure.function_graph` is seeded with positive, negative and boundary criticality cases (cross-module distinct callers, uncalled zero, single-caller dedup, self-recursion boundary), and P8 `change.native_duplication` is `deferred`. `evals/maintainability-parity.cjs` accepts the report as an optional second argument: `not_implemented` is accepted, `pyguard_maintainability_ready` requires every non-deferred capability to pass all three case kinds, `pyguard_cases_passed` tracks the seeded cases, and a failing Tsguard or Python case exits non-zero. CI runs the suite on all three OSes and feeds it to the parity job.
+
 ### Changed
 
 - Tsguard and PyGuard pin `golang.org/x/sys` v0.49.0 (was v0.42.0) and `golang.org/x/term` v0.47.0 (was v0.41.0). The bump resolves advisory GO-2026-5024 (CVE-2026-39824: `NewNTUnicodeString` in `golang.org/x/sys/windows` truncates strings longer than the 16-bit `NTUnicodeString` size instead of failing), which is fixed upstream in v0.44.0. The advisory is Windows-only and not reachable from our code, which never calls `NewNTUnicodeString`. `tsguard/go.mod` raises its `go` directive to 1.26.0 because these releases require it, matching `pyguard`; no Go source changed.

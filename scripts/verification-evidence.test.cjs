@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { hash, trustedRun, reusableEnvironment, validate, files } = require('./verification-evidence.cjs');
+const { hash, trustedRun, reusableEnvironment, validate, files, requiredReports } = require('./verification-evidence.cjs');
 function fixture() {
   const inputs = { repository: 'owner/repo', revision: 'a'.repeat(40), workflow_revision: 'a'.repeat(40), tree: 'b'.repeat(40), suite: 'npm',
     group: 'npm-linux-npm', runner_environment: 'github-hosted', image_os: 'ubuntu24', image_version: '20261015',
@@ -52,6 +52,11 @@ test('missing runner identity, missing reports and corrupted reports force verif
   assert.throws(() => validate(f.manifest, f.current, f.source, {}));
   assert.throws(() => validate(f.manifest, f.current, f.source, { ...f.actual, 'maintainability.json': 'corrupt' }));
   assert.throws(() => validate({ ...f.manifest, files: {} }, f.current, f.source, {}));
+});
+test('required reports cover the maintainability evidence of each suite', () => {
+  assert.deepEqual(requiredReports({ suite: 'pyguard' }), ['candidate/behavior.json', 'candidate/parity.json', 'maintainability.json']);
+  assert.deepEqual(requiredReports({ suite: 'npm', manager: 'npm', platform: 'linux', arch: 'x64' }), ['npm-linux-x64/candidate.json', 'maintainability.json']);
+  assert.deepEqual(requiredReports({ suite: 'npm', manager: 'pnpm' }), []);
 });
 test('report hashing covers nested payloads and detects tampering', t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oxguard-evidence-'));

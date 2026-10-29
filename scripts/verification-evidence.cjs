@@ -93,7 +93,7 @@ function files(directory, prefix = '') {
   return result;
 }
 function requiredReports(inputs) {
-  if (inputs.suite === 'pyguard') return ['candidate/behavior.json', 'candidate/parity.json'];
+  if (inputs.suite === 'pyguard') return ['candidate/behavior.json', 'candidate/parity.json', 'maintainability.json'];
   return inputs.manager === 'npm' ? [`npm-${inputs.platform}-${inputs.arch}/candidate.json`, 'maintainability.json'] : [];
 }
 function validate(manifest, current, source, actualFiles) {

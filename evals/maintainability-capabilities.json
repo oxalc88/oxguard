@@ -5,97 +5,216 @@
     {
       "id": "quality.zero_config_exception_handling",
       "tsguard": "baseline.empty_catch",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Ruff S110/B012 with explicit project-policy resolution"
     },
     {
       "id": "maintainability.delegation",
       "tsguard": "smells.resolved_chain",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Python ast with resolved local callable identities"
     },
     {
       "id": "maintainability.failure_policies",
       "tsguard": "smells.failure_policy_controls",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Ruff plus Python ast for short identical handlers"
     },
     {
       "id": "structure.runtime_graph",
       "tsguard": "structure.runtime_cycle",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Extend existing pyan3/NetworkX infrastructure with module imports and SCCs"
     },
     {
       "id": "structure.false_positive_controls",
       "tsguard": "structure.type_only_cycle_control",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Python-specific TYPE_CHECKING and deferred-import controls"
     },
     {
       "id": "change.complexity_displacement",
       "tsguard": "change.artificial_split_and_inert_baseline",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Inert Git sources, ast/Radon facts and baseline comparison"
     },
     {
       "id": "change.false_positive_controls",
       "tsguard": "change.real_simplification_control",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Python-specific equivalent-behavior refactor fixtures"
     },
     {
       "id": "structure.function_graph",
       "tsguard": "structure.function_graph",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [
+            "criticality.distinct_callers_cross_module"
+          ],
+          "negative": [
+            "criticality.uncalled_function_zero",
+            "criticality.same_caller_not_inflated"
+          ],
+          "boundary": [
+            "criticality.self_recursion_counts_once"
+          ]
+        }
+      },
       "python_candidate": "Extend existing pyan3 caller graph with fan-out and SCC call depth"
     },
     {
       "id": "structure.coupling",
       "tsguard": "structure.coupling",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Module fan-in/out and coupling observations"
     },
     {
       "id": "change.native_duplication",
       "tsguard": "change.native_duplication_and_move_control",
-      "pyguard": null,
+      "pyguard": {
+        "status": "deferred",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Native clone measurements over inert Python sources"
     },
     {
       "id": "change.function_complexity",
       "tsguard": "change.native_function_complexity_and_move_control",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Radon function complexity and conservative identity matching"
     },
     {
       "id": "change.truthful_completeness",
       "tsguard": "change.cognitive_suppression_is_partial",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Explicit unsupported/suppressed measurement controls"
     },
     {
       "id": "quality.compiler_unsafe_operations",
       "tsguard": "typed.unsafe_assertion_condition_and_promises",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
     },
     {
       "id": "quality.discarded_failures",
       "tsguard": "smells.discarded_settled_rejection",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
     },
     {
       "id": "quality.complexity_context",
       "tsguard": "complexity.fta_failure_has_context",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
     },
     {
       "id": "maintainability.async_delegation",
       "tsguard": "smells.async_forwarding_and_boundary_controls",
-      "pyguard": null,
+      "pyguard": {
+        "status": "planned",
+        "cases": {
+          "positive": [],
+          "negative": [],
+          "boundary": []
+        }
+      },
       "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
     }
   ],

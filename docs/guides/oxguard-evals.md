@@ -57,6 +57,17 @@ node evals/python/run.cjs --binary /tmp/pyguard-eval --source . \
 
 Use uv 0.12.19 (on Windows the interpreter is `Scripts/python.exe`). `--baseline-binary`, `--baseline-source` and `--baseline-revision` evaluate a rebuilt base commit. `behavior.json` requires every behavior case to pass; `parity.json` requires all 26 parity requirements. `evals/python/cases.json` holds the PyGuard corpus; a case pins the analyzer's own exit status with `oracle_exit_code` when findings do not imply it (mypy exits 2 on a syntax abort). `evals/capabilities.json` maps the 18 shared capabilities across both languages. See [PyGuard agent evaluation](pyguard-agent-evaluation.md).
 
+### Python maintainability parity
+
+`evals/maintainability-capabilities.json` gives every maintainability capability a `pyguard` slot with status `planned`, `implemented` or `deferred` and its positive, negative and boundary case IDs. `evals/python/maintainability.cjs` seeds `structure.function_graph` with four `criticality` cases run through the built binary against fixtures it writes to a temp directory: distinct cross-module callers rank at their caller count (repeated calls by one caller count once), an uncalled function stays at `in_degree` 0, repeated calls from a single caller never inflate the count, and the self-recursion boundary scores exactly 1 (a self-call is one defined caller; neither 0 nor a depth-dependent count). All other capabilities stay `planned` with no cases yet, and P8 `change.native_duplication` is `deferred`.
+
+```sh
+node evals/python/maintainability.cjs --binary /tmp/pyguard-eval \
+  --python /tmp/pyguard-evals/bin/python --output eval-reports/pyguard/maintainability.json
+```
+
+The report is the `maintainability.python` suite; its case set must match the capability spec exactly or the parity report rejects it. `node evals/maintainability-parity.cjs <tsguard.json> [<pyguard.json>]` takes the Python report as an optional second argument: without it, behavior is unchanged (`not_evaluated`, or `deferred` for deferred slots). With it, `deferred` stays deferred, `planned` capabilities report `not_implemented` (accepted for CI, never a pass) and list their seed outcomes in `pyguard_cases`, and only an `implemented` capability whose positive, negative and boundary cases are all present and passing reports `pass`. `pyguard_maintainability_ready` requires every non-deferred capability to be `pass`, `maintainability_parity_ready` combines it with `tsguard_scope_ready`, and the process exits non-zero when the Tsguard scope fails or any Python case fails. The harness unit tests mock the binary; they run a real build when `PYGUARD_EVAL_BINARY` and `PYGUARD_EVAL_PYTHON` (or `EVAL_PY`) are set, and CI runs the suite on all three OSes.
+
 ## Level 1 completion gate
 
 The report job runs `evals/level1-ready.cjs` and publishes `level1-ready.json`. Readiness requires every case in both corpora and all 18 shared capabilities. `level1_agent_contract_ready` also requires the agent traces to be ready and current: on PRs, failing or stale traces are a warning; releases set `OXGUARD_REQUIRE_CURRENT_TRACES=1` and block.
