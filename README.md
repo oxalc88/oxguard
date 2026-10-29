@@ -21,6 +21,7 @@ slips through.
 | Cyclomatic complexity | radon cc | Functions too branchy to safely modify |
 | Maintainability index | radon mi | Files that have grown too tangled to maintain |
 | Halstead complexity | radon hal + check_halstead.py | Functions with too many distinct concepts — error-prone to reason about |
+| Cognitive complexity (advisory) | complexipy 8.3.0 | Functions whose nesting and callback boundaries exceed a reader's working memory — warning only above 20 |
 | Type annotation complexity | check_type_complexity.py | Type hints that hide structure behind deep nesting |
 | Coverage | pytest (or unittest via pytest) — 80% floor | Untested code paths |
 | Security — static | bandit | `eval()`, shell injection, weak crypto, insecure defaults |
@@ -44,9 +45,13 @@ pyguard types        # type-annotation complexity only
 pyguard diagnose --output json  # collect all independent analyses before repair, no installs
 ```
 
+**Cognitive complexity — advisory:** `pyguard radon` also runs complexipy 8.3.0 and emits one `complexipy.cognitive` measurement per function with a threshold of 20. A function scoring above 20 produces the warning `pyguard.complexipy.cognitive_exceeded`; exactly 20 is clean. In this release the warning never changes the exit code or the gate/overall pass–fail status, but the next release makes it blocking, so review such functions now. `pyguard doctor` reports the pinned version. See [docs/metrics.md](docs/metrics.md).
+
 **Complexity gates — test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and
-the `tests/` directory are excluded from radon cc/mi/hal, Halstead, and type-annotation
-complexity gates by default. Test files are intentionally repetitive; complexity metrics
+the `tests/` directory are excluded from radon cc/mi/hal, complexipy cognitive, Halstead,
+and type-annotation complexity gates by default. For complexipy, which has no directory
+`--ignore`, path globs also cover root-level matches and whole `tests/` or `test/`
+directories at any depth. Test files are intentionally repetitive; complexity metrics
 don't apply meaningfully to them. Ruff and coverage gates still cover test code.
 
 Configure per-project in `pyproject.toml`:
@@ -261,9 +266,10 @@ prompt and let your agent handle the full install + setup flow.
 
 pyguard and tsguard enforce the same quality goals but reach them with different idioms:
 
-- **Complexity**: pyguard splits complexity into three separate gates (cyclomatic per-function,
-  Halstead per-function, maintainability index per-file). tsguard combines all three into a
-  single FTA score per file. See [docs/metrics.md](docs/metrics.md) for what each measures.
+- **Complexity**: pyguard splits complexity into four separate gates (cyclomatic per-function,
+  Halstead per-function, maintainability index per-file, and advisory cognitive complexity
+  per-function). tsguard combines the first three into a single FTA score per file and adds
+  its own native cognitive comparison. See [docs/metrics.md](docs/metrics.md) for what each measures.
 
 - **Security**: pyguard runs Bandit, pip-audit and detect-secrets. Python has no implemented Opengrep `--deep` command; strict flag validation rejects it. tsguard uses Opengrep as its blocking SAST engine through a project-local binary.
 
@@ -283,4 +289,4 @@ and methods by distinct callers and writes the top 30 to `CRITICALITY.md`.
 
 ### Capability evals
 
-OxGuard has known-answer corpora for Tsguard and PyGuard, baseline/candidate comparison reports and a shared capability matrix. Both CLIs share a normalized Go result contract with bounded agent and complete JSON outputs; Python retains all 15 baseline behavior checks, passes all 16 behavior checks and all 26 current parity checks. The Python maintainability parity suite (`evals/python/maintainability.cjs`) seeds criticality cases through the built binary; `planned` capabilities report `not_implemented` and P8 native duplication stays `deferred`, so neither counts as a pass. See [capability evals](docs/guides/oxguard-evals.md), [Python outputs](docs/guides/pyguard-result-contract.md) and [TypeScript outputs](docs/guides/tsguard-result-contract.md) for execution paths, adapter limits and remaining evaluation gaps.
+OxGuard has known-answer corpora for Tsguard and PyGuard, baseline/candidate comparison reports and a shared capability matrix. Both CLIs share a normalized Go result contract with bounded agent and complete JSON outputs; Python retains all 15 baseline behavior checks, passes all 16 behavior checks and all 26 current parity checks. The Python maintainability parity suite (`evals/python/maintainability.cjs`) seeds criticality and complexipy cognitive-complexity cases through the built binary; the `quality.cognitive_complexity` capability is implemented, other `planned` capabilities report `not_implemented` and P8 native duplication stays `deferred`, so none of those counts as a pass. See [capability evals](docs/guides/oxguard-evals.md), [Python outputs](docs/guides/pyguard-result-contract.md) and [TypeScript outputs](docs/guides/tsguard-result-contract.md) for execution paths, adapter limits and remaining evaluation gaps.

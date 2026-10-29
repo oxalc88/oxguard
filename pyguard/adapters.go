@@ -163,6 +163,8 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 				visit(file, b)
 			}
 		}
+	case "complexipy_cognitive":
+		r.normalizeComplexipy(spec, res, stdout, refs)
 	case "radon_mi":
 		var files map[string]struct {
 			MI    *float64 `json:"mi"`

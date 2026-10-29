@@ -1,6 +1,6 @@
 # Collect a complete assessment before repair
 
-Use `diagnose` to collect independent quality analyses in one run. A failing lint check does not prevent complexity, type, coverage, or security checks from running. Python CC, MI, and Halstead are separate analyses, so a CC failure does not hide maintainability debt. Existing `check`, `fta`, and `radon` commands retain their established execution policy.
+Use `diagnose` to collect independent quality analyses in one run. A failing lint check does not prevent complexity, type, coverage, or security checks from running. Python CC, MI, Halstead and advisory cognitive complexity are separate analyses, so a CC failure does not hide maintainability debt. Existing `check`, `fta`, and `radon` commands retain their established execution policy.
 
 ```sh
 tsguard diagnose --dirs src --output json
@@ -11,7 +11,7 @@ The commands use the existing project root, exclusions, thresholds, locking, and
 
 ## Read the result
 
-The JSON envelope retains the existing fields and adds `analyses` for `diagnose`. Each entry contains `name`, parent `gate`, `status`, `normalization`, diagnostic references, and a reason when coverage is incomplete. Python includes distinct `radon.cc`, `radon.mi`, and `radon.halstead` entries. TypeScript reports the FTA measurement collection ceiling separately as `fta.collection_score_cap`; findings and `fta.score` measurements retain the effective project policy threshold.
+The JSON envelope retains the existing fields and adds `analyses` for `diagnose`. Each entry contains `name`, parent `gate`, `status`, `normalization`, diagnostic references, and a reason when coverage is incomplete. Python includes distinct `radon.cc`, `radon.mi`, `radon.halstead` and `complexipy.cognitive` entries; cognitive warnings stay advisory and never make the assessment fail. TypeScript reports the FTA measurement collection ceiling separately as `fta.collection_score_cap`; findings and `fta.score` measurements retain the effective project policy threshold.
 
 | Result | Meaning |
 | --- | --- |

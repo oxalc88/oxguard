@@ -23,7 +23,7 @@ Quality gates (replaces make):
   pyguard security       security only: bandit + pip-audit + secrets
   pyguard ruff           lint + format check
   pyguard mypy           type checking
-  pyguard radon          complexity analysis (fails if CC > 10)
+  pyguard radon          complexity analysis (fails if CC > 10; cognitive complexity above 20 is advisory)
   pyguard types          type-annotation complexity (fails if depth>2 or length>40)
   pyguard coverage       run tests with coverage
   pyguard bandit         security scan

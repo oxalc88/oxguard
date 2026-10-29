@@ -35,6 +35,17 @@ func runDoctor(root string) int {
 		fmt.Println("  [OK]   .venv")
 	}
 
+	// Exact pins are advisory here: other tools are unpinned, and doctor still
+	// reports their installed versions below. A mismatched complexipy pin is
+	// actionable but does not turn an otherwise healthy toolchain into failure.
+	if mismatches, err := uvDevDepMismatches(root, requiredUvDevDeps); err != nil {
+		fmt.Printf("  [WARN] pyproject.toml — %v\n", err)
+	} else {
+		for _, mismatch := range mismatches {
+			fmt.Printf("  [WARN] %s\n", mismatch)
+		}
+	}
+
 	// Individual tools via uv run
 	for _, tool := range []struct{ name, cmd string }{
 		{"ruff", "ruff"},
@@ -42,6 +53,7 @@ func runDoctor(root string) int {
 		{"pytest", "pytest"},
 		{"bandit", "bandit"},
 		{"radon", "radon"},
+		{"complexipy", "complexipy"},
 	} {
 		out, _, err := RunSilent(root, "uv", "run", tool.cmd, "--version")
 		if err != nil {
