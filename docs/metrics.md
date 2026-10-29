@@ -126,6 +126,42 @@ PyGuard dev-dependency manifest, the hash-locked Python evaluation toolchain, an
 
 ---
 
+## Zero-config exception handling (pyguard)
+
+**Tool:** Ruff S110 + B012
+
+**Policy:** blocking only when the project root has no Ruff configuration
+
+When the project has no Ruff configuration, pyguard adds `--extend-select S110,B012`
+to the Ruff lint invocations it owns and records one `ruff.baseline_version`
+measurement at level `code`, location `.`, value `1`, unit `version`. The two rules
+are blocking through the normal Ruff adapter, so they fail the ruff gate and change
+the exit code.
+
+| Rule | Catches | Typical fix |
+|---|---|---|
+| S110 | A `pass`-only handler for bare `except:`, `except Exception:` or `except BaseException:`. Ruff's default `check-typed-exception = false` means typed handlers such as `except ValueError: pass` are not flagged | Log the failure, re-raise it, or narrow the handler and document why it is safe to ignore |
+| B012 | `return`, `break` or `continue` in a `finally` block | Move the control-flow statement out of `finally`; it can silently discard a pending exception |
+
+Configuration detection covers `[tool.ruff]` and every `[tool.ruff.*]` table in
+`pyproject.toml`, plus `ruff.toml` and `.ruff.toml` at the project root. A configured
+project is run exactly as before: no extra flags and no baseline measurement. This
+matters because Ruff's CLI `--extend-select` overrides project `ignore` entries, so a
+project that ignores S110 deliberately must keep that ignore. Unreadable or malformed
+configuration is treated conservatively as configured, preserving the existing Ruff
+invocation rather than injecting CLI overrides. Nested Ruff config files do not count
+for this root decision; Ruff still discovers them itself.
+
+Ruff's native semantics are retained: `# noqa: S110` is respected, S112 is not added,
+and an ellipsis handler (`except Exception: ...`) is not reported by S110. S110 also
+keeps Ruff's default `check-typed-exception = false`, so only bare and
+`Exception`/`BaseException` handlers with a `pass`-only body are reported;
+`except ValueError: pass` is a documented limitation and the harness exercises it as a
+boundary. The baseline does not exclude test files; unlike the complexity analyzers,
+Ruff continues to gate conventional test code.
+
+---
+
 ## FTA Score (tsguard)
 
 **Tool:** `fta` (from the `fta-cli` package)  

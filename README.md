@@ -47,6 +47,8 @@ pyguard diagnose --output json  # collect all independent analyses before repair
 
 **Cognitive complexity — advisory:** `pyguard radon` also runs complexipy 8.3.0 and emits one `complexipy.cognitive` measurement per function with a threshold of 20. A function scoring above 20 produces the warning `pyguard.complexipy.cognitive_exceeded`; exactly 20 is clean. In this release the warning never changes the exit code or the gate/overall pass–fail status, but the next release makes it blocking, so review such functions now. `pyguard doctor` reports the pinned version. See [docs/metrics.md](docs/metrics.md).
 
+**Zero-config exception handling:** when the project root has no Ruff configuration, PyGuard adds Ruff's blocking S110 and B012 rules to lint (`--extend-select S110,B012`) and records `ruff.baseline_version`. A `pass`-only handler on a bare `except:`, `except Exception:` or `except BaseException:`, or a `return`/`break`/`continue` in `finally`, therefore fails the ruff gate. Ruff's default `check-typed-exception = false` means a typed handler such as `except ValueError: pass` is not flagged. Add `[tool.ruff]` (or `ruff.toml`/`.ruff.toml`) to own lint policy, including ignores; configured projects run exactly as before. `# noqa: S110` remains effective. See [docs/metrics.md](docs/metrics.md).
+
 **Complexity gates — test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and
 the `tests/` directory are excluded from radon cc/mi/hal, complexipy cognitive, Halstead,
 and type-annotation complexity gates by default. For complexipy, which has no directory

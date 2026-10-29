@@ -6,14 +6,26 @@
       "id": "quality.zero_config_exception_handling",
       "tsguard": "baseline.empty_catch",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "ruff.baseline.empty_handler_is_blocking",
+            "ruff.baseline.finally_jump_is_blocking",
+            "ruff.baseline.logging_contrast_pass_is_blocking"
+          ],
+          "negative": [
+            "ruff.baseline.logging_or_reraise_is_clean",
+            "ruff.baseline.project_ignore_preserved",
+            "ruff.baseline.noqa_suppression_respected"
+          ],
+          "boundary": [
+            "ruff.baseline.ellipsis_body_not_flagged",
+            "ruff.baseline.typed_exception_handler_not_flagged",
+            "ruff.baseline.test_files_still_linted"
+          ]
         }
       },
-      "python_candidate": "Ruff S110/B012 with explicit project-policy resolution"
+      "python_candidate": "Ruff S110/B012 zero-config baseline; project Ruff configuration stays authoritative"
     },
     {
       "id": "maintainability.delegation",
