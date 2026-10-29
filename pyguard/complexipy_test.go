@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -327,5 +328,55 @@ func TestComplexipyTestExcludeCoversRootAndNestedPaths(t *testing.T) {
 		if !found {
 			t.Fatalf("complexipy test exclusion %q missing %q", complexipyTestExclude, want)
 		}
+	}
+}
+
+// complexipy on Windows can report extended-length absolute paths. Both the
+// diagnostic location and the measurement must stay project-relative with
+// forward slashes so JSON consumers see the same path on every platform.
+func TestComplexipyNormalizesAnalyzerPaths(t *testing.T) {
+	const windowsFile = `C:\Users\runneradmin\AppData\Local\Temp\project\src\complexity.py`
+	root := t.TempDir()
+	file := filepath.Join(root, "src", "complexity.py")
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte("def above(x):\n    return x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct{ name, input, want string }{
+		{"already relative", "src/complexity.py", "src/complexity.py"},
+		{"absolute", file, "src/complexity.py"},
+	}
+	if runtime.GOOS == "windows" {
+		cases = append(cases,
+			struct{ name, input, want string }{"extended backslash", `\\?\` + file, "src/complexity.py"},
+			struct{ name, input, want string }{"extended slash", "//?/" + filepath.ToSlash(file), "src/complexity.py"},
+		)
+	} else {
+		cases = append(cases,
+			struct{ name, input, want string }{"extended slash", "//?/C:/Users/runneradmin/AppData/Local/Temp/project/src/complexity.py", "C:/Users/runneradmin/AppData/Local/Temp/project/src/complexity.py"},
+			struct{ name, input, want string }{"extended backslash", `\\?\` + windowsFile, strings.ReplaceAll(windowsFile, `\`, "/")},
+		)
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &Runner{root: root, timeout: 2, outputMode: "json", result: newRunResult("radon")}
+			data := fmt.Sprintf(`[{"complexity":21,"function_name":"above","path":%q}]`, tc.input)
+			spec := toolSpec{gate: "radon", adapter: "complexipy_cognitive", advisory: true, reportPath: writeComplexipyReport(t, r, data)}
+			r.normalizeComplexipy(spec, Result{ok: false, exitCode: 1}, strings.NewReader(""), nil)
+			if len(r.result.Measurements) != 1 {
+				t.Fatalf("measurements: %+v", r.result.Measurements)
+			}
+			if got := r.result.Measurements[0].Location.File; got != tc.want {
+				t.Fatalf("measurement path = %q, want %q", got, tc.want)
+			}
+			if len(r.result.Findings) != 1 || r.result.Findings[0].Location == nil {
+				t.Fatalf("findings: %+v", r.result.Findings)
+			}
+			if got := r.result.Findings[0].Location.File; got != tc.want {
+				t.Fatalf("finding path = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

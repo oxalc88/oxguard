@@ -167,18 +167,44 @@ func (r *RunResult) Finish(code int) error {
 }
 
 func RelativePath(root, path string) string {
+	root = stripWindowsExtendedPrefix(root)
+	path = stripWindowsExtendedPrefix(path)
 	if filepath.IsAbs(path) {
 		// macOS exposes temporary roots through /var -> /private/var. Compare
 		// physical paths so explicit roots and invocation-cwd logs agree.
+		// Windows 8.3 short names are another alias for the same directory.
 		if physical, err := filepath.EvalSymlinks(root); err == nil {
-			root = physical
+			root = stripWindowsExtendedPrefix(physical)
 		}
 		if physical, err := filepath.EvalSymlinks(path); err == nil {
-			path = physical
+			path = stripWindowsExtendedPrefix(physical)
 		}
-		if rel, err := filepath.Rel(root, path); err == nil {
+		if rel, err := filepath.Rel(root, path); err == nil && filepath.IsLocal(rel) {
 			path = rel
 		}
 	}
 	return strings.ReplaceAll(filepath.Clean(path), "\\", "/")
+}
+
+// stripWindowsExtendedPrefix removes the extended-length prefixes Windows
+// analyzers can emit (\\?\C:\..., //?/C:/..., and their UNC forms). Go's
+// filepath.Rel treats an extended path as a different volume from a normal
+// project root, so without this a path under the project looks like an
+// unrelated absolute path. The slash form is used by complexipy 8.3.0.
+func stripWindowsExtendedPrefix(path string) string {
+	prefixes := []struct {
+		prefix      string
+		replacement string
+	}{
+		{`\\?\UNC\`, `\\`},
+		{`//?/UNC/`, `//`},
+		{`\\?\`, ``},
+		{`//?/`, ``},
+	}
+	for _, candidate := range prefixes {
+		if len(path) >= len(candidate.prefix) && strings.EqualFold(path[:len(candidate.prefix)], candidate.prefix) {
+			return candidate.replacement + path[len(candidate.prefix):]
+		}
+	}
+	return path
 }
