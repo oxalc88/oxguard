@@ -110,8 +110,40 @@ function structureDepth(result, file) {
   assert.ok(found, `missing module.dependency_depth for ${file}; measurements: ${JSON.stringify(result.measurements)}`);
   return found.value;
 }
+function findModuleMeasurement(result, metric, file) {
+  return result.measurements.find(m => m.metric === metric && m.location.file === file);
+}
+function moduleMeasurement(result, metric, file) {
+  const found = findModuleMeasurement(result, metric, file);
+  assert.ok(found, `missing ${metric} for ${file}; measurements: ${JSON.stringify(result.measurements)}`);
+  return found;
+}
 function circularFindings(result) {
   return result.findings.filter(f => f.rule === 'pyguard.structure.CIRCULAR_DEPENDENCY');
+}
+function couplingFindings(result) {
+  return result.findings.filter(f => f.rule === 'pyguard.structure.HIGH_MODULE_COUPLING');
+}
+// A hub plus callers and leaf dependencies. The eighth dependency can be made
+// type-only, deferred or external; all three are controlled by the analyzer
+// and must not contribute to fan-out. Excluded/test fixtures modify the files
+// or pyproject after generation.
+function couplingFixture({ importers = 3, dependencies = 8, eighth = 'runtime' } = {}) {
+  const files = { 'src/pkg/__init__.py': '' };
+  for (let i = 0; i < dependencies; i++) files[`src/pkg/leaf${i}.py`] = `VALUE${i} = ${i}\n`;
+  const lines = [];
+  const runtimeDependencies = eighth === 'type' || eighth === 'deferred' ? dependencies - 1 : dependencies;
+  for (let i = 0; i < runtimeDependencies; i++) lines.push(`from . import leaf${i}`);
+  if (eighth === 'type') {
+    lines.push('from typing import TYPE_CHECKING', '', 'if TYPE_CHECKING:', `    from . import leaf${dependencies - 1}`);
+  } else if (eighth === 'deferred') {
+    lines.push('', 'def load():', `    from . import leaf${dependencies - 1}`, `    return leaf${dependencies - 1}`);
+  } else if (eighth === 'external') {
+    lines.push('import json');
+  }
+  files['src/pkg/hub.py'] = lines.join('\n') + '\n';
+  for (let i = 0; i < importers; i++) files[`src/pkg/caller${i}.py`] = 'from .hub import VALUE0\n';
+  return files;
 }
 
 function ruffMeasurement(result) {
@@ -1212,6 +1244,197 @@ const definitions = [
       complete(result);
       assert.equal(inDegree(result, 'src/recursion.py', 'recursion.countdown'), 1, 'criticality.in_degree for recursion.countdown');
       assert.equal(ranked(result, 'recursion.countdown').observed, 1, 'ranked criticality finding for recursion.countdown');
+    },
+  },
+  {
+    id: 'structure.coupling_hub_threshold',
+    capability: 'structure.coupling',
+    kind: 'positive',
+    command: 'structure',
+    files: couplingFixture(),
+    check: ({ result }) => {
+      // Exactly three in-scope importers and eight in-scope runtime
+      // dependencies meet the joint review threshold. The finding is advisory
+      // and never changes the exit code or blocking outcome.
+      complete(result, 'structure');
+      const findings = couplingFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      const finding = findings[0];
+      assert.equal(finding.level, 'structure');
+      assert.equal(finding.gate, 'structure');
+      assert.equal(finding.severity, 'warning');
+      assert.equal(finding.status, 'advisory');
+      assert.equal(finding.category, 'quality');
+      assert.equal(finding.location.file, 'src/pkg/hub.py');
+      assert.equal(finding.evidence, '3 importing modules depend on this module, which imports 8 in-scope runtime modules.');
+      assert.match(finding.remediation, /do not prove excessive coupling/);
+      const fanIn = moduleMeasurement(result, 'module.fan_in', 'src/pkg/hub.py');
+      const fanOut = moduleMeasurement(result, 'module.fan_out', 'src/pkg/hub.py');
+      assert.equal(fanIn.value, 3);
+      assert.equal(fanIn.unit, 'modules');
+      assert.equal(fanIn.level, 'structure');
+      assert.equal(fanOut.value, 8);
+      assert.equal(fanOut.unit, 'modules');
+      assert.equal(fanOut.level, 'structure');
+      // Fan counts are per module and directional: an importer has fan-out 1
+      // and no importers, while a dependency has fan-in 1 and no dependencies.
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/caller0.py').value, 0);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/caller0.py').value, 1);
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/leaf0.py').value, 1);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/leaf0.py').value, 0);
+      assert.equal(structureMeasurement(result, 'module.count'), 13);
+      assert.equal(structureMeasurement(result, 'module.edges'), 11);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.coupling_below_importer_threshold',
+    capability: 'structure.coupling',
+    kind: 'negative',
+    command: 'structure',
+    files: couplingFixture({ importers: 2 }),
+    check: ({ result }) => {
+      // Eight dependencies alone are not a hotspot: the joint threshold also
+      // requires at least three importers.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/hub.py').value, 2);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/hub.py').value, 8);
+      assert.equal(structureMeasurement(result, 'module.count'), 12);
+      assert.equal(structureMeasurement(result, 'module.edges'), 10);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.coupling_below_dependency_threshold',
+    capability: 'structure.coupling',
+    kind: 'negative',
+    command: 'structure',
+    files: couplingFixture({ dependencies: 7 }),
+    check: ({ result }) => {
+      // Three importers alone are not a hotspot either: seven dependencies
+      // stay one below the fixed fan-out threshold.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/hub.py').value, 3);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/hub.py').value, 7);
+      assert.equal(structureMeasurement(result, 'module.count'), 12);
+      assert.equal(structureMeasurement(result, 'module.edges'), 10);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.coupling_type_only_dependency_control',
+    capability: 'structure.coupling',
+    kind: 'boundary',
+    command: 'structure',
+    files: couplingFixture({ eighth: 'type' }),
+    check: ({ result }) => {
+      // The eighth import is under TYPE_CHECKING: it is counted as a type
+      // import, creates no runtime edge and leaves fan-out at seven.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/hub.py').value, 3);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/hub.py').value, 7);
+      assert.equal(structureMeasurement(result, 'module.type_imports'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 10);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.coupling_deferred_dependency_control',
+    capability: 'structure.coupling',
+    kind: 'boundary',
+    command: 'structure',
+    files: couplingFixture({ eighth: 'deferred' }),
+    check: ({ result }) => {
+      // A function-local import executes only when the function runs; it is
+      // counted as deferred and leaves the runtime fan-out at seven.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/hub.py').value, 3);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/hub.py').value, 7);
+      assert.equal(structureMeasurement(result, 'module.deferred_imports'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 10);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.coupling_external_dependency_control',
+    capability: 'structure.coupling',
+    kind: 'boundary',
+    command: 'structure',
+    files: couplingFixture({ dependencies: 7, eighth: 'external' }),
+    check: ({ result }) => {
+      // The eighth import is external (json). It is not an in-scope runtime
+      // dependency, so the hub has seven dependencies and no finding.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/hub.py').value, 3);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/hub.py').value, 7);
+      assert.equal(structureMeasurement(result, 'module.type_imports'), 0);
+      assert.equal(structureMeasurement(result, 'module.edges'), 10);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.coupling_excluded_modules_boundary',
+    capability: 'structure.coupling',
+    kind: 'boundary',
+    command: 'structure',
+    pyproject: PYPROJECT + '[tool.pyguard]\nexclude = ["src/pkg/caller2.py", "src/pkg/leaf7.py"]\n',
+    files: couplingFixture(),
+    check: ({ result }) => {
+      // One importer and one dependency are excluded by project configuration.
+      // They are scope boundaries: no edge is inferred and neither count
+      // reaches the joint threshold. Their files get no module measurements.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/hub.py').value, 2);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/hub.py').value, 7);
+      assert.equal(findModuleMeasurement(result, 'module.fan_in', 'src/pkg/caller2.py'), undefined);
+      assert.equal(findModuleMeasurement(result, 'module.fan_in', 'src/pkg/leaf7.py'), undefined);
+      assert.equal(structureMeasurement(result, 'module.count'), 11);
+      assert.equal(structureMeasurement(result, 'module.edges'), 9);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.coupling_test_file_boundary',
+    capability: 'structure.coupling',
+    kind: 'boundary',
+    command: 'structure',
+    files: (() => {
+      const files = couplingFixture({ importers: 2, dependencies: 7 });
+      files['src/pkg/tests/__init__.py'] = '';
+      files['src/pkg/tests/test_helper.py'] = 'VALUE = 0\n';
+      files['src/pkg/tests/test_consumer.py'] = 'from ..hub import VALUE0\n';
+      files['src/pkg/hub.py'] += 'from .tests.test_helper import VALUE as TEST_VALUE\n';
+      return files;
+    })(),
+    check: ({ result }) => {
+      // The project nominally has three importers and eight dependencies, but
+      // the third importer and eighth dependency are conventional test files.
+      // Test exclusions leave the hub at 2/7 with no finding or measurements
+      // for the excluded files.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(moduleMeasurement(result, 'module.fan_in', 'src/pkg/hub.py').value, 2);
+      assert.equal(moduleMeasurement(result, 'module.fan_out', 'src/pkg/hub.py').value, 7);
+      assert.equal(findModuleMeasurement(result, 'module.fan_in', 'src/pkg/tests/test_consumer.py'), undefined);
+      assert.equal(findModuleMeasurement(result, 'module.fan_in', 'src/pkg/tests/test_helper.py'), undefined);
+      assert.equal(structureMeasurement(result, 'module.count'), 11);
+      assert.equal(structureMeasurement(result, 'module.edges'), 9);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
     },
   },
   {
