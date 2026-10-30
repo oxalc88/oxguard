@@ -1445,6 +1445,56 @@ const definitions = [
     },
   },
   {
+    id: 'function_graph.encoded_source_preserves_import_root',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    dirs: 'src/pkg/a.py,src/pkg/b.py',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': utf8BomSource('from pkg.b import target\n\n\ndef run():\n    return target()\n'),
+      'src/pkg/b.py': utf8BomSource('def target():\n    return 1\n'),
+    },
+    check: ({ result }) => {
+      // The UTF-8 mirror must keep pyan3's original import root. The parent
+      // __init__.py is outside this narrowed file scope and is not copied, but
+      // the selected modules are still pkg.a/pkg.b, so the absolute import
+      // edge survives and fan-in/fan-out/depth stay correct.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/pkg/b.py', 'pkg.b.target').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/pkg/a.py', 'pkg.a.run').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/pkg/a.py', 'pkg.a.run').value, 1);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.unresolved_indirect_and_closure_calls',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/unresolved.py': 'def first(items):\n    return items[0]()\n\n\ndef plain(items):\n    return items[0]\n\n\ndef outer(callback):\n    def inner():\n        return callback()\n    return inner()\n',
+    },
+    check: ({ result }) => {
+      // items[0]() is a call through a parameter even though the callee is a
+      // Subscript, and inner() calls a parameter bound by its enclosing
+      // function. Both are unresolved call references; plain parameter reads
+      // are not. The assessment stays complete and no finding is produced.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 2);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.first').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.plain').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.outer').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.outer.inner').value, 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
     id: 'structure.coupling_hub_threshold',
     capability: 'structure.coupling',
     kind: 'positive',

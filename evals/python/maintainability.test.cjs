@@ -45,6 +45,8 @@ const FUNCTION_GRAPH = {
   'function_graph.test_file_exclusion': { functions: [['src/main.py', 'main.target', 1, 0, 0, 0]], recursive: 0, unresolved: 0 },
   'function_graph.mutual_recursion_depth': { functions: [['src/mutual.py', 'mutual.start', 1, 0, 1, 2], ['src/mutual.py', 'mutual.even', 4, 2, 2, 1], ['src/mutual.py', 'mutual.odd', 10, 1, 1, 1], ['src/mutual.py', 'mutual.sink', 14, 1, 0, 0]], recursive: 1, unresolved: 0 },
   'function_graph.unresolved_dynamic_call': { functions: [['src/dynamic.py', 'dynamic.dynamic', 1, 1, 0, 0], ['src/dynamic.py', 'dynamic.caller', 5, 0, 1, 1]], recursive: 0, unresolved: 1 },
+  'function_graph.encoded_source_preserves_import_root': { functions: [['src/pkg/a.py', 'pkg.a.run', 4, 0, 1, 1], ['src/pkg/b.py', 'pkg.b.target', 1, 1, 0, 0]], recursive: 0, unresolved: 0 },
+  'function_graph.unresolved_indirect_and_closure_calls': { functions: [['src/unresolved.py', 'unresolved.first', 1, 0, 0, 0], ['src/unresolved.py', 'unresolved.plain', 5, 0, 0, 0], ['src/unresolved.py', 'unresolved.outer', 9, 0, 1, 1], ['src/unresolved.py', 'unresolved.outer.inner', 10, 0, 0, 0]], recursive: 0, unresolved: 2 },
   'function_graph.unparsable_is_not_evaluated': { functions: [['src/good.py', 'good.target', 1, 0, 0, 0]], recursive: 0, unresolved: 0, partial: 'Unparsable source: src/broken.py', status: 'advisory', gate: 'advisory', normalization: 'partial', assessment: 'incomplete' },
 };
 

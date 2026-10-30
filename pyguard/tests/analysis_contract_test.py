@@ -12,6 +12,7 @@ from pathlib import Path
 
 ANALYSIS = Path(__file__).resolve().parents[1] / "analysis"
 sys.path.insert(0, str(ANALYSIS))
+import analyze_structure
 import check_halstead
 import vulture_report
 
@@ -55,6 +56,65 @@ class ContractLocations(unittest.TestCase):
             self.assertEqual(
                 [(v.function, v.line) for v in violations], [("work", 2), ("work", 5)]
             )
+
+
+class StructureFunctionGraphContract(unittest.TestCase):
+    """pyan3 staging and unresolved-call filters keep graph evidence exact."""
+
+    def test_encoded_mirror_preserves_import_root_for_narrow_scope(self):
+        with tempfile.TemporaryDirectory() as root:
+            project = Path(root)
+            package = project / "src" / "pkg"
+            package.mkdir(parents=True)
+            (package / "__init__.py").write_text("")
+            (package / "a.py").write_bytes(
+                b"\xef\xbb\xbf"
+                + b"from pkg.b import target\n\n\ndef run():\n    return target()\n"
+            )
+            (package / "b.py").write_bytes(
+                b"\xef\xbb\xbf" + b"def target():\n    return 1\n"
+            )
+            graph, skipped = analyze_structure.build_function_graph(
+                [str((package / "a.py").resolve()), str((package / "b.py").resolve())],
+                project.resolve(),
+            )
+            self.assertEqual(skipped, [])
+            self.assertEqual(
+                [function["symbol"] for function in graph["functions"]],
+                ["pkg.a.run", "pkg.b.target"],
+            )
+            self.assertEqual(graph["calls"], [{"caller": 0, "callee": 1}])
+            self.assertEqual(graph["functions"][0]["depth"], 1)
+            self.assertEqual(graph["function_counts"]["unresolved_calls"], 0)
+
+    def test_indirect_and_closure_parameter_calls_are_unresolved(self):
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "unresolved.py"
+            source.write_text(
+                "def first(items):\n"
+                "    return items[0]()\n\n\n"
+                "def plain(items):\n"
+                "    return items[0]\n\n\n"
+                "def outer(callback):\n"
+                "    def inner():\n"
+                "        return callback()\n"
+                "    return inner()\n"
+            )
+            graph, skipped = analyze_structure.build_function_graph(
+                [str(source.resolve())], Path(root).resolve()
+            )
+            self.assertEqual(skipped, [])
+            self.assertEqual(graph["function_counts"]["unresolved_calls"], 2)
+            self.assertEqual(
+                [function["symbol"] for function in graph["functions"]],
+                [
+                    "unresolved.first",
+                    "unresolved.plain",
+                    "unresolved.outer",
+                    "unresolved.outer.inner",
+                ],
+            )
+            self.assertEqual(graph["calls"], [{"caller": 2, "callee": 3}])
 
 
 class DeepAnnotationContract(unittest.TestCase):

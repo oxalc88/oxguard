@@ -164,7 +164,9 @@
             "criticality.self_recursion_counts_once",
             "function_graph.mutual_recursion_depth",
             "function_graph.unresolved_dynamic_call",
-            "function_graph.unparsable_is_not_evaluated"
+            "function_graph.unparsable_is_not_evaluated",
+            "function_graph.encoded_source_preserves_import_root",
+            "function_graph.unresolved_indirect_and_closure_calls"
           ]
         }
       },

@@ -631,8 +631,24 @@ def called_identifier_names(node: ast.AST) -> set[str]:
     function parameter. Only an unresolved callee whose name is actually used
     in a call expression is a call reference for the unresolved-call count.
     For ``helpers.run()`` both ``helpers`` and ``run`` participate in the call.
+    A subscript callee such as ``items[0]()`` is a call through ``items``, and
+    a boolean/conditional callee is a call through every operand that can
+    supply the callable. Arguments of nested calls are not call targets.
     """
     names: set[str] = set()
+    composite = (
+        ast.Await,
+        ast.BinOp,
+        ast.BoolOp,
+        ast.Compare,
+        ast.Dict,
+        ast.IfExp,
+        ast.List,
+        ast.Set,
+        ast.Starred,
+        ast.Tuple,
+        ast.UnaryOp,
+    )
     for child in ast.walk(node):
         if not isinstance(child, ast.Call):
             continue
@@ -644,12 +660,18 @@ def called_identifier_names(node: ast.AST) -> set[str]:
             elif isinstance(current, ast.Attribute):
                 names.add(current.attr)
                 pending.append(current.value)
+            elif isinstance(current, ast.Subscript):
+                pending.append(current.value)
             elif isinstance(current, ast.Call):
                 pending.append(current.func)
+            elif isinstance(current, composite):
+                pending.extend(ast.iter_child_nodes(current))
     return names
 
 
-def parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+def parameter_names(
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
+) -> set[str]:
     """Return every bound parameter name, including positional-only and variadic."""
     arguments = node.args
     names = {
@@ -667,6 +689,34 @@ def parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
     return names
 
 
+def function_parameter_scopes(trees: list[ast.Module]) -> dict[ast.AST, set[str]]:
+    """Map each function node to the parameters visible in its lexical scope.
+
+    pyan3 reports a called parameter through one shared placeholder, including
+    when a nested function calls a parameter bound by an enclosing function.
+    Tracking enclosing parameter names keeps those calls as call references
+    without treating a parameter read as one. Class bodies pass the enclosing
+    function scope through: a method defined inside a function can close over
+    that function's parameters.
+    """
+    scopes: dict[ast.AST, set[str]] = {}
+
+    def visit(node: ast.AST, inherited: set[str]) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            visible = inherited | parameter_names(node)
+            if not isinstance(node, ast.Lambda):
+                scopes[node] = visible
+            for child in ast.iter_child_nodes(node):
+                visit(child, visible)
+            return
+        for child in ast.iter_child_nodes(node):
+            visit(child, inherited)
+
+    for tree in trees:
+        visit(tree, set())
+    return scopes
+
+
 def empty_function_graph() -> dict[str, object]:
     return {
         "functions": [],
@@ -682,14 +732,22 @@ def empty_function_graph() -> dict[str, object]:
 
 
 def stage_pyan_sources(
-    files: list[str], root: Path
-) -> tuple[list[str], dict[str, str], tempfile.TemporaryDirectory[str] | None]:
+    files: list[str],
+) -> tuple[
+    list[str],
+    dict[str, str],
+    tempfile.TemporaryDirectory[str] | None,
+    str | None,
+]:
     """Mirror sources as UTF-8 when pyan3 cannot read their valid encoding.
 
     pyan3 opens every file as UTF-8, so a UTF-8 BOM or a valid PEP 263 source
     declaration makes it drop the file (or fail). The structure parser already
-    accepted those files. A temporary mirror keeps line numbers and relative
-    module layout, and the original paths remain the reported locations.
+    accepted those files. A temporary mirror keeps line numbers and the module
+    layout relative to pyan3's original inferred import root, and the original
+    paths remain the reported locations. The mirror root is returned so the
+    visitor uses that same root even when ``__init__.py`` ancestors were not in
+    scope and therefore were not copied.
     """
     needs_copy = False
     for path in files:
@@ -703,18 +761,19 @@ def stage_pyan_sources(
             needs_copy = True
             break
     if not needs_copy:
-        return files, {}, None
+        return files, {}, None, None
 
+    from pyan.anutils import infer_root
+
+    try:
+        # This is exactly the root pyan3 would infer for the original files.
+        import_root = Path(infer_root(files))
+    except (OSError, ValueError):
+        import_root = Path(os.path.abspath(os.path.commonpath(files)))
+        if not import_root.is_dir():
+            import_root = import_root.parent
     temporary = tempfile.TemporaryDirectory(prefix="pyguard-structure-functions-")
     staged_root = Path(temporary.name)
-    # A root marker pins pyan3's inferred import root to the mirrored tree even
-    # when the original project root marker is outside the copied common path.
-    (staged_root / "pyproject.toml").write_bytes(b"")
-    base = root
-    if any(not Path(path).is_relative_to(base) for path in files):
-        base = Path(os.path.commonpath(files))
-        if not base.is_dir():
-            base = base.parent
     staged: list[str] = []
     mapping: dict[str, str] = {}
     for path in files:
@@ -722,7 +781,7 @@ def stage_pyan_sources(
         encoding, _ = tokenize.detect_encoding(io.BytesIO(source).readline)
         text = source.decode(encoding)
         try:
-            relative = Path(path).relative_to(base)
+            relative = Path(os.path.abspath(path)).relative_to(import_root)
         except ValueError:
             relative = Path(path).name
         target = staged_root / relative
@@ -730,7 +789,7 @@ def stage_pyan_sources(
         target.write_bytes(text.encode("utf-8"))
         staged.append(str(target))
         mapping[str(target)] = path
-    return staged, mapping, temporary
+    return staged, mapping, temporary, str(staged_root)
 
 
 def build_function_graph(
@@ -739,16 +798,19 @@ def build_function_graph(
     """Build the function graph, normalizing only sources pyan3 cannot decode."""
     if not files:
         return empty_function_graph(), []
-    staged, source_map, temporary = stage_pyan_sources(files, root)
+    staged, source_map, temporary, visitor_root = stage_pyan_sources(files)
     try:
-        return _build_function_graph(staged, source_map, root)
+        return _build_function_graph(staged, source_map, root, visitor_root)
     finally:
         if temporary is not None:
             temporary.cleanup()
 
 
 def _build_function_graph(
-    files: list[str], source_map: dict[str, str], root: Path
+    files: list[str],
+    source_map: dict[str, str],
+    root: Path,
+    visitor_root: str | None = None,
 ) -> tuple[dict[str, object], list[str]]:
     """Build the in-scope function graph from pyan3's resolved use edges.
 
@@ -756,12 +818,12 @@ def _build_function_graph(
     ``FunctionDef``/``AsyncFunctionDef`` nodes in the requested files, and pyan3
     ``uses_edges`` whose caller and callee are both selected functions. SCCs and
     condensation depth come from NetworkX. A parameter placeholder is only
-    counted as unresolved when the function actually calls a parameter; plain
-    parameter reads are not call references.
+    counted as unresolved when a call target names a parameter visible in the
+    caller's lexical scope; plain parameter reads are not call references.
     """
     from pyan.analyzer import CallGraphVisitor
 
-    visitor = CallGraphVisitor(files)
+    visitor = CallGraphVisitor(files, root=visitor_root)
     skipped = sorted(
         source_map.get(path, path) for path in set(files) - set(visitor.filenames)
     )
@@ -781,6 +843,17 @@ def _build_function_graph(
             node.get_name(),
         ),
     )
+    module_trees: list[ast.Module] = []
+    seen_trees: set[int] = set()
+    for group in visitor.nodes.values():
+        for node in group:
+            if not isinstance(node.ast_node, ast.Module):
+                continue
+            if id(node.ast_node) in seen_trees:
+                continue
+            seen_trees.add(id(node.ast_node))
+            module_trees.append(node.ast_node)
+    parameter_scopes = function_parameter_scopes(module_trees)
     index = {node: position for position, node in enumerate(ordered)}
     calls: set[tuple[int, int]] = set()
     unresolved = 0
@@ -788,7 +861,9 @@ def _build_function_graph(
         if caller not in index:
             continue
         called = called_identifier_names(caller.ast_node)
-        parameters = parameter_names(caller.ast_node)
+        parameters = parameter_scopes.get(caller.ast_node)
+        if parameters is None:
+            parameters = parameter_names(caller.ast_node)
         for callee in callees:
             if callee in index:
                 calls.add((index[caller], index[callee]))
