@@ -449,6 +449,22 @@ class StructureDelegationContract(unittest.TestCase):
         self.assertEqual(functions["pkg.cases.wrapper"]["forward_target"], "pkg.cases.real")
         self.assertEqual(functions["pkg.cases.wrapper"]["forwarding_mode"], "sync")
 
+    def test_aliased_import_and_same_named_annotation_use_return_binding(self):
+        files = {
+            "worker.py": "def real(x):\n    return x\n",
+            "schema.py": "def target():\n    return int\n",
+            "wrapper.py": (
+                "from .worker import real as target\n"
+                "from . import schema\n\n\n"
+                "def wrapper(x: schema.target()):\n"
+                "    return target(x)\n"
+            ),
+        }
+        with tempfile.TemporaryDirectory() as root:
+            functions = self.graph(root, files)
+        self.assertEqual(functions["pkg.wrapper.wrapper"]["forward_target"], "pkg.worker.real")
+        self.assertEqual(functions["pkg.wrapper.wrapper"]["forwarding_mode"], "sync")
+
     def test_non_forwarding_shapes_are_excluded(self):
         files = {
             "controls.py": (

@@ -730,7 +730,8 @@ def module_level_function_ids(tree: ast.Module) -> set[int]:
 
 def forwarding_fact(
     node: object,
-    resolved: list[object],
+    module_scope: object,
+    function_scope: object,
     module_level: set[int],
     in_scope: set[object],
 ) -> tuple[str, str] | None:
@@ -738,9 +739,10 @@ def forwarding_fact(
 
     Only a module-level, undecorated ``def``/``async def`` with plain
     positional-or-keyword parameters and exactly one ``return <Call>`` can
-    forward. A leading docstring is allowed. The call target is the single
-    pyan3-resolved in-scope function other than the wrapper itself, and its
-    return annotation must be textually identical. ``async def`` forwards only
+    forward. A leading docstring is allowed. The call target is the pyan3
+    module binding for the returned name, unless that name is shadowed in the
+    wrapper scope. It must be an in-scope function other than the wrapper
+    itself, and its return annotation must be textually identical. ``async def`` forwards only
     as ``return await b(...)`` to another ``async def``.
     """
     definition = getattr(node, "ast_node", None)
@@ -792,19 +794,16 @@ def forwarding_fact(
         for argument, parameter in zip(call.args, parameters)
     ):
         return None
-    # pyan's use edges also include names used in annotations and defaults.
-    # Keep only the edge matching this returned call's identifier; pyan has
-    # already resolved that identifier in the wrapper's scope.
-    candidates = [
-        callee
-        for callee in resolved
-        if callee in in_scope
-        and getattr(getattr(callee, "ast_node", None), "name", None)
-        == call.func.id
-    ]
-    if len(candidates) != 1 or candidates[0] is node:
+    # Use the returned Name's binding rather than use_edges, which also
+    # contains annotation/default references and loses import alias names.
+    name = call.func.id
+    if name in getattr(function_scope, "locals", set()):
         return None
-    target = candidates[0]
+    target = getattr(module_scope, "defs", {}).get(name)
+    if target not in in_scope or target is node:
+        return None
+    if not isinstance(getattr(target, "ast_node", None), (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return None
     if is_async and not isinstance(target.ast_node, ast.AsyncFunctionDef):
         return None
     if (definition.returns is None) != (target.ast_node.returns is None):
@@ -958,10 +957,12 @@ def _build_function_graph(
         ),
     )
     module_trees: dict[str, ast.Module] = {}
+    module_nodes: dict[str, object] = {}
     for group in visitor.nodes.values():
         for node in group:
             if isinstance(node.ast_node, ast.Module):
                 module_trees.setdefault(node.filename, node.ast_node)
+                module_nodes.setdefault(node.filename, node)
     module_level = {
         identifier
         for tree in module_trees.values()
@@ -995,7 +996,15 @@ def _build_function_graph(
         for function in ordered
         if (
             fact := forwarding_fact(
-                function, resolved_by_caller.get(function, []), module_level, set(index)
+                function,
+                visitor.scopes.get(
+                    module_nodes[function.filename].get_name()
+                    if function.filename in module_nodes
+                    else ""
+                ),
+                visitor.scopes.get(function.get_name()),
+                module_level,
+                set(index),
             )
         )
         is not None
