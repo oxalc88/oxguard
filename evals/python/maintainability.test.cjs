@@ -90,6 +90,15 @@ const STRUCTURE = {
   'structure.invalid_relative_import_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 2, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0 }, partial: 'Unresolved local import: <relative> (src/pkg/a.py:1)' },
   'structure.type_only_package_export_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 3, edges: 1, cycles: 0, type_imports: 1, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 1, 'src/pkg/a.py': 0, 'src/pkg/b.py': 0 }, partial: 'Unresolved local import: pkg.Foo (src/pkg/b.py:1)' },
   'structure.annotation_only_export_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 2, edges: 1, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 1, 'src/pkg/worker.py': 0 }, partial: 'Unresolved local import: pkg.client (src/pkg/worker.py:1)' },
+  'structure.coupling_hub_threshold': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, counts: { modules: 13, edges: 11, cycles: 0, type_imports: 0, deferred_imports: 0 }, fan_in: { 'src/pkg/hub.py': 3, 'src/pkg/caller0.py': 0, 'src/pkg/leaf0.py': 1 }, fan_out: { 'src/pkg/hub.py': 8, 'src/pkg/caller0.py': 1, 'src/pkg/leaf0.py': 0 }, coupling: ['src/pkg/hub.py'] },
+  'structure.coupling_human_warning': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, human: true, counts: { modules: 15, edges: 13, cycles: 1, type_imports: 0, deferred_imports: 0 }, fan_in: { 'src/pkg/hub.py': 3 }, fan_out: { 'src/pkg/hub.py': 8 }, coupling: ['src/pkg/hub.py'], cycles: [['src/pkg/a.py', 'src/pkg/b.py']] },
+  'structure.coupling_below_importer_threshold': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 12, edges: 10, cycles: 0, type_imports: 0, deferred_imports: 0 }, fan_in: { 'src/pkg/hub.py': 2 }, fan_out: { 'src/pkg/hub.py': 8 } },
+  'structure.coupling_below_dependency_threshold': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 12, edges: 10, cycles: 0, type_imports: 0, deferred_imports: 0 }, fan_in: { 'src/pkg/hub.py': 3 }, fan_out: { 'src/pkg/hub.py': 7 } },
+  'structure.coupling_type_only_dependency_control': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 13, edges: 10, cycles: 0, type_imports: 1, deferred_imports: 0 }, fan_in: { 'src/pkg/hub.py': 3 }, fan_out: { 'src/pkg/hub.py': 7 } },
+  'structure.coupling_deferred_dependency_control': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 13, edges: 10, cycles: 0, type_imports: 0, deferred_imports: 1 }, fan_in: { 'src/pkg/hub.py': 3 }, fan_out: { 'src/pkg/hub.py': 7 } },
+  'structure.coupling_external_dependency_control': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 12, edges: 10, cycles: 0, type_imports: 0, deferred_imports: 0 }, fan_in: { 'src/pkg/hub.py': 3 }, fan_out: { 'src/pkg/hub.py': 7 } },
+  'structure.coupling_excluded_modules_boundary': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 11, edges: 9, cycles: 0, type_imports: 0, deferred_imports: 0 }, fan_in: { 'src/pkg/hub.py': 2 }, fan_out: { 'src/pkg/hub.py': 7 } },
+  'structure.coupling_test_file_boundary': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 11, edges: 9, cycles: 0, type_imports: 0, deferred_imports: 0 }, fan_in: { 'src/pkg/hub.py': 2 }, fan_out: { 'src/pkg/hub.py': 7 } },
 };
 
 function standInBinary(t) {
@@ -111,10 +120,19 @@ if (ruff[caseId]) {
 }
 if (structure[caseId]) {
   const spec = structure[caseId];
+  if (spec.human) {
+    const lines = ['  [OK]   structure'];
+    for (const file of spec.coupling || []) lines.push('  [ADVISORY] pyguard.structure.HIGH_MODULE_COUPLING ' + file + ' — ' + (spec.fan_in?.[file] ?? 0) + ' importing modules depend on this module, which imports ' + (spec.fan_out?.[file] ?? 0) + ' in-scope runtime modules.');
+    for (const files of spec.cycles || []) lines.push('  [ADVISORY] pyguard.structure.CIRCULAR_DEPENDENCY ' + files[0] + ' — Runtime imports form a strongly connected component: ' + files.join(', '));
+    process.stdout.write(lines.join('\\n') + '\\n');
+    process.exit(spec.exit);
+  }
   const measurements = Object.entries(spec.depths || {}).map(([file, value]) => ({ metric: 'module.dependency_depth', level: 'structure', location: { file }, value, unit: 'edges' }));
+  for (const [metric, values] of [['module.fan_in', spec.fan_in], ['module.fan_out', spec.fan_out]]) for (const [file, value] of Object.entries(values || {})) measurements.push({ metric, level: 'structure', location: { file }, value, unit: 'modules' });
   const units = { modules: 'modules', edges: 'edges', cycles: 'components', type_imports: 'references', deferred_imports: 'references' };
   for (const [name, value] of Object.entries(spec.counts)) measurements.push({ metric: name === 'modules' ? 'module.count' : 'module.' + name, level: 'structure', location: { file: '.' }, value, unit: units[name] });
   const findings = (spec.cycles || []).map(files => ({ level: 'structure', gate: 'structure', rule: 'pyguard.structure.CIRCULAR_DEPENDENCY', severity: 'warning', status: 'advisory', category: 'quality', location: { file: files[0] }, related: files.slice(1).map(file => ({ file })), evidence: 'Runtime imports form a strongly connected component: ' + files.join(', '), diagnostics: [] }));
+  for (const file of spec.coupling || []) findings.push({ level: 'structure', gate: 'structure', rule: 'pyguard.structure.HIGH_MODULE_COUPLING', severity: 'warning', status: 'advisory', category: 'quality', location: { file }, evidence: (spec.fan_in?.[file] ?? 0) + ' importing modules depend on this module, which imports ' + (spec.fan_out?.[file] ?? 0) + ' in-scope runtime modules.', remediation: 'Review the change surface and cohesion; these counts alone do not prove excessive coupling.', diagnostics: [] });
   if (spec.partial) findings.push({ level: 'structure', gate: 'structure', rule: 'pyguard.structure.not_evaluated', severity: 'info', status: 'advisory', category: 'quality', evidence: spec.partial, diagnostics: [] });
   process.stdout.write(JSON.stringify({ schema_version: '1', status: spec.status, assessment: spec.assessment, gates: [{ name: 'structure', status: spec.gate, normalization: spec.normalization }], exit_code: spec.exit, findings, measurements, artifacts: [], diagnostics: [] }));
   process.exit(spec.exit);
@@ -159,7 +177,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'structure.runtime_graph', 'structure.false_positive_controls', 'structure.function_graph', 'quality.cognitive_complexity']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'structure.runtime_graph', 'structure.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 

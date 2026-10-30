@@ -167,11 +167,23 @@
       "id": "structure.coupling",
       "tsguard": "structure.coupling",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "structure.coupling_hub_threshold",
+            "structure.coupling_human_warning"
+          ],
+          "negative": [
+            "structure.coupling_below_importer_threshold",
+            "structure.coupling_below_dependency_threshold"
+          ],
+          "boundary": [
+            "structure.coupling_type_only_dependency_control",
+            "structure.coupling_deferred_dependency_control",
+            "structure.coupling_external_dependency_control",
+            "structure.coupling_excluded_modules_boundary",
+            "structure.coupling_test_file_boundary"
+          ]
         }
       },
       "python_candidate": "Module fan-in/out and coupling observations"

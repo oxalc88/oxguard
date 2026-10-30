@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -220,5 +222,238 @@ func TestStructureAdapterNormalizesModulePaths(t *testing.T) {
 				t.Fatalf("finding path not normalized: %+v", r.result.Findings)
 			}
 		})
+	}
+}
+
+// structureCouplingReport builds a valid acyclic graph with a hub that is
+// imported by callers and imports dependencies. A self-import is optional so
+// its effect on fan counts can be isolated from the cycle it still creates.
+func structureCouplingReport(t *testing.T, importers, dependencies int, selfImport bool) string {
+	t.Helper()
+	modules := []structureModule{{Name: "hub", File: "hub.py"}}
+	imports := []structureImport{}
+	for i := 0; i < importers; i++ {
+		name := fmt.Sprintf("caller%d", i)
+		modules = append(modules, structureModule{Name: name, File: name + ".py"})
+		imports = append(imports, structureImport{Importer: name, Imported: "hub"})
+	}
+	for i := 0; i < dependencies; i++ {
+		name := fmt.Sprintf("dep%d", i)
+		modules = append(modules, structureModule{Name: name, File: name + ".py"})
+		imports = append(imports, structureImport{Importer: "hub", Imported: name})
+	}
+	if selfImport {
+		imports = append(imports, structureImport{Importer: "hub", Imported: "hub"})
+	}
+	components := make([]structureComponent, len(modules))
+	for i, module := range modules {
+		components[i] = structureComponent{Modules: []string{module.Name}, Cyclic: selfImport && module.Name == "hub"}
+	}
+	report := structureReport{
+		SchemaVersion: "1",
+		Modules:       modules,
+		Imports:       imports,
+		Components:    components,
+		Counts:        structureCounts{Modules: len(modules), Edges: len(imports)},
+	}
+	if selfImport {
+		report.Counts.Cycles = 1
+	}
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func couplingFindings(result *RunResult) []Finding {
+	findings := []Finding{}
+	for _, finding := range result.Findings {
+		if finding.Rule == "pyguard.structure.HIGH_MODULE_COUPLING" {
+			findings = append(findings, finding)
+		}
+	}
+	return findings
+}
+
+func TestStructureAdapterCouplingThresholds(t *testing.T) {
+	cases := []struct {
+		name       string
+		importers  int
+		deps       int
+		high       bool
+		wantStatus Status
+		wantGate   Status
+	}{
+		{"at threshold", 3, 8, true, StatusAdvisory, StatusAdvisory},
+		{"too few importers", 2, 8, false, StatusPass, StatusPassed},
+		{"too few dependencies", 3, 7, false, StatusPass, StatusPassed},
+		{"below both", 2, 7, false, StatusPass, StatusPassed},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := contractRunner(t)
+			r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureCouplingReport(t, tc.importers, tc.deps, false)), nil)
+			if err := r.result.Finish(0); err != nil {
+				t.Fatal(err)
+			}
+			if r.result.ExitCode != 0 || r.result.Status != tc.wantStatus || r.result.Assessment != Complete {
+				t.Fatalf("coupling changed policy: exit=%d status=%s assessment=%s", r.result.ExitCode, r.result.Status, r.result.Assessment)
+			}
+			if len(r.result.Gates) != 1 || r.result.Gates[0].Status != tc.wantGate || r.result.Gates[0].Normalization != Complete {
+				t.Fatalf("gate: %+v", r.result.Gates)
+			}
+			fanIn := structureMeasurement(r.result, "module.fan_in", "hub.py")
+			fanOut := structureMeasurement(r.result, "module.fan_out", "hub.py")
+			if fanIn == nil || fanIn.Value != float64(tc.importers) || fanIn.Unit != "modules" || fanIn.Level != "structure" {
+				t.Fatalf("hub fan_in: %+v", fanIn)
+			}
+			if fanOut == nil || fanOut.Value != float64(tc.deps) || fanOut.Unit != "modules" || fanOut.Level != "structure" {
+				t.Fatalf("hub fan_out: %+v", fanOut)
+			}
+			if caller := structureMeasurement(r.result, "module.fan_out", "caller0.py"); caller == nil || caller.Value != 1 {
+				t.Fatalf("caller fan_out: %+v", caller)
+			}
+			if dep := structureMeasurement(r.result, "module.fan_in", "dep0.py"); dep == nil || dep.Value != 1 {
+				t.Fatalf("dependency fan_in: %+v", dep)
+			}
+			findings := couplingFindings(r.result)
+			if !tc.high {
+				if len(findings) != 0 || len(r.result.Findings) != 0 {
+					t.Fatalf("unexpected findings: %+v", r.result.Findings)
+				}
+				return
+			}
+			if len(findings) != 1 {
+				t.Fatalf("coupling findings: %+v", r.result.Findings)
+			}
+			f := findings[0]
+			if f.Level != "structure" || f.Gate != "structure" || f.Severity != "warning" || f.Status != StatusAdvisory || f.Category != "quality" {
+				t.Fatalf("coupling finding contract: %+v", f)
+			}
+			if f.Location == nil || f.Location.File != "hub.py" {
+				t.Fatalf("coupling location: %+v", f.Location)
+			}
+			if f.Evidence != "3 importing modules depend on this module, which imports 8 in-scope runtime modules." {
+				t.Fatalf("coupling evidence: %q", f.Evidence)
+			}
+			if !strings.Contains(f.Remediation, "do not prove excessive coupling") {
+				t.Fatalf("coupling remediation: %q", f.Remediation)
+			}
+		})
+	}
+}
+
+func TestStructureAdapterSelfImportIsNotItsOwnCoupling(t *testing.T) {
+	r := contractRunner(t)
+	// Two importers and seven dependencies stay below the joint threshold
+	// unless the self-import is counted as both an importer and a dependency.
+	r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureCouplingReport(t, 2, 7, true)), nil)
+	if err := r.result.Finish(0); err != nil {
+		t.Fatal(err)
+	}
+	if fanIn := structureMeasurement(r.result, "module.fan_in", "hub.py"); fanIn == nil || fanIn.Value != 2 {
+		t.Fatalf("self-import counted as importer: %+v", fanIn)
+	}
+	if fanOut := structureMeasurement(r.result, "module.fan_out", "hub.py"); fanOut == nil || fanOut.Value != 7 {
+		t.Fatalf("self-import counted as dependency: %+v", fanOut)
+	}
+	if len(couplingFindings(r.result)) != 0 {
+		t.Fatalf("self-import created coupling: %+v", r.result.Findings)
+	}
+	cycles := 0
+	for _, finding := range r.result.Findings {
+		if finding.Rule == "pyguard.structure.CIRCULAR_DEPENDENCY" {
+			cycles++
+		}
+	}
+	if cycles != 1 {
+		t.Fatalf("self-import cycle finding: %+v", r.result.Findings)
+	}
+	if r.result.ExitCode != 0 || r.result.Status != StatusAdvisory || r.result.Assessment != Complete {
+		t.Fatalf("self-import changed policy: %+v", r.result)
+	}
+}
+
+// structureHumanReport combines a coupling hub with a runtime cycle so the
+// human renderer must show both advisory finding kinds.
+func structureHumanReport(t *testing.T) string {
+	t.Helper()
+	var report structureReport
+	if err := json.Unmarshal([]byte(structureCouplingReport(t, 3, 8, false)), &report); err != nil {
+		t.Fatal(err)
+	}
+	report.Modules = append(report.Modules,
+		structureModule{Name: "pkg.a", File: "src/pkg/a.py"},
+		structureModule{Name: "pkg.b", File: "src/pkg/b.py"},
+	)
+	report.Imports = append(report.Imports,
+		structureImport{Importer: "pkg.a", Imported: "pkg.b"},
+		structureImport{Importer: "pkg.b", Imported: "pkg.a"},
+	)
+	report.Components = append(report.Components, structureComponent{Modules: []string{"pkg.a", "pkg.b"}, Cyclic: true})
+	report.Counts.Modules = len(report.Modules)
+	report.Counts.Edges = len(report.Imports)
+	report.Counts.Cycles = 1
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// TestStructureHumanProcess is the fake analyzer used by the human-mode
+// regression test. It emits the same structured payload the owned adapter
+// consumes, so the test exercises the production subprocess runner.
+func TestStructureHumanProcess(t *testing.T) {
+	if os.Getenv("PYGUARD_STRUCTURE_HUMAN_HELPER") == "" {
+		return
+	}
+	fmt.Fprint(os.Stdout, structureHumanReport(t))
+	os.Exit(0)
+}
+
+func captureStdoutText(t *testing.T, fn func() int) (int, string) {
+	t.Helper()
+	file, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	old := os.Stdout
+	os.Stdout = file
+	defer func() { os.Stdout = old }()
+	code := fn()
+	if _, err := file.Seek(0, 0); err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return code, string(data)
+}
+
+func TestStructureHumanRendersCouplingAndCycles(t *testing.T) {
+	r := &Runner{root: t.TempDir(), timeout: 2, outputMode: "human", result: newRunResult("structure")}
+	t.Setenv("PYGUARD_STRUCTURE_HUMAN_HELPER", "1")
+	code, output := captureStdoutText(t, func() int {
+		return runStructureHumanReport(r, os.Args[0], "-test.run=^TestStructureHumanProcess$")
+	})
+	if code != 0 {
+		t.Fatalf("human structure exit = %d, want 0; output: %s", code, output)
+	}
+	for _, want := range []string{
+		"[OK]   structure",
+		"[ADVISORY] pyguard.structure.HIGH_MODULE_COUPLING hub.py",
+		"[ADVISORY] pyguard.structure.CIRCULAR_DEPENDENCY src/pkg/a.py",
+		"src/pkg/a.py, src/pkg/b.py",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("human structure output missing %q: %s", want, output)
+		}
+	}
+	if count := strings.Count(output, "HIGH_MODULE_COUPLING"); count != 1 {
+		t.Fatalf("human structure coupling count = %d, want 1: %s", count, output)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strings"
 )
@@ -49,6 +50,29 @@ type structureReport struct {
 		Category string `json:"category"`
 		Message  string `json:"message"`
 	} `json:"error,omitempty"`
+}
+
+// Joint review thresholds copied from Tsguard: a module is worth reviewing
+// only when it is both widely imported and itself imports many modules.
+const (
+	highModuleCouplingImporters    = 3
+	highModuleCouplingDependencies = 8
+)
+
+// structureFanCounts counts distinct in-scope runtime importers and
+// dependencies per module. A self-import is one runtime edge and one cycle,
+// but a module is neither its own importer nor its own dependency.
+func structureFanCounts(report structureReport) (map[string]int, map[string]int) {
+	fanIn := map[string]int{}
+	fanOut := map[string]int{}
+	for _, edge := range report.Imports {
+		if edge.Importer == edge.Imported {
+			continue
+		}
+		fanOut[edge.Importer]++
+		fanIn[edge.Imported]++
+	}
+	return fanIn, fanOut
 }
 
 // parseStructureReport rejects missing, malformed or internally inconsistent
@@ -165,12 +189,26 @@ func (r *Runner) normalizeStructure(spec toolSpec, res Result, stdout io.Reader,
 		complete = false
 	}
 
-	for _, module := range report.Modules {
-		r.result.Measurements = append(r.result.Measurements, Measurement{Metric: "module.dependency_depth", Level: "structure", Location: Location{File: relativePath(r.root, module.File)}, Value: float64(module.Depth), Unit: "edges"})
-	}
+	fanIn, fanOut := structureFanCounts(report)
 	status := StatusAdvisory
 	if !spec.advisory {
 		status = StatusBlocking
+	}
+	for _, module := range report.Modules {
+		location := Location{File: relativePath(r.root, module.File)}
+		r.result.Measurements = append(r.result.Measurements,
+			Measurement{Metric: "module.fan_in", Level: "structure", Location: location, Value: float64(fanIn[module.Name]), Unit: "modules"},
+			Measurement{Metric: "module.fan_out", Level: "structure", Location: location, Value: float64(fanOut[module.Name]), Unit: "modules"},
+			Measurement{Metric: "module.dependency_depth", Level: "structure", Location: location, Value: float64(module.Depth), Unit: "edges"},
+		)
+		if fanIn[module.Name] < highModuleCouplingImporters || fanOut[module.Name] < highModuleCouplingDependencies {
+			continue
+		}
+		importers, dependencies := fanIn[module.Name], fanOut[module.Name]
+		r.result.AddFinding(Finding{Gate: spec.gate, Level: "structure", Rule: "pyguard.structure.HIGH_MODULE_COUPLING", Status: status, Severity: "warning", Category: "quality", Location: &location,
+			Evidence:    fmt.Sprintf("%d importing modules depend on this module, which imports %d in-scope runtime modules.", importers, dependencies),
+			Remediation: "Review the change surface and cohesion; these counts alone do not prove excessive coupling.",
+			Diagnostics: refs})
 	}
 	for _, component := range report.Components {
 		if !component.Cyclic {
@@ -216,27 +254,69 @@ func (r *Runner) normalizeStructure(spec toolSpec, res Result, stdout io.Reader,
 	return complete
 }
 
-// runStructure measures the runtime module graph. Cyclic-component findings are
-// advisory in every mode; only analyzer execution failures return 1.
+// structureArgs builds the analyzer invocation. The structured payload is the
+// single source of truth in every mode; human output is rendered from the same
+// normalized findings.
+func structureArgs(r *Runner) []string {
+	args := []string{"uv", "run", "python", "tools/analysis/analyze_structure.py", "--json"}
+	return append(args, r.dirs...)
+}
+
+// runStructure measures the runtime module graph. Cyclic-component and coupling
+// findings are advisory in every mode; only analyzer execution failures return 1.
 func runStructure(r *Runner) int {
 	r.exportExcludeEnv()
-	args := []string{"uv", "run", "python", "tools/analysis/analyze_structure.py"}
-	if r.machine() {
-		args = append(args, "--json")
+	if !r.machine() {
+		return runStructureHuman(r)
 	}
-	args = append(args, r.dirs...)
 	before := len(r.result.Findings)
-	res := r.RunTool(toolSpec{gate: "structure", adapter: "structure", advisory: true}, "structure", args...)
-	if r.machine() {
-		for _, finding := range r.result.Findings[before:] {
-			if finding.Status == StatusExecutionError {
-				return 1
-			}
+	res := r.RunTool(toolSpec{gate: "structure", adapter: "structure", advisory: true}, "structure", structureArgs(r)...)
+	for _, finding := range r.result.Findings[before:] {
+		if finding.Status == StatusExecutionError {
+			return 1
 		}
-		return 0
 	}
 	if !res.ok {
 		return 1
 	}
 	return 0
+}
+
+// runStructureHuman runs the same structured analysis through the adapter and
+// renders its advisory findings. It never re-derives cycles or coupling from
+// analyzer prose, so human and machine modes share one policy.
+func runStructureHuman(r *Runner) int {
+	return runStructureHumanReport(r, structureArgs(r)...)
+}
+
+func runStructureHumanReport(r *Runner, args ...string) int {
+	res, findings := r.runCaptured(toolSpec{gate: "structure", adapter: "structure", advisory: true}, "structure", args...)
+	for _, finding := range findings {
+		if finding.Status == StatusExecutionError {
+			r.printf("  [FAIL] structure — %s\n", finding.Evidence)
+			return 1
+		}
+	}
+	if !res.ok {
+		r.println("  [FAIL] structure — analyzer exited without a successful report")
+		return 1
+	}
+	reportHumanStructure(os.Stdout, findings)
+	return 0
+}
+
+// reportHumanStructure preserves the historical success line and adds one
+// advisory line per normalized finding, including coupling and cycles.
+func reportHumanStructure(w io.Writer, findings []Finding) {
+	fmt.Fprintln(w, "  [OK]   structure")
+	for _, finding := range findings {
+		if finding.Status != StatusAdvisory {
+			continue
+		}
+		if finding.Location != nil && finding.Location.File != "" {
+			fmt.Fprintf(w, "  [ADVISORY] %s %s — %s\n", finding.Rule, finding.Location.File, finding.Evidence)
+			continue
+		}
+		fmt.Fprintf(w, "  [ADVISORY] %s — %s\n", finding.Rule, finding.Evidence)
+	}
 }
