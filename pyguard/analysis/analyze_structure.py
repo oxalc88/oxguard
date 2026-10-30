@@ -741,7 +741,7 @@ def forwarding_fact(
     positional-or-keyword parameters and exactly one ``return <Call>`` can
     forward. A leading docstring is allowed. The call target is the pyan3
     module binding for the returned name, unless that name is shadowed in the
-    wrapper scope. It must be an in-scope function other than the wrapper
+    wrapper parameter or local. It must be an in-scope function other than the wrapper
     itself, and its return annotation must be textually identical. ``async def`` forwards only
     as ``return await b(...)`` to another ``async def``.
     """
@@ -797,7 +797,19 @@ def forwarding_fact(
     # Use the returned Name's binding rather than use_edges, which also
     # contains annotation/default references and loses import alias names.
     name = call.func.id
-    if name in getattr(function_scope, "locals", set()):
+    parameter_names = {
+        argument.arg
+        for argument in (
+            *arguments.posonlyargs,
+            *arguments.args,
+            *arguments.kwonlyargs,
+        )
+    }
+    if arguments.vararg is not None:
+        parameter_names.add(arguments.vararg.arg)
+    if arguments.kwarg is not None:
+        parameter_names.add(arguments.kwarg.arg)
+    if name in parameter_names or name in getattr(function_scope, "locals", set()):
         return None
     target = getattr(module_scope, "defs", {}).get(name)
     if target not in in_scope or target is node:

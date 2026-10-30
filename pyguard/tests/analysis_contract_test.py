@@ -465,6 +465,20 @@ class StructureDelegationContract(unittest.TestCase):
         self.assertEqual(functions["pkg.wrapper.wrapper"]["forward_target"], "pkg.worker.real")
         self.assertEqual(functions["pkg.wrapper.wrapper"]["forwarding_mode"], "sync")
 
+    def test_parameter_shadowing_does_not_resolve_to_module_function(self):
+        files = {
+            "cases.py": (
+                "def target(x):\n"
+                "    return x\n\n\n"
+                "def wrapper(target):\n"
+                "    return target(target)\n"
+            )
+        }
+        with tempfile.TemporaryDirectory() as root:
+            functions = self.graph(root, files)
+        self.assertEqual(functions["pkg.cases.wrapper"]["forward_target"], "")
+        self.assertEqual(functions["pkg.cases.wrapper"]["forwarding_mode"], "")
+
     def test_non_forwarding_shapes_are_excluded(self):
         files = {
             "controls.py": (
