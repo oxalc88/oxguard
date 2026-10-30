@@ -58,14 +58,14 @@
       "id": "maintainability.failure_policies",
       "tsguard": "smells.failure_policy_controls",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": ["failure_policy.controls", "failure_policy.silent_loop_exits", "failure_policy.empty_literal_boundaries", "failure_policy.repeated_handlers"],
+          "negative": ["failure_policy.caught_name_and_other_name", "failure_policy.pass_and_typed_controls", "failure_policy.literal_sensitive_fingerprint"],
+          "boundary": ["failure_policy.repetition_threshold_boundary", "failure_policy.except_star_and_scope", "failure_policy.test_file_exclusion", "failure_policy.unparsable_is_incomplete"]
         }
       },
-      "python_candidate": "Ruff plus Python ast for short identical handlers"
+      "python_candidate": "pyguard structure AST handler policies and body-only tokenize fingerprints, with broad-only fallback/exit rules and partial evidence on parse failures"
     },
     {
       "id": "structure.runtime_graph",

@@ -661,6 +661,39 @@ const definitions = [
     },
   },
   {
+    id: 'failure_policy.controls', capability: 'maintainability.failure_policies', kind: 'positive', command: 'structure', files: { 'src/policy.py': 'import logging\nlog = logging.getLogger(__name__)\ndef record():\n    try:\n        work()\n    except Exception:\n        log.exception("failed")\n        return None\ndef silent():\n    try:\n        work()\n    except Exception:\n        return None\n' }, check: ({ result }) => { complete(result, 'structure'); const f = result.findings.filter(x => x.rule === 'pyguard.structure.SILENT_EXCEPTION_FALLBACK'); assert.deepEqual(f.map(x => [x.location.file, x.location.line]), [['src/policy.py', 12]]); assert.equal(result.exit_code, 0); assert.equal(blockingOutcome(result), false); },
+  },
+  {
+    id: 'failure_policy.silent_loop_exits', capability: 'maintainability.failure_policies', kind: 'positive', command: 'structure', files: { 'src/loops.py': 'def run(items):\n    for item in items:\n        try:\n            work(item)\n        except Exception:\n            continue\n        try:\n            work(item)\n        except Exception:\n            record()\n            continue\n    while True:\n        try:\n            work()\n        except BaseException:\n            break\n' }, check: ({ result }) => { complete(result, 'structure'); const f = result.findings.filter(x => x.rule === 'pyguard.structure.SILENT_EXCEPTION_EXIT'); assert.deepEqual(f.map(x => x.location.line), [5, 15]); assert.equal(result.exit_code, 0); },
+  },
+  {
+    id: 'failure_policy.empty_literal_boundaries', capability: 'maintainability.failure_policies', kind: 'positive', command: 'structure', files: { 'src/literals.py': 'def run():\n    try:\n        work()\n    except Exception:\n        return ()\n    try:\n        work()\n    except Exception:\n        return {}\n    try:\n        work()\n    except Exception:\n        return set()\n' }, check: ({ result }) => { complete(result, 'structure'); const f = result.findings.filter(x => x.rule === 'pyguard.structure.SILENT_EXCEPTION_FALLBACK'); assert.deepEqual(f.map(x => x.location.line), [4, 8]); },
+  },
+  {
+    id: 'failure_policy.repeated_handlers', capability: 'maintainability.failure_policies', kind: 'positive', command: 'structure', files: { 'src/repeat.py': 'def a():\n    try:\n        first()\n    except Exception:\n        log.error("failed", exc_info=True)\n        return None\ndef b():\n    try:\n        second()\n    except KeyError:\n        log.error("failed", exc_info=True)\n        return None\ndef c():\n    try:\n        third()\n    except ValueError:\n        log.error("failed", exc_info=True)\n        return None\n' }, check: ({ result }) => { complete(result, 'structure'); const f = result.findings.filter(x => x.rule === 'pyguard.structure.REPEATED_ERROR_HANDLER'); assert.equal(f.length, 1); assert.equal(f[0].location.line, 4); assert.equal(f[0].observed, 3); assert.equal(f[0].related.length, 2); },
+  },
+  {
+    id: 'failure_policy.caught_name_and_other_name', capability: 'maintainability.failure_policies', kind: 'negative', command: 'structure', files: { 'src/names.py': 'def run():\n    try:\n        work()\n    except Exception as error:\n        return error\n    try:\n        work()\n    except Exception as error:\n        return fallback\n' }, check: ({ result }) => { complete(result, 'structure'); const f = result.findings.filter(x => x.rule === 'pyguard.structure.SILENT_EXCEPTION_FALLBACK'); assert.deepEqual(f.map(x => x.location.line), [8]); },
+  },
+  {
+    id: 'failure_policy.pass_and_typed_controls', capability: 'maintainability.failure_policies', kind: 'negative', command: 'structure', files: { 'src/controls.py': 'def run():\n    try:\n        work()\n    except Exception:\n        pass\n    try:\n        work()\n    except KeyError:\n        return None\n' }, check: ({ result }) => { complete(result, 'structure'); assert.equal(result.findings.length, 0); },
+  },
+  {
+    id: 'failure_policy.literal_sensitive_fingerprint', capability: 'maintainability.failure_policies', kind: 'negative', command: 'structure', files: { 'src/repeat.py': 'def a():\n    try:\n        one()\n    except Exception:\n        log.error("one", exc_info=True); recover(value, retry=True)\ndef b():\n    try:\n        two()\n    except Exception:\n        log.error("two", exc_info=True); recover(value, retry=True)\ndef c():\n    try:\n        three()\n    except Exception:\n        log.error("three", exc_info=True); recover(value, retry=True)\n' }, check: ({ result }) => { complete(result, 'structure'); assert.equal(result.findings.filter(x => x.rule === 'pyguard.structure.REPEATED_ERROR_HANDLER').length, 0); },
+  },
+  {
+    id: 'failure_policy.repetition_threshold_boundary', capability: 'maintainability.failure_policies', kind: 'boundary', command: 'structure', files: { 'src/repeat.py': 'def a():\n    try:\n        one()\n    except Exception:\n        recover(value)\ndef b():\n    try:\n        two()\n    except Exception:\n        recover(value)\ndef c():\n    try:\n        three()\n    except Exception:\n        recover(value)\ndef d():\n    try:\n        four()\n    except Exception:\n        logger.error("failed", exc_info=True); recover(value, retry=True, context=context)\ndef e():\n    try:\n        five()\n    except Exception:\n        logger.error("failed", exc_info=True); recover(value, retry=True, context=context)\n' }, check: ({ result }) => { complete(result, 'structure'); assert.equal(result.findings.filter(x => x.rule === 'pyguard.structure.REPEATED_ERROR_HANDLER').length, 0); },
+  },
+  {
+    id: 'failure_policy.except_star_and_scope', capability: 'maintainability.failure_policies', kind: 'boundary', command: 'structure', files: { 'src/module.py': 'try:\n    work()\nexcept* Exception:\n    logger.error("failed", exc_info=True)\n    recover(value, retry=True)\nclass Worker:\n    def run(self):\n        try:\n            work()\n        except KeyError:\n            logger.error("failed", exc_info=True)\n            recover(value, retry=True)\ndef other():\n    try:\n        work()\n    except ValueError:\n        logger.error("failed", exc_info=True)\n        recover(value, retry=True)\n' }, check: ({ result }) => { complete(result, 'structure'); const f = result.findings.filter(x => x.rule === 'pyguard.structure.REPEATED_ERROR_HANDLER'); assert.equal(f.length, 1); assert.equal(f[0].location.line, 3); assert.equal(f[0].observed, 3); assert.equal(f[0].related.length, 2); },
+  },
+  {
+    id: 'failure_policy.test_file_exclusion', capability: 'maintainability.failure_policies', kind: 'boundary', command: 'structure', files: { 'src/main.py': 'def run():\n    try:\n        work()\n    except Exception:\n        return None\n', 'src/test_main.py': 'def test_run():\n    try:\n        work()\n    except Exception:\n        return None\n' }, check: ({ result }) => { complete(result, 'structure'); const f = result.findings.filter(x => x.rule === 'pyguard.structure.SILENT_EXCEPTION_FALLBACK'); assert.deepEqual(f.map(x => x.location.file), ['src/main.py']); },
+  },
+  {
+    id: 'failure_policy.unparsable_is_incomplete', capability: 'maintainability.failure_policies', kind: 'boundary', command: 'structure', files: { 'src/main.py': 'def run():\n    try:\n        work()\n    except Exception:\n        return None\n', 'src/broken.py': 'def broken(:\n    pass\n' }, check: ({ result }) => { assert.equal(result.assessment, 'incomplete'); assert.ok(result.findings.some(x => x.rule === 'pyguard.structure.not_evaluated')); assert.equal(result.exit_code, 0); },
+  },
+  {
     id: 'structure.runtime_cycle',
     capability: 'structure.runtime_graph',
     kind: 'positive',

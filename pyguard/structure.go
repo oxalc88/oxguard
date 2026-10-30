@@ -67,6 +67,15 @@ type structureFunctionCounts struct {
 	UnresolvedCalls     int `json:"unresolved_calls"`
 }
 
+type structureFailureHandler struct {
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+	Fallback    bool   `json:"fallback"`
+	Exit        bool   `json:"exit"`
+	TokenCount  int    `json:"token_count"`
+	Fingerprint string `json:"fingerprint"`
+}
+
 // structureReport is the owned analyzer payload. Python builds the runtime
 // module graph with grimp and the function graph with pyan3/networkx; Go
 // validates both and owns measurements, findings and policy.
@@ -80,12 +89,58 @@ type structureReport struct {
 	Calls              []structureCall              `json:"calls"`
 	FunctionComponents []structureFunctionComponent `json:"function_components"`
 	FunctionCounts     structureFunctionCounts      `json:"function_counts"`
+	FailureHandlers    []structureFailureHandler    `json:"failure_handlers"`
 	Partial            bool                         `json:"partial"`
 	Limitation         string                       `json:"limitation"`
 	Error              *struct {
 		Category string `json:"category"`
 		Message  string `json:"message"`
 	} `json:"error,omitempty"`
+}
+
+func (r *Runner) structureFailurePolicyFindings(gate string, handlers []structureFailureHandler, status Status, refs []string) {
+	ordered := append([]structureFailureHandler(nil), handlers...)
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].File == ordered[j].File {
+			return ordered[i].Line < ordered[j].Line
+		}
+		return ordered[i].File < ordered[j].File
+	})
+	for _, handler := range ordered {
+		for _, policy := range []struct {
+			match          bool
+			rule, evidence string
+		}{{handler.Fallback, "SILENT_EXCEPTION_FALLBACK", "A broad exception handler returns a silent fallback value."}, {handler.Exit, "SILENT_EXCEPTION_EXIT", "A broad exception handler silently exits its loop with continue or break."}} {
+			if !policy.match {
+				continue
+			}
+			location := Location{File: relativePath(r.root, handler.File), Line: handler.Line}
+			r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "pyguard.structure." + policy.rule, Status: status, Severity: "warning", Category: "quality", Location: &location, Evidence: policy.evidence, Remediation: "Review whether this failure policy is intentional and whether callers need a recorded or propagated failure.", Diagnostics: refs})
+		}
+	}
+	groups := map[string][]structureFailureHandler{}
+	for _, handler := range ordered {
+		if handler.TokenCount >= 12 && handler.Fingerprint != "" {
+			groups[handler.Fingerprint] = append(groups[handler.Fingerprint], handler)
+		}
+	}
+	keys := make([]string, 0, len(groups))
+	for key := range groups {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		group := groups[key]
+		if len(group) < 3 {
+			continue
+		}
+		locations := make([]Location, len(group))
+		for i, h := range group {
+			locations[i] = Location{File: relativePath(r.root, h.File), Line: h.Line}
+		}
+		value := float64(len(group))
+		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "pyguard.structure.REPEATED_ERROR_HANDLER", Status: status, Severity: "warning", Category: "quality", Location: &locations[0], Related: locations[1:], Observed: &value, Evidence: fmt.Sprintf("%d handlers have the same body token sequence (%d tokens).", len(group), group[0].TokenCount), Remediation: "Review whether repeated recovery logic should share a helper or represent an explicit common policy.", Diagnostics: refs})
+	}
 }
 
 // Joint review thresholds copied from Tsguard: a module is worth reviewing
@@ -479,6 +534,7 @@ func (r *Runner) normalizeStructure(spec toolSpec, res Result, stdout io.Reader,
 	if !spec.advisory {
 		status = StatusBlocking
 	}
+	r.structureFailurePolicyFindings(spec.gate, report.FailureHandlers, status, refs)
 	for _, module := range report.Modules {
 		location := Location{File: relativePath(r.root, module.File)}
 		r.result.Measurements = append(r.result.Measurements,

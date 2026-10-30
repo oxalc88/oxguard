@@ -11,6 +11,7 @@ import os
 import sys
 import tempfile
 import tokenize
+import hashlib
 from pathlib import Path
 
 # Python packages grimp cannot infer for top-level modules are represented as
@@ -212,6 +213,65 @@ def read_tree(path: Path) -> ast.Module:
         raise StructureError(
             "adapter_failure", f"Unparsable source: {path}: {error}"
         ) from error
+
+
+def failure_handlers(path: Path, tree: ast.Module) -> list[dict[str, object]]:
+    """Return syntactic exception-handler policy facts for Go normalization."""
+    try:
+        with tokenize.open(path) as source_file:
+            source = source_file.read()
+    except (OSError, UnicodeError, SyntaxError) as error:
+        raise StructureError("adapter_failure", f"Unparsable source: {path}: {error}") from error
+    lines = source.splitlines(keepends=True)
+    facts: list[dict[str, object]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Try, getattr(ast, "TryStar", ast.Try))):
+            continue
+        for handler in node.handlers:
+            body = handler.body
+            fallback = False
+            exit_policy = False
+            if len(body) == 1 and not isinstance(body[0], ast.Pass):
+                statement = body[0]
+                if isinstance(statement, ast.Return):
+                    value = statement.value
+                    if value is None:
+                        fallback = True
+                    elif isinstance(value, ast.Constant):
+                        fallback = True
+                    elif isinstance(value, ast.Name):
+                        fallback = value.id != handler.name
+                    elif isinstance(value, (ast.List, ast.Tuple, ast.Dict)) and not getattr(value, "elts", []) and not getattr(value, "keys", []):
+                        fallback = True
+                elif isinstance(statement, (ast.Continue, ast.Break)):
+                    exit_policy = True
+            def broad_type(item: ast.AST) -> bool:
+                return ((isinstance(item, ast.Name) and item.id in {"Exception", "BaseException"}) or
+                        (isinstance(item, ast.Attribute) and isinstance(item.value, ast.Name)
+                         and item.value.id == "builtins" and item.attr in {"Exception", "BaseException"}) or
+                        (isinstance(item, ast.Tuple) and any(broad_type(child) for child in item.elts)))
+            broad = handler.type is None or broad_type(handler.type)
+            tokens: list[str] = []
+            if body:
+                start_line, end_line = body[0].lineno, body[-1].end_lineno or body[-1].lineno
+                start_text = lines[start_line - 1]
+                end_text = lines[end_line - 1]
+                start_col = len(start_text.encode("utf-8")[:body[0].col_offset].decode("utf-8"))
+                end_col_bytes = body[-1].end_col_offset or len(end_text.encode("utf-8"))
+                end_col = len(end_text.encode("utf-8")[:end_col_bytes].decode("utf-8"))
+                start_position = (start_line, start_col)
+                end_position = (end_line, end_col)
+                try:
+                    tokens = [token.string for token in tokenize.generate_tokens(io.StringIO(source).readline)
+                              if token.start >= start_position and token.end <= end_position
+                              and token.type not in {tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT,
+                                                     tokenize.DEDENT, tokenize.ENCODING, tokenize.ENDMARKER}]
+                except tokenize.TokenError:
+                    tokens = []
+            facts.append({"file": path.as_posix(), "line": handler.lineno, "fallback": fallback and broad,
+                          "exit": exit_policy and broad, "token_count": len(tokens),
+                          "fingerprint": hashlib.sha256("\0".join(tokens).encode("utf-8")).hexdigest()})
+    return facts
 
 
 def absolute_import_base(
@@ -1115,6 +1175,10 @@ def build_report(targets: list[str]) -> dict[str, object]:
         except StructureError:
             unparsable.append(path)
 
+    handler_facts: list[dict[str, object]] = []
+    for path in sorted(parsed):
+        handler_facts.extend(failure_handlers(path, parsed[path]))
+
     retained: dict[str, tuple[Path, Path, bool]] = {}
     retained_by_path: dict[Path, tuple[str, Path, bool]] = {}
     for path in sorted(parsed):
@@ -1314,6 +1378,7 @@ def build_report(targets: list[str]) -> dict[str, object]:
             "deferred_imports": deferred_imports,
         },
         **function_graph,
+        "failure_handlers": handler_facts,
         "partial": bool(reasons),
         "limitation": " ".join(reasons),
     }

@@ -136,6 +136,20 @@ const RUFF = {
   'ruff.baseline.test_files_still_linted': { exit: 1, status: 'fail', gate: 'failed', measurement: true, findings: [['S110', 'src/tests/test_handlers.py', 4]] },
 };
 
+const FAILURE_POLICIES = {
+  'failure_policy.controls': [['SILENT_EXCEPTION_FALLBACK', 'src/policy.py', 12]],
+  'failure_policy.silent_loop_exits': [['SILENT_EXCEPTION_EXIT', 'src/loops.py', 5], ['SILENT_EXCEPTION_EXIT', 'src/loops.py', 15]],
+  'failure_policy.caught_name_and_other_name': [['SILENT_EXCEPTION_FALLBACK', 'src/names.py', 8]],
+  'failure_policy.empty_literal_boundaries': [['SILENT_EXCEPTION_FALLBACK', 'src/literals.py', 4], ['SILENT_EXCEPTION_FALLBACK', 'src/literals.py', 8]],
+  'failure_policy.pass_and_typed_controls': [],
+  'failure_policy.repeated_handlers': [['REPEATED_ERROR_HANDLER', 'src/repeat.py', 4, 3, 2]],
+  'failure_policy.repetition_threshold_boundary': [],
+  'failure_policy.literal_sensitive_fingerprint': [],
+  'failure_policy.except_star_and_scope': [['REPEATED_ERROR_HANDLER', 'src/module.py', 3, 3, 2]],
+  'failure_policy.test_file_exclusion': [['SILENT_EXCEPTION_FALLBACK', 'src/main.py', 2]],
+  'failure_policy.unparsable_is_incomplete': [['not_evaluated', 'src/broken.py', 1]],
+};
+
 // Canned structure reports for the Python module-graph controls. The real-binary
 // test independently verifies the same measurements and findings with grimp.
 const STRUCTURE = {
@@ -192,9 +206,15 @@ const ruff = ${JSON.stringify(RUFF)};
 const structure = ${JSON.stringify(STRUCTURE)};
 const functionGraph = ${JSON.stringify(FUNCTION_GRAPH)};
 const delegation = ${JSON.stringify(DELEGATION)};
+const failurePolicies = ${JSON.stringify(FAILURE_POLICIES)};
 const caseId = path.basename(path.dirname(process.cwd()));
 const variant = path.basename(process.cwd());
 const command = process.argv[2] || 'criticality';
+if (failurePolicies[caseId] && command === 'structure') {
+  const partial = caseId === 'failure_policy.unparsable_is_incomplete';
+  const findings = failurePolicies[caseId].map(([rule, file, line, observed, related]) => ({ level:'structure', gate:'structure', rule: rule === 'not_evaluated' ? 'pyguard.structure.not_evaluated' : 'pyguard.structure.' + rule, severity:rule === 'not_evaluated' ? 'info' : 'warning', status:'advisory', category:'quality', location:{file,line}, ...(observed ? {observed} : {}), ...(related ? {related:Array.from({length:related},()=>({file:'src/repeat.py'}))} : {}), evidence:'advisory fixture', diagnostics:[] }));
+  process.stdout.write(JSON.stringify({schema_version:'1',status:findings.length?'advisory':'pass',assessment:partial?'incomplete':'complete',gates:[{name:'structure',status:findings.length?'advisory':'passed',normalization:partial?'partial':'complete'}],exit_code:0,findings,measurements:[],artifacts:[],diagnostics:[]})); process.exit(0);
+}
 if (ruff[caseId]) {
   const spec = ruff[caseId];
   const findings = spec.findings.map(([rule, file, line]) => ({ rule, level: 'code', gate: 'ruff', severity: 'error', status: 'blocking', category: 'quality', location: { file, line, column: 5 }, evidence: rule + ' violation', diagnostics: [] }));
@@ -293,7 +313,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'structure.runtime_graph', 'structure.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'maintainability.failure_policies', 'structure.runtime_graph', 'structure.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 
