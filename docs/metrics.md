@@ -178,7 +178,7 @@ Two project measurements use location `.`:
 
 A self-call is one call edge and one recursive component, but a function is neither its own caller nor its own callee. Therefore `function.fan_in` equals the unchanged `pyguard criticality` `criticality.in_degree` except for self-recursive functions, where criticality counts the self-call once and function fan-in counts zero. Both metrics are retained; `pyguard criticality` and its in-degree semantics are unchanged.
 
-The function graph emits no findings and never changes the exit code, status or blocking outcome. An SCC, recursion, high fan-in or unresolved call is not by itself a quality violation. `tokenize.detect_encoding` decides pyan3 normalization: a source whose declared or BOM encoding is not plain UTF-8, including non-UTF-8 bytes that also decode as UTF-8, is copied into a temporary UTF-8 mirror for pyan3 while reported locations stay the original paths and line numbers and pyan3's original inferred import root is preserved, including when an ancestor `__init__.py` marker is outside the requested scope; a file pyan3 cannot parse leaves the assessment incomplete with `pyguard.structure.not_evaluated`, as in the module graph. Missing/broken pyan3 or NetworkX is an execution error. Source scope follows `--dirs`, `[tool.pyguard] exclude` and the default test-file/directory exclusion exactly like the module graph.
+The function graph itself emits no findings and never changes the exit code, status or blocking outcome; delegation reviews reuse the same resolved edges and are documented below. An SCC, recursion, high fan-in or unresolved call is not by itself a quality violation. `tokenize.detect_encoding` decides pyan3 normalization: a source whose declared or BOM encoding is not plain UTF-8, including non-UTF-8 bytes that also decode as UTF-8, is copied into a temporary UTF-8 mirror for pyan3 while reported locations stay the original paths and line numbers and pyan3's original inferred import root is preserved, including when an ancestor `__init__.py` marker is outside the requested scope; a file pyan3 cannot parse leaves the assessment incomplete with `pyguard.structure.not_evaluated`, as in the module graph. Missing/broken pyan3 or NetworkX is an execution error. Source scope follows `--dirs`, `[tool.pyguard] exclude` and the default test-file/directory exclusion exactly like the module graph.
 
 ---
 
@@ -288,6 +288,14 @@ a depth limit pushes toward explicit, readable data models.
 The same test-file exclusion that applies to the radon gates (`test_*.py`, `*_test.py`,
 `conftest.py`, `tests/`) also applies here — test fixtures and parametrize helpers often
 use complex type annotations by design.
+
+## PyGuard delegation (structure)
+
+`pyguard structure` measures `delegation.depth` in `layers` for every in-scope function. The value is the memoized suffix length of unchanged forwarding layers: a function that does not forward has depth 0, a direct wrapper has depth 1, and a forwarding cycle has no finite suffix length and is reported as 0 rather than an invented number. Every forwarding function also gets `delegation.forwarding` (value 1, unit `calls`) with additive measurement fields `forwarding_mode` (`sync` or `async-return-await`) and the module-qualified `forward_target` symbol.
+
+Only module-level, undecorated `def`/`async def` functions with plain positional-or-keyword parameters and exactly one `return <Call>` (an optional leading docstring is allowed) can forward. The call target must be a bare `Name` resolved by pyan3 to one other in-scope function, arguments must be the parameters as bare names in the same order without keywords or starred arguments, and return annotations must match as `ast.unparse` text (both absent or identical). An async function forwards only as `return await b(...)` to another async function; a plain `def` returning a call is `sync`, and an un-awaited async return or an await of a non-async target is not forwarding.
+
+Depth 3 or more reports advisory `pyguard.structure.LONG_DELEGATION_CHAIN`, and a chain across at least three files whose analyzed module-level functions all forward reports advisory `pyguard.structure.FRAGMENTED_DELEGATION`. Both are review cues, not architecture prescriptions; methods, nested/decorated functions, parameter defaults, `*args`, `**kwargs`, keyword-only and positional-only parameters, transformed or reordered arguments, annotation mismatches, tests and forwarding cycles are excluded boundaries. The findings never change the exit code or blocking outcome.
 
 ## Tsguard function context
 

@@ -56,6 +56,11 @@ type Measurement struct {
 	Value     float64  `json:"value"`
 	Unit      string   `json:"unit"`
 	Threshold float64  `json:"threshold,omitempty"`
+	// ForwardingMode and ForwardTarget are optional additive facts for
+	// measurements whose value alone cannot express the observation. PyGuard
+	// uses them for delegation.forwarding.
+	ForwardingMode string `json:"forwarding_mode,omitempty"`
+	ForwardTarget  string `json:"forward_target,omitempty"`
 }
 
 type Artifact struct {

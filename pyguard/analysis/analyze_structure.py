@@ -705,6 +705,110 @@ def own_scope_calls(
     return calls
 
 
+def module_level_function_ids(tree: ast.Module) -> set[int]:
+    """Collect function definitions whose enclosing scope is the module.
+
+    Definitions under module-level ``if``/``try``/``with``/loop statements are
+    still module-level. Class and function bodies belong to another scope and
+    are never descended into.
+    """
+    identifiers: set[int] = set()
+
+    def visit(node: ast.AST) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            identifiers.add(id(node))
+            return
+        if isinstance(node, ast.ClassDef):
+            return
+        for child in ast.iter_child_nodes(node):
+            visit(child)
+
+    for statement in tree.body:
+        visit(statement)
+    return identifiers
+
+
+def forwarding_fact(
+    node: object,
+    resolved: list[object],
+    module_level: set[int],
+    in_scope: set[object],
+) -> tuple[str, str] | None:
+    """Return (mode, target symbol) for one unchanged forwarding wrapper.
+
+    Only a module-level, undecorated ``def``/``async def`` with plain
+    positional-or-keyword parameters and exactly one ``return <Call>`` can
+    forward. A leading docstring is allowed. The call target is the single
+    pyan3-resolved in-scope function other than the wrapper itself, and its
+    return annotation must be textually identical. ``async def`` forwards only
+    as ``return await b(...)`` to another ``async def``.
+    """
+    definition = getattr(node, "ast_node", None)
+    if not isinstance(definition, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return None
+    if id(definition) not in module_level or definition.decorator_list:
+        return None
+    arguments = definition.args
+    if (
+        arguments.posonlyargs
+        or arguments.vararg
+        or arguments.kwarg
+        or arguments.kwonlyargs
+        or arguments.defaults
+        or arguments.kw_defaults
+    ):
+        return None
+    body = list(definition.body)
+    if (
+        body
+        and isinstance(body[0], ast.Expr)
+        and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
+    ):
+        body = body[1:]
+    if len(body) != 1 or not isinstance(body[0], ast.Return):
+        return None
+    returned = body[0].value
+    if returned is None:
+        return None
+    is_async = isinstance(definition, ast.AsyncFunctionDef)
+    if is_async:
+        if not isinstance(returned, ast.Await) or not isinstance(
+            returned.value, ast.Call
+        ):
+            return None
+        call = returned.value
+    else:
+        if not isinstance(returned, ast.Call):
+            return None
+        call = returned
+    if not isinstance(call.func, ast.Name) or call.keywords:
+        return None
+    parameters = [argument.arg for argument in arguments.args]
+    if len(call.args) != len(parameters):
+        return None
+    if any(
+        not isinstance(argument, ast.Name) or argument.id != parameter
+        for argument, parameter in zip(call.args, parameters)
+    ):
+        return None
+    candidates = [
+        callee for callee in resolved if callee is not node and callee in in_scope
+    ]
+    if len(candidates) != 1:
+        return None
+    target = candidates[0]
+    if is_async and not isinstance(target.ast_node, ast.AsyncFunctionDef):
+        return None
+    if (definition.returns is None) != (target.ast_node.returns is None):
+        return None
+    if definition.returns is not None and ast.unparse(
+        definition.returns
+    ) != ast.unparse(target.ast_node.returns):
+        return None
+    return ("async-return-await" if is_async else "sync", target.get_name())
+
+
 def empty_function_graph() -> dict[str, object]:
     return {
         "functions": [],
@@ -851,24 +955,44 @@ def _build_function_graph(
         for node in group:
             if isinstance(node.ast_node, ast.Module):
                 module_trees.setdefault(node.filename, node.ast_node)
+    module_level = {
+        identifier
+        for tree in module_trees.values()
+        for identifier in module_level_function_ids(tree)
+    }
     imported_by_module = {
         filename: import_bound_names(tree) for filename, tree in module_trees.items()
     }
     index = {node: position for position, node in enumerate(ordered)}
     calls: set[tuple[int, int]] = set()
+    resolved_by_caller: dict[object, list[object]] = {}
     unresolved = 0
     for caller in ordered:
+        resolved = [
+            callee for callee in visitor.uses_edges.get(caller, ()) if callee in index
+        ]
+        resolved_by_caller[caller] = resolved
         callee_names: set[str] = set()
-        for callee in visitor.uses_edges.get(caller, ()):
-            if callee in index:
-                calls.add((index[caller], index[callee]))
-                callee_names.add(callee.name)
+        for callee in resolved:
+            calls.add((index[caller], index[callee]))
+            callee_names.add(callee.name)
         imported_names = imported_by_module.get(caller.filename, set())
         unresolved += sum(
             1
             for call in own_scope_calls(caller.ast_node)
             if not call_is_resolved(call.func, callee_names, imported_names)
         )
+
+    forwarding = {
+        function: fact
+        for function in ordered
+        if (
+            fact := forwarding_fact(
+                function, resolved_by_caller.get(function, []), module_level, set(index)
+            )
+        )
+        is not None
+    }
 
     import networkx as nx
 
@@ -902,6 +1026,9 @@ def _build_function_graph(
                     "line": node.ast_node.lineno,
                     "symbol": node.get_name(),
                     "depth": depths[mapping[position]],
+                    "module_level": id(node.ast_node) in module_level,
+                    "forwarding_mode": forwarding.get(node, ("", ""))[0],
+                    "forward_target": forwarding.get(node, ("", ""))[1],
                 }
                 for position, node in enumerate(ordered)
             ],

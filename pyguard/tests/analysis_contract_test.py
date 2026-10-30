@@ -376,5 +376,112 @@ class VultureReportContract(unittest.TestCase):
         self.assertEqual(data["error"]["category"], "tool_missing")
 
 
+
+class StructureDelegationContract(unittest.TestCase):
+    """Forwarding facts stay exact for the Python-specific delegation rules."""
+
+    def graph(self, root, files):
+        package = Path(root) / "pkg"
+        package.mkdir()
+        (package / "__init__.py").write_text("")
+        for name, text in files.items():
+            (package / name).write_text(text)
+        graph, skipped = analyze_structure.build_function_graph(
+            sorted(str(path.resolve()) for path in package.glob("*.py")),
+            Path(root).resolve(),
+        )
+        self.assertEqual(skipped, [])
+        return {function["symbol"]: function for function in graph["functions"]}
+
+    def test_module_level_chain_records_modes_and_targets(self):
+        files = {
+            "real.py": "def real(x: int) -> int:\n    return x * 2\n",
+            "c.py": "from .real import real\n\n\ndef c(x: int) -> int:\n    return real(x)\n",
+            "b.py": "from .c import c\n\n\ndef b(x: int) -> int:\n    return c(x)\n",
+            "a.py": "from .b import b\n\n\ndef a(x: int) -> int:\n    return b(x)\n",
+        }
+        with tempfile.TemporaryDirectory() as root:
+            functions = self.graph(root, files)
+        self.assertEqual(functions["pkg.a.a"]["forward_target"], "pkg.b.b")
+        self.assertEqual(functions["pkg.a.a"]["forwarding_mode"], "sync")
+        self.assertEqual(functions["pkg.c.c"]["forward_target"], "pkg.real.real")
+        self.assertEqual(functions["pkg.real.real"]["forward_target"], "")
+        self.assertTrue(functions["pkg.a.a"]["module_level"])
+
+    def test_async_forwarding_requires_await_and_an_async_target(self):
+        files = {
+            "chain.py": (
+                "async def work(x: int) -> int:\n"
+                "    return x\n\n\n"
+                "async def c(x: int) -> int:\n"
+                "    return await work(x)\n\n\n"
+                "async def boundary(x: int) -> int:\n"
+                "    try:\n"
+                "        return await work(x)\n"
+                "    except Exception as error:\n"
+                "        raise RuntimeError('boundary') from error\n"
+            )
+        }
+        with tempfile.TemporaryDirectory() as root:
+            functions = self.graph(root, files)
+        self.assertEqual(functions["pkg.chain.c"]["forwarding_mode"], "async-return-await")
+        self.assertEqual(functions["pkg.chain.c"]["forward_target"], "pkg.chain.work")
+        self.assertEqual(functions["pkg.chain.boundary"]["forward_target"], "")
+        self.assertEqual(functions["pkg.chain.boundary"]["forwarding_mode"], "")
+
+    def test_non_forwarding_shapes_are_excluded(self):
+        files = {
+            "controls.py": (
+                "def real(x: int, y: int = 0) -> int:\n"
+                "    return x + y\n\n\n"
+                "def defaults(x: int) -> int:\n"
+                "    return real(x, 0)\n\n\n"
+                "def varargs(*args: int) -> int:\n"
+                "    return real(*args)\n\n\n"
+                "def kwonly(x: int, *, y: int) -> int:\n"
+                "    return real(x, y)\n\n\n"
+                "def reordered(x: int, y: int) -> int:\n"
+                "    return real(y, x)\n\n\n"
+                "def mismatched(x: int) -> str:\n"
+                "    return real(x, 0)\n\n\n"
+                "def marker(function):\n"
+                "    return function\n\n\n"
+                "@marker\n"
+                "def decorated(x: int) -> int:\n"
+                "    return real(x, 0)\n\n\n"
+                "class Service:\n"
+                "    def load(self, x: int) -> int:\n"
+                "        return real(x, 0)\n"
+            )
+        }
+        with tempfile.TemporaryDirectory() as root:
+            functions = self.graph(root, files)
+        for symbol in (
+            "pkg.controls.real",
+            "pkg.controls.defaults",
+            "pkg.controls.varargs",
+            "pkg.controls.kwonly",
+            "pkg.controls.reordered",
+            "pkg.controls.mismatched",
+            "pkg.controls.decorated",
+            "pkg.controls.Service.load",
+        ):
+            self.assertEqual(functions[symbol]["forward_target"], "")
+            self.assertEqual(functions[symbol]["forwarding_mode"], "")
+        self.assertFalse(functions["pkg.controls.Service.load"]["module_level"])
+
+    def test_forwarding_cycle_keeps_facts_without_a_finite_depth(self):
+        files = {
+            "a.py": "from .b import b\n\n\ndef a(x: int) -> int:\n    return b(x)\n",
+            "b.py": "from .c import c\n\n\ndef b(x: int) -> int:\n    return c(x)\n",
+            "c.py": "from .a import a\n\n\ndef c(x: int) -> int:\n    return a(x)\n",
+        }
+        with tempfile.TemporaryDirectory() as root:
+            functions = self.graph(root, files)
+        for symbol in ("pkg.a.a", "pkg.b.b", "pkg.c.c"):
+            self.assertEqual(functions[symbol]["forwarding_mode"], "sync")
+            self.assertNotEqual(functions[symbol]["forward_target"], "")
+
+
 if __name__ == "__main__":
     unittest.main()
