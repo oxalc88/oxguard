@@ -81,7 +81,7 @@ makes mistakes likely.
 
 **Test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and the `tests/`
 directory are excluded from the radon gates (cc, mi, hal), the Halstead script,
-complexipy and the runtime module graph by default. For complexipy, which has no directory `--ignore`, the exclusion
+complexipy, the runtime module graph and the function graph by default. For complexipy, which has no directory `--ignore`, the exclusion
 globs also cover root-level matches and whole `tests/` or `test/` directories at any
 depth. Test files are intentionally repetitive — many similar cases, parameterized
 fixtures — so complexity metrics don't apply meaningfully. Ruff and coverage still gate
@@ -151,6 +151,34 @@ Python-specific controls are explicit. Imports guarded by `TYPE_CHECKING` are ex
 Source scope follows `--dirs`, `[tool.pyguard] exclude` and the default test-file/directory exclusion. `--dirs`, exclusion globs and test filters choose graph nodes only; they do not remove files from local import resolution. grimp is pinned exactly at 3.18 in the dev-dependency manifest and hash-locked evaluation toolchain; `pyguard doctor` reports its version.
 
 The graph is static evidence, not proof of runtime reachability. Dynamic imports, import hooks and conditional package availability remain outside the graph; the missing-local/unparsable controls keep incomplete evidence visible rather than turning it into a pass.
+
+---
+
+## Function call graph (pyguard, advisory)
+
+**Tool:** pyan3 2.9.0 + NetworkX 3.7
+**Command:** `pyguard structure` (also `pyguard audit` and the `structure.module_graph` `pyguard diagnose` analysis; not `pyguard check`)
+
+The same command builds a graph of resolved calls between defined in-scope Python functions. Nodes are `FunctionDef`/`AsyncFunctionDef` definitions in the selected non-test files, including methods and nested functions; call edges come from pyan3's function-use edges restricted to those definitions. External, out-of-scope and module-level calls are not edges. Repeated calls from one function remain one edge and one caller/callee. Every function produces these measurements at location file, line and symbol:
+
+| Metric | Meaning | Unit |
+|---|---|---|
+| `function.fan_in` | Distinct in-scope defined functions that call it; a self-call is not counted | `callers` |
+| `function.fan_out` | Distinct in-scope defined functions it calls; a self-call is not counted | `callees` |
+| `function.call_depth` | Longest path in the call SCC condensation DAG, measured in edges; internal cycle edges add no depth | `edges` |
+
+Two project measurements use location `.`:
+
+| Metric | Meaning | Unit |
+|---|---|---|
+| `function.recursive_components` | Call SCCs with more than one function, plus self-recursive functions | `components` |
+| `calls.unresolved` | Own-scope syntactic call sites that are not a resolved in-scope callee, builtin or imported name/attribute chain | `calls` |
+
+`calls.unresolved` is a deterministic count of syntactic call sites, not a pyan3 placeholder/wildcard edge count. For every defined in-scope function node it visits `ast.Call` expressions in that function's own scope only: nested `FunctionDef`/`AsyncFunctionDef`/`ClassDef` bodies are not descended into because they are their own callers, while lambda and comprehension bodies stay with the enclosing function and a nested definition's decorators/defaults (and annotations) belong to the enclosing scope. A call site is resolved when its target is a `Name` or `Attribute` whose terminal name (`Name.id` or `Attribute.attr`) equals the short name of a callee in that caller's resolved in-scope function edges (including a self-call), or a `Name` that is a Python builtin from the `builtins` module, or a `Name`/`Attribute` chain rooted at a name bound by an import statement in that module (an external or imported API boundary). Every other call site is unresolved, including subscript or call-result targets such as `items[0]()` and `f()()`, local aliases such as `saved = callback; saved()`, parameters and closure variables, and attribute receivers whose name is not a resolved in-scope callee or imported root such as `obj.run()`. Each syntactic call site counts once and a receiver is never a separate call site. There is no alias or dataflow tracking; this is a syntactic approximation and may over- or under-count dynamic dispatch. The measurement is evidence only: unresolved calls never make the assessment incomplete and the result remains complete unless a source file or module resolution limitation is separately reported.
+
+A self-call is one call edge and one recursive component, but a function is neither its own caller nor its own callee. Therefore `function.fan_in` equals the unchanged `pyguard criticality` `criticality.in_degree` except for self-recursive functions, where criticality counts the self-call once and function fan-in counts zero. Both metrics are retained; `pyguard criticality` and its in-degree semantics are unchanged.
+
+The function graph emits no findings and never changes the exit code, status or blocking outcome. An SCC, recursion, high fan-in or unresolved call is not by itself a quality violation. `tokenize.detect_encoding` decides pyan3 normalization: a source whose declared or BOM encoding is not plain UTF-8, including non-UTF-8 bytes that also decode as UTF-8, is copied into a temporary UTF-8 mirror for pyan3 while reported locations stay the original paths and line numbers and pyan3's original inferred import root is preserved, including when an ancestor `__init__.py` marker is outside the requested scope; a file pyan3 cannot parse leaves the assessment incomplete with `pyguard.structure.not_evaluated`, as in the module graph. Missing/broken pyan3 or NetworkX is an execution error. Source scope follows `--dirs`, `[tool.pyguard] exclude` and the default test-file/directory exclusion exactly like the module graph.
 
 ---
 

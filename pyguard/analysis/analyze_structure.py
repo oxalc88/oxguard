@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import ast
+import builtins
 import fnmatch
+import io
 import json
 import os
 import sys
+import tempfile
+import tokenize
 from pathlib import Path
 
 # Python packages grimp cannot infer for top-level modules are represented as
@@ -14,6 +18,7 @@ from pathlib import Path
 # root so relative imports resolve exactly as Python does.
 TEST_FILE_PATTERNS = ("test_*.py", "*_test.py", "conftest.py")
 TEST_DIRECTORY_NAMES = {"test", "tests"}
+BUILTIN_NAMES = frozenset(dir(builtins))
 ENVIRONMENT_DIRECTORY_NAMES = {
     "__pycache__",
     ".git",
@@ -621,6 +626,308 @@ def build_graph(
     return sorted(edges), ordered_components, module_depth, cycles, resolver_reason
 
 
+def import_bound_names(tree: ast.Module) -> set[str]:
+    """Return every name bound by an import statement anywhere in the module.
+
+    This is a syntactic boundary, not scope resolution: a name imported by any
+    statement in the module marks a call chain as an imported/external API.
+    Star imports bind no specific name and therefore contribute nothing.
+    """
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                names.add(alias.asname or alias.name.split(".", 1)[0])
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name != "*":
+                    names.add(alias.asname or alias.name)
+    return names
+
+
+def call_target_names(func: ast.expr) -> tuple[str | None, str | None]:
+    """Return the terminal and root names of a Name/Attribute call target.
+
+    A subscript, call result or other expression has no terminal name and is
+    therefore never resolvable by this syntactic rule.
+    """
+    if isinstance(func, ast.Name):
+        return func.id, func.id
+    if isinstance(func, ast.Attribute):
+        current = func.value
+        while isinstance(current, ast.Attribute):
+            current = current.value
+        root = current.id if isinstance(current, ast.Name) else None
+        return func.attr, root
+    return None, None
+
+
+def call_is_resolved(
+    func: ast.expr, callee_names: set[str], imported_names: set[str]
+) -> bool:
+    """Decide one call site from names alone; there is no alias/dataflow tracking."""
+    terminal, root = call_target_names(func)
+    if terminal is None:
+        return False
+    if terminal in callee_names:
+        return True
+    if isinstance(func, ast.Name) and terminal in BUILTIN_NAMES:
+        return True
+    return root is not None and root in imported_names
+
+
+def own_scope_calls(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> list[ast.Call]:
+    """Visit calls in one function's own scope, never its nested definitions.
+
+    Nested functions and classes are their own callers, so their bodies are not
+    descended into. A nested definition's header (decorators, defaults and
+    annotations) executes in the enclosing scope and is visited. Lambda and
+    comprehension bodies have no caller of their own and stay in this scope.
+    """
+    calls: list[ast.Call] = []
+
+    def visit(current: ast.AST) -> None:
+        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            body_ids = {id(statement) for statement in current.body}
+            for child in ast.iter_child_nodes(current):
+                if id(child) not in body_ids:
+                    visit(child)
+            return
+        if isinstance(current, ast.Call):
+            calls.append(current)
+        for child in ast.iter_child_nodes(current):
+            visit(child)
+
+    for statement in node.body:
+        visit(statement)
+    return calls
+
+
+def empty_function_graph() -> dict[str, object]:
+    return {
+        "functions": [],
+        "calls": [],
+        "function_components": [],
+        "function_counts": {
+            "functions": 0,
+            "calls": 0,
+            "recursive_components": 0,
+            "unresolved_calls": 0,
+        },
+    }
+
+
+def needs_utf8_mirror(data: bytes) -> bool:
+    """Decide from Python's own detection whether pyan3 would misread bytes.
+
+    A source the structure parser accepted has a valid PEP 263 encoding, and
+    that encoding is not necessarily UTF-8 just because the bytes also happen
+    to decode as UTF-8. pyan3 always opens files as UTF-8, so a Latin-1 file
+    that is coincidentally valid UTF-8 would expose different identifiers and
+    could collapse distinct functions after Python's NFKC normalization.
+    """
+    try:
+        encoding, _ = tokenize.detect_encoding(io.BytesIO(data).readline)
+    except (SyntaxError, UnicodeDecodeError):
+        # The structure parser already accepted the same bytes, so this is
+        # unexpected. Mirroring cannot lose information and is the safe answer.
+        return True
+    return encoding != "utf-8"
+
+
+def stage_pyan_sources(
+    files: list[str],
+) -> tuple[
+    list[str],
+    dict[str, str],
+    tempfile.TemporaryDirectory[str] | None,
+    str | None,
+]:
+    """Mirror sources as UTF-8 when pyan3 would not read their declared text.
+
+    pyan3 opens every file as UTF-8, so a UTF-8 BOM or a valid PEP 263 source
+    declaration makes it drop the file (or fail). Successful UTF-8 decoding is
+    not sufficient evidence: a Latin-1 source can also decode as UTF-8 while
+    pyan3 would see different characters and Python would then normalize two
+    distinct identifiers together. ``tokenize.detect_encoding`` mirrors every
+    source whose declared or BOM encoding is not plain UTF-8, decoding with
+    that detected encoding. The structure parser already accepted those files.
+    A temporary mirror keeps line numbers and the module layout relative to
+    pyan3's original inferred import root, and the original paths remain the
+    reported locations. The mirror root is returned so the visitor uses that
+    same root even when ``__init__.py`` ancestors were not in scope and
+    therefore were not copied.
+    """
+    needs_copy = any(
+        needs_utf8_mirror(Path(path).read_bytes()) for path in files
+    )
+    if not needs_copy:
+        return files, {}, None, None
+
+    from pyan.anutils import infer_root
+
+    try:
+        # This is exactly the root pyan3 would infer for the original files.
+        import_root = Path(infer_root(files))
+    except (OSError, ValueError):
+        import_root = Path(os.path.abspath(os.path.commonpath(files)))
+        if not import_root.is_dir():
+            import_root = import_root.parent
+    temporary = tempfile.TemporaryDirectory(prefix="pyguard-structure-functions-")
+    staged_root = Path(temporary.name)
+    staged: list[str] = []
+    mapping: dict[str, str] = {}
+    for path in files:
+        source = Path(path).read_bytes()
+        encoding, _ = tokenize.detect_encoding(io.BytesIO(source).readline)
+        text = source.decode(encoding)
+        try:
+            relative = Path(os.path.abspath(path)).relative_to(import_root)
+        except ValueError:
+            relative = Path(path).name
+        target = staged_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(text.encode("utf-8"))
+        staged.append(str(target))
+        mapping[str(target)] = path
+    return staged, mapping, temporary, str(staged_root)
+
+
+def build_function_graph(
+    files: list[str], root: Path
+) -> tuple[dict[str, object], list[str]]:
+    """Build the function graph, normalizing only sources pyan3 would misread."""
+    if not files:
+        return empty_function_graph(), []
+    staged, source_map, temporary, visitor_root = stage_pyan_sources(files)
+    try:
+        return _build_function_graph(staged, source_map, root, visitor_root)
+    finally:
+        if temporary is not None:
+            temporary.cleanup()
+
+
+def _build_function_graph(
+    files: list[str],
+    source_map: dict[str, str],
+    root: Path,
+    visitor_root: str | None = None,
+) -> tuple[dict[str, object], list[str]]:
+    """Build the in-scope function graph from pyan3's resolved use edges.
+
+    Node and edge selection matches the criticality analyzer: defined
+    ``FunctionDef``/``AsyncFunctionDef`` nodes in the requested files, and pyan3
+    ``uses_edges`` whose caller and callee are both selected functions. SCCs and
+    condensation depth come from NetworkX. ``calls.unresolved`` is measured
+    separately by visiting the caller's own-scope ``ast.Call`` sites, not from
+    pyan3 placeholder or wildcard edges.
+    """
+    from pyan.analyzer import CallGraphVisitor
+
+    visitor = CallGraphVisitor(files, root=visitor_root)
+    skipped = sorted(
+        source_map.get(path, path) for path in set(files) - set(visitor.filenames)
+    )
+    functions = {
+        node
+        for group in visitor.nodes.values()
+        for node in group
+        if node.defined
+        and node.filename in files
+        and isinstance(node.ast_node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    ordered = sorted(
+        functions,
+        key=lambda node: (
+            relative_path(Path(source_map.get(node.filename, node.filename)), root),
+            node.ast_node.lineno,
+            node.get_name(),
+        ),
+    )
+    module_trees: dict[str, ast.Module] = {}
+    for group in visitor.nodes.values():
+        for node in group:
+            if isinstance(node.ast_node, ast.Module):
+                module_trees.setdefault(node.filename, node.ast_node)
+    imported_by_module = {
+        filename: import_bound_names(tree) for filename, tree in module_trees.items()
+    }
+    index = {node: position for position, node in enumerate(ordered)}
+    calls: set[tuple[int, int]] = set()
+    unresolved = 0
+    for caller in ordered:
+        callee_names: set[str] = set()
+        for callee in visitor.uses_edges.get(caller, ()):
+            if callee in index:
+                calls.add((index[caller], index[callee]))
+                callee_names.add(callee.name)
+        imported_names = imported_by_module.get(caller.filename, set())
+        unresolved += sum(
+            1
+            for call in own_scope_calls(caller.ast_node)
+            if not call_is_resolved(call.func, callee_names, imported_names)
+        )
+
+    import networkx as nx
+
+    dag = nx.DiGraph()
+    dag.add_nodes_from(range(len(ordered)))
+    dag.add_edges_from(sorted(calls))
+    components = [set(component) for component in nx.strongly_connected_components(dag)]
+    condensation = nx.condensation(dag, scc=components)
+    depths = {node: 0 for node in condensation.nodes}
+    for component in reversed(list(nx.topological_sort(condensation))):
+        depths[component] = max(
+            (1 + depths[target] for target in condensation.successors(component)),
+            default=0,
+        )
+    mapping = condensation.graph["mapping"]
+    ordered_components = sorted(
+        (sorted(component) for component in components), key=lambda part: tuple(part)
+    )
+    recursive_components = sum(
+        1
+        for component in ordered_components
+        if len(component) > 1 or (component[0], component[0]) in calls
+    )
+    return (
+        {
+            "functions": [
+                {
+                    "file": relative_path(
+                        Path(source_map.get(node.filename, node.filename)), root
+                    ),
+                    "line": node.ast_node.lineno,
+                    "symbol": node.get_name(),
+                    "depth": depths[mapping[position]],
+                }
+                for position, node in enumerate(ordered)
+            ],
+            "calls": [
+                {"caller": caller, "callee": callee}
+                for caller, callee in sorted(calls)
+            ],
+            "function_components": [
+                {
+                    "functions": component,
+                    "cyclic": len(component) > 1
+                    or (component[0], component[0]) in calls,
+                }
+                for component in ordered_components
+            ],
+            "function_counts": {
+                "functions": len(ordered),
+                "calls": len(calls),
+                "recursive_components": recursive_components,
+                "unresolved_calls": unresolved,
+            },
+        },
+        skipped,
+    )
+
+
 def build_report(targets: list[str]) -> dict[str, object]:
     root = Path.cwd().resolve()
     target_paths = [Path(target) for target in targets or ["."]]
@@ -755,11 +1062,32 @@ def build_report(targets: list[str]) -> dict[str, object]:
             valid_by_module,
         )
 
+    # Files that the structure parser could not read are already incomplete
+    # evidence. pyan3 only sees parseable sources, so its own skipped set adds
+    # evidence only for a source it drops after Python accepted it.
+    function_graph, function_skipped = build_function_graph(
+        sorted(str(path) for path in parsed), root
+    )
+
     reasons: list[str] = []
     if unparsable:
         reasons.append(
             "Unparsable source: "
             + ", ".join(relative_path(path, root) for path in sorted(set(unparsable)))
+        )
+    # pyan3 drops a file it cannot parse from its filename set instead of
+    # failing. Structure already treats those files as unparsable, so only a
+    # skip that the module parser did not see adds another limitation.
+    unparsable_paths = {str(path.resolve()) for path in unparsable}
+    extra_skipped = [
+        path for path in function_skipped if str(Path(path).resolve()) not in unparsable_paths
+    ]
+    if extra_skipped:
+        reasons.append(
+            "Unparsable source skipped by pyan3: "
+            + ", ".join(
+                relative_path(Path(path), root) for path in sorted(set(extra_skipped))
+            )
         )
     imported_targets = {
         target
@@ -830,6 +1158,7 @@ def build_report(targets: list[str]) -> dict[str, object]:
             "type_imports": type_imports,
             "deferred_imports": deferred_imports,
         },
+        **function_graph,
         "partial": bool(reasons),
         "limitation": " ".join(reasons),
     }
@@ -844,6 +1173,7 @@ def machine_failure(category: str, message: str) -> int:
                 "imports": [],
                 "components": [],
                 "counts": {},
+                **empty_function_graph(),
                 "partial": False,
                 "limitation": "",
                 "error": {"category": category, "message": message},
@@ -874,6 +1204,13 @@ def main() -> int:
                 "tool_missing",
                 f"networkx is not installed. Run: uv add --group dev networkx ({error})",
             ) from error
+        try:
+            from pyan.analyzer import CallGraphVisitor  # noqa: F401
+        except ImportError as error:
+            raise StructureError(
+                "tool_missing",
+                f"pyan3 is not installed. Run: uv add --group dev pyan3 ({error})",
+            ) from error
         report = build_report(targets)
     except StructureError as error:
         if machine:
@@ -884,6 +1221,7 @@ def main() -> int:
         AttributeError,
         IndexError,
         KeyError,
+        NotImplementedError,
         OSError,
         RecursionError,
         RuntimeError,

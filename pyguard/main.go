@@ -30,7 +30,7 @@ Quality gates (replaces make):
   pyguard pip-audit      dependency vulnerability scan
   pyguard secrets        credential scan
   pyguard criticality    call-graph criticality analysis
-  pyguard structure      runtime module graph: cycles, coupling and dependency depth
+  pyguard structure      advisory module graph (cycles, coupling, depth) and function call graph
   pyguard dead-code      detect dead code
   pyguard deps           dependency hygiene
 

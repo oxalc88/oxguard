@@ -29,6 +29,10 @@ const structureCycleReport = `{
     {"modules": ["pkg.c"], "cyclic": false}
   ],
   "counts": {"modules": 4, "edges": 2, "cycles": 1, "type_imports": 2, "deferred_imports": 1},
+  "functions": [],
+  "calls": [],
+  "function_components": [],
+  "function_counts": {"functions": 0, "calls": 0, "recursive_components": 0, "unresolved_calls": 0},
   "partial": false,
   "limitation": ""
 }`
@@ -39,6 +43,10 @@ const structureSelfLoopReport = `{
   "imports": [{"importer": "pkg.a", "imported": "pkg.a"}],
   "components": [{"modules": ["pkg.a"], "cyclic": true}],
   "counts": {"modules": 1, "edges": 1, "cycles": 1, "type_imports": 0, "deferred_imports": 0},
+  "functions": [],
+  "calls": [],
+  "function_components": [],
+  "function_counts": {"functions": 0, "calls": 0, "recursive_components": 0, "unresolved_calls": 0},
   "partial": false,
   "limitation": ""
 }`
@@ -49,6 +57,10 @@ const structurePartialReport = `{
   "imports": [],
   "components": [{"modules": ["pkg.a"], "cyclic": false}],
   "counts": {"modules": 1, "edges": 0, "cycles": 0, "type_imports": 0, "deferred_imports": 0},
+  "functions": [],
+  "calls": [],
+  "function_components": [],
+  "function_counts": {"functions": 0, "calls": 0, "recursive_components": 0, "unresolved_calls": 0},
   "partial": true,
   "limitation": "Unresolved local import: pkg.missing (src/pkg/a.py:1)"
 }`
@@ -212,7 +224,7 @@ func TestStructureAdapterNormalizesModulePaths(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := &Runner{root: root, timeout: 2, outputMode: "json", result: newRunResult("structure")}
-			payload := fmt.Sprintf(`{"schema_version":"1","modules":[{"name":"pkg.a","file":%q,"depth":0}],"imports":[{"importer":"pkg.a","imported":"pkg.a"}],"components":[{"modules":["pkg.a"],"cyclic":true}],"counts":{"modules":1,"edges":1,"cycles":1,"type_imports":0,"deferred_imports":0},"partial":false,"limitation":""}`, tc.path)
+			payload := fmt.Sprintf(`{"schema_version":"1","modules":[{"name":"pkg.a","file":%q,"depth":0}],"imports":[{"importer":"pkg.a","imported":"pkg.a"}],"components":[{"modules":["pkg.a"],"cyclic":true}],"counts":{"modules":1,"edges":1,"cycles":1,"type_imports":0,"deferred_imports":0},"functions":[],"calls":[],"function_components":[],"function_counts":{"functions":0,"calls":0,"recursive_components":0,"unresolved_calls":0},"partial":false,"limitation":""}`, tc.path)
 			r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(payload), nil)
 			measurement := structureMeasurement(r.result, "module.dependency_depth", "src/pkg/a.py")
 			if measurement == nil {
@@ -250,11 +262,15 @@ func structureCouplingReport(t *testing.T, importers, dependencies int, selfImpo
 		components[i] = structureComponent{Modules: []string{module.Name}, Cyclic: selfImport && module.Name == "hub"}
 	}
 	report := structureReport{
-		SchemaVersion: "1",
-		Modules:       modules,
-		Imports:       imports,
-		Components:    components,
-		Counts:        structureCounts{Modules: len(modules), Edges: len(imports)},
+		SchemaVersion:      "1",
+		Modules:            modules,
+		Imports:            imports,
+		Components:         components,
+		Counts:             structureCounts{Modules: len(modules), Edges: len(imports)},
+		Functions:          []structureFunction{},
+		Calls:              []structureCall{},
+		FunctionComponents: []structureFunctionComponent{},
+		FunctionCounts:     structureFunctionCounts{},
 	}
 	if selfImport {
 		report.Counts.Cycles = 1
@@ -455,5 +471,128 @@ func TestStructureHumanRendersCouplingAndCycles(t *testing.T) {
 	}
 	if count := strings.Count(output, "HIGH_MODULE_COUPLING"); count != 1 {
 		t.Fatalf("human structure coupling count = %d, want 1: %s", count, output)
+	}
+}
+
+const structureFunctionReport = `{
+  "schema_version": "1",
+  "modules": [{"name": "source", "file": "src/source.py", "depth": 0}],
+  "imports": [],
+  "components": [{"modules": ["source"], "cyclic": false}],
+  "counts": {"modules": 1, "edges": 0, "cycles": 0, "type_imports": 0, "deferred_imports": 0},
+  "functions": [
+    {"file": "src/source.py", "line": 1, "symbol": "source.target", "depth": 0},
+    {"file": "src/source.py", "line": 4, "symbol": "source.a", "depth": 1},
+    {"file": "src/source.py", "line": 8, "symbol": "source.b", "depth": 1},
+    {"file": "src/source.py", "line": 11, "symbol": "source.recursive", "depth": 0}
+  ],
+  "calls": [
+    {"caller": 1, "callee": 0},
+    {"caller": 2, "callee": 0},
+    {"caller": 3, "callee": 3}
+  ],
+  "function_components": [
+    {"functions": [0], "cyclic": false},
+    {"functions": [1], "cyclic": false},
+    {"functions": [2], "cyclic": false},
+    {"functions": [3], "cyclic": true}
+  ],
+  "function_counts": {"functions": 4, "calls": 3, "recursive_components": 1, "unresolved_calls": 0},
+  "partial": false,
+  "limitation": ""
+}`
+
+func functionMeasurement(result *RunResult, metric, file, symbol string) *Measurement {
+	for i := range result.Measurements {
+		measurement := &result.Measurements[i]
+		if measurement.Metric == metric && measurement.Location.File == file && measurement.Location.Symbol == symbol {
+			return measurement
+		}
+	}
+	return nil
+}
+
+func TestStructureAdapterReportsFunctionGraphWithoutFindings(t *testing.T) {
+	r := contractRunner(t)
+	r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureFunctionReport), nil)
+	if err := r.result.Finish(0); err != nil {
+		t.Fatal(err)
+	}
+	if r.result.ExitCode != 0 || r.result.Status != StatusPass || r.result.Assessment != Complete {
+		t.Fatalf("function graph changed policy: exit=%d status=%s assessment=%s", r.result.ExitCode, r.result.Status, r.result.Assessment)
+	}
+	if len(r.result.Findings) != 0 {
+		t.Fatalf("function graph emitted findings: %+v", r.result.Findings)
+	}
+	for _, tc := range []struct {
+		metric, file, symbol string
+		want                 float64
+		unit                 string
+	}{
+		{"function.fan_in", "src/source.py", "source.target", 2, "callers"},
+		{"function.fan_out", "src/source.py", "source.target", 0, "callees"},
+		{"function.call_depth", "src/source.py", "source.target", 0, "edges"},
+		{"function.fan_in", "src/source.py", "source.a", 0, "callers"},
+		{"function.fan_out", "src/source.py", "source.a", 1, "callees"},
+		{"function.call_depth", "src/source.py", "source.a", 1, "edges"},
+		{"function.fan_in", "src/source.py", "source.recursive", 0, "callers"},
+		{"function.fan_out", "src/source.py", "source.recursive", 0, "callees"},
+		{"function.call_depth", "src/source.py", "source.recursive", 0, "edges"},
+	} {
+		measurement := functionMeasurement(r.result, tc.metric, tc.file, tc.symbol)
+		if measurement == nil || measurement.Value != tc.want || measurement.Unit != tc.unit || measurement.Level != "structure" {
+			t.Fatalf("%s for %s: %+v", tc.metric, tc.symbol, measurement)
+		}
+	}
+	for metric, want := range map[string]float64{
+		"function.recursive_components": 1,
+		"calls.unresolved":              0,
+	} {
+		measurement := structureMeasurement(r.result, metric, ".")
+		if measurement == nil || measurement.Value != want || measurement.Level != "structure" {
+			t.Fatalf("%s measurement: %+v", metric, measurement)
+		}
+		if metric == "function.recursive_components" && measurement.Unit != "components" {
+			t.Fatalf("%s unit: %+v", metric, measurement)
+		}
+		if metric == "calls.unresolved" && measurement.Unit != "calls" {
+			t.Fatalf("%s unit: %+v", metric, measurement)
+		}
+	}
+}
+
+func TestStructureAdapterReportsUnresolvedCalls(t *testing.T) {
+	r := contractRunner(t)
+	payload := strings.Replace(structureFunctionReport,
+		`"unresolved_calls": 0`,
+		`"unresolved_calls": 2`, 1)
+	r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(payload), nil)
+	if err := r.result.Finish(0); err != nil {
+		t.Fatal(err)
+	}
+	measurement := structureMeasurement(r.result, "calls.unresolved", ".")
+	if measurement == nil || measurement.Value != 2 || measurement.Unit != "calls" {
+		t.Fatalf("unresolved calls measurement: %+v", measurement)
+	}
+	if len(r.result.Findings) != 0 || r.result.Assessment != Complete || r.result.ExitCode != 0 {
+		t.Fatalf("unresolved measurement changed policy: %+v", r.result)
+	}
+}
+
+func TestStructureAdapterRejectsMalformedFunctionGraphs(t *testing.T) {
+	cases := []string{
+		`{"schema_version":"1","modules":[],"imports":[],"components":[],"counts":{"modules":0,"edges":0,"cycles":0},"partial":false,"limitation":""}`,
+		strings.Replace(structureFunctionReport, `"function_counts": {"functions": 4`, `"function_counts": {"functions": 5`, 1),
+		strings.Replace(structureFunctionReport, `{"caller": 3, "callee": 3}`, `{"caller": 9, "callee": 3}`, 1),
+		strings.Replace(structureFunctionReport, `{"functions": [3], "cyclic": true}`, `{"functions": [3], "cyclic": false}`, 1),
+		strings.Replace(structureFunctionReport, `{"file": "src/source.py", "line": 4, "symbol": "source.a", "depth": 1}`, `{"file": "src/source.py", "line": 1, "symbol": "source.target", "depth": 1}`, 1),
+		strings.Replace(structureFunctionReport, `"unresolved_calls": 0`, `"unresolved_calls": -1`, 1),
+	}
+	for _, data := range cases {
+		r := contractRunner(t)
+		r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(data), nil)
+		if len(r.result.Findings) != 1 || r.result.Findings[0].Status != StatusExecutionError || r.result.Findings[0].Category != "adapter_failure" {
+			t.Fatalf("accepted malformed function graph %q: %+v", data, r.result.Findings)
+		}
 	}
 }

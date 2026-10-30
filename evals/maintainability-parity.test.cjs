@@ -62,9 +62,12 @@ test('the CLI keeps its single-report contract and exits on native failures', ()
 });
 test('a passing Python report is accepted as not_implemented without claiming readiness', () => {
   const result=assess(evidence(),pythonEvidence());
-  const seeded=result.capabilities.find(c=>c.id==='structure.function_graph');
-  assert.equal(seeded.pyguard,'not_implemented');
-  assert.deepEqual(seeded.pyguard_cases,Object.fromEntries(declared().filter(d=>d.capability==='structure.function_graph').map(d=>[d.id,'pass'])));
+  const implemented=result.capabilities.find(c=>c.id==='structure.function_graph');
+  assert.equal(implemented.pyguard,'pass');
+  assert.deepEqual(implemented.pyguard_cases,Object.fromEntries(declared().filter(d=>d.capability==='structure.function_graph').map(d=>[d.id,'pass'])));
+  const planned=result.capabilities.find(c=>c.id==='maintainability.delegation');
+  assert.equal(planned.pyguard,'not_implemented');
+  assert.deepEqual(planned.pyguard_cases,{});
   assert.equal(result.capabilities.find(c=>c.id==='change.native_duplication').pyguard,'deferred');
   for (const row of result.capabilities) assert.equal(Object.keys(row.pyguard_cases).length,declared().filter(d=>d.capability===row.id).length);
   assert.equal(result.pyguard_cases_passed,true);
@@ -79,7 +82,7 @@ test('a failing Python seed case is not ready and fails the process', () => {
   assert.equal(result.pyguard_maintainability_ready,false);
   assert.equal(result.maintainability_parity_ready,false);
   const seeded=result.capabilities.find(c=>c.id==='structure.function_graph');
-  assert.equal(seeded.pyguard,'not_implemented');
+  assert.equal(seeded.pyguard,'fail');
   assert.deepEqual(Object.values(seeded.pyguard_cases).filter(o=>o==='fail'),['fail']);
   assert.equal(cli([evidence(),pyguard]).status,1);
 });

@@ -43,6 +43,12 @@ function inDegree(result, file, symbol) {
   return found.value;
 }
 
+function functionMeasurement(result, metric, file, symbol) {
+  const found = result.measurements.find(m => m.metric === metric && m.location.file === file && m.location.symbol === symbol);
+  assert.ok(found, `missing ${metric} for ${symbol} in ${file}; measurements: ${JSON.stringify(result.measurements)}`);
+  return found;
+}
+
 function ranked(result, symbol) {
   return result.findings.find(f => f.rule === 'pyguard.criticality.ranked' && f.location.symbol === symbol);
 }
@@ -1187,63 +1193,396 @@ const definitions = [
     id: 'criticality.distinct_callers_cross_module',
     capability: 'structure.function_graph',
     kind: 'positive',
+    command: 'structure',
+    criticality: true,
     files: {
       'src/core.py': 'def target():\n    return 1\n',
       'src/caller_one.py': 'import core\n\n\ndef one():\n    core.target()\n    core.target()\n    return core.target()\n',
       'src/caller_two.py': 'import core\n\n\ndef two():\n    return core.target()\n',
       'src/caller_three.py': 'import core\n\n\ndef three():\n    return core.target()\n',
     },
+    check: ({ result, criticality }) => {
+      // Three distinct callers across three modules give target fan-in 3; one
+      // caller repeating the call three times still counts once. The criticality
+      // command keeps its unchanged in-degree semantics for the same fixture.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/core.py', 'core.target').value, 3);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/core.py', 'core.target').unit, 'callers');
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/caller_one.py', 'caller_one.one').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/caller_one.py', 'caller_one.one').value, 1);
+      assert.equal(structureMeasurement(result, 'function.recursive_components'), 0);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      complete(criticality);
+      assert.equal(inDegree(criticality, 'src/core.py', 'core.target'), 3, 'criticality.in_degree for core.target');
+      assert.equal(ranked(criticality, 'core.target').observed, 3, 'ranked criticality finding for core.target');
+      assert.equal(inDegree(criticality, 'src/caller_one.py', 'caller_one.one'), 0, 'criticality.in_degree for caller_one.one');
+    },
+  },
+  {
+    id: 'function_graph.tsguard_parity',
+    capability: 'structure.function_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/source.py': 'def target():\n    return 1\n\n\ndef a():\n    target()\n    return target()\n\n\ndef b():\n    return target()\n\n\ndef recursive():\n    return recursive()\n',
+    },
     check: ({ result }) => {
-      // Three distinct callers across three modules rank target at exactly 3;
-      // one caller repeating the call three times still counts once.
-      complete(result);
-      assert.equal(inDegree(result, 'src/core.py', 'core.target'), 3, 'criticality.in_degree for core.target');
-      assert.equal(ranked(result, 'core.target').observed, 3, 'ranked criticality finding for core.target');
-      assert.equal(inDegree(result, 'src/caller_one.py', 'caller_one.one'), 0, 'criticality.in_degree for caller_one.one');
+      // The same graph shape as the Tsguard structure.function_graph case:
+      // target has two distinct callers, a calls one callee, and recursion is
+      // one recursive component with no special depth inside the cycle.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/source.py', 'source.target').value, 2);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/source.py', 'source.a').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/source.py', 'source.a').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/source.py', 'source.recursive').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/source.py', 'source.recursive').value, 0);
+      assert.equal(structureMeasurement(result, 'function.recursive_components'), 1);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+    },
+  },
+  {
+    id: 'function_graph.method_call',
+    capability: 'structure.function_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/methods.py': 'class Worker:\n    def run(self):\n        return self.helper()\n\n    def helper(self):\n        return 1\n',
+    },
+    check: ({ result }) => {
+      // Methods are defined functions like any other: pyan resolves
+      // self.helper() inside the class, so run has one callee and helper one
+      // caller. No finding is produced from a resolved method call.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/methods.py', 'methods.Worker.helper').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/methods.py', 'methods.Worker.run').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/methods.py', 'methods.Worker.run').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/methods.py', 'methods.Worker.helper').value, 0);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+    },
+  },
+  {
+    id: 'function_graph.nested_function',
+    capability: 'structure.function_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/nested.py': 'def outer(x):\n    def inner(y):\n        return target(y)\n    return inner(x)\n\n\ndef target(y):\n    return y\n',
+    },
+    check: ({ result }) => {
+      // A nested def is its own function node. outer -> inner -> target gives
+      // outer depth 2, inner depth 1 and target depth 0; nested bodies are not
+      // walked into by the enclosing function's unresolved-call count.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/nested.py', 'nested.outer').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/nested.py', 'nested.outer').value, 2);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/nested.py', 'nested.outer.inner').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/nested.py', 'nested.target').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/nested.py', 'nested.outer.inner').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/nested.py', 'nested.target').value, 1);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(structureMeasurement(result, 'function.recursive_components'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
     },
   },
   {
     id: 'criticality.uncalled_function_zero',
     capability: 'structure.function_graph',
     kind: 'negative',
+    command: 'structure',
+    criticality: true,
     files: { 'src/lonely.py': 'def never_called():\n    return 1\n' },
-    check: ({ result }) => {
-      // A function nobody calls stays at in_degree 0 and never enters the
-      // ranked findings; silence must not be fabricated into a caller count.
-      complete(result);
-      assert.equal(inDegree(result, 'src/lonely.py', 'lonely.never_called'), 0, 'criticality.in_degree for lonely.never_called');
-      assert.equal(ranked(result, 'lonely.never_called'), undefined, 'ranked criticality finding for lonely.never_called');
-      assert.equal(result.findings.length, 0);
+    check: ({ result, criticality }) => {
+      // A function nobody calls stays at fan-in 0 and in-degree 0 and never
+      // enters ranked findings; silence must not be fabricated into a count.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/lonely.py', 'lonely.never_called').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/lonely.py', 'lonely.never_called').value, 0);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/lonely.py', 'lonely.never_called').value, 0);
+      assert.equal(structureMeasurement(result, 'function.recursive_components'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      complete(criticality);
+      assert.equal(inDegree(criticality, 'src/lonely.py', 'lonely.never_called'), 0, 'criticality.in_degree for lonely.never_called');
+      assert.equal(ranked(criticality, 'lonely.never_called'), undefined, 'ranked criticality finding for lonely.never_called');
+      assert.equal(criticality.findings.length, 0);
     },
   },
   {
     id: 'criticality.same_caller_not_inflated',
     capability: 'structure.function_graph',
     kind: 'negative',
+    command: 'structure',
+    criticality: true,
     files: {
       'src/hub.py': 'def hub():\n    return 1\n',
       'src/busy.py': 'import hub\n\n\ndef busy():\n    hub.hub()\n    hub.hub()\n    hub.hub()\n    return hub.hub()\n',
     },
+    check: ({ result, criticality }) => {
+      // Four calls from one caller are one distinct caller, not four, in both
+      // the function graph and the unchanged criticality command.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/hub.py', 'hub.hub').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/busy.py', 'busy.busy').value, 1);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      complete(criticality);
+      assert.equal(inDegree(criticality, 'src/hub.py', 'hub.hub'), 1, 'criticality.in_degree for hub.hub');
+      assert.equal(ranked(criticality, 'hub.hub').observed, 1, 'ranked criticality finding for hub.hub');
+      assert.equal(inDegree(criticality, 'src/busy.py', 'busy.busy'), 0, 'criticality.in_degree for busy.busy');
+    },
+  },
+  {
+    id: 'function_graph.test_file_exclusion',
+    capability: 'structure.function_graph',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/main.py': 'def target():\n    return 1\n',
+      'src/test_main.py': 'import main\n\n\ndef test_calls():\n    main.target()\n',
+      'src/tests/helper.py': 'def helper():\n    return 1\n',
+    },
     check: ({ result }) => {
-      // Four calls from one caller are one distinct caller, not four.
-      complete(result);
-      assert.equal(inDegree(result, 'src/hub.py', 'hub.hub'), 1, 'criticality.in_degree for hub.hub');
-      assert.equal(ranked(result, 'hub.hub').observed, 1, 'ranked criticality finding for hub.hub');
-      assert.equal(inDegree(result, 'src/busy.py', 'busy.busy'), 0, 'criticality.in_degree for busy.busy');
+      // Conventional test files and whole test directories are outside the
+      // structure scope, so their functions are neither nodes nor callers.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/main.py', 'main.target').value, 0);
+      assert.equal(result.measurements.some(m => m.location && (m.location.file === 'src/test_main.py' || m.location.file === 'src/tests/helper.py')), false);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+    },
+  },
+  {
+    id: 'function_graph.builtin_import_and_resolved_calls',
+    capability: 'structure.function_graph',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/boundaries.py': 'import os\n\n\ndef builtin_calls(value):\n    print(value)\n    return len(value)\n\n\ndef external_call():\n    return os.getcwd()\n\n\ndef resolved_call():\n    return target()\n\n\ndef target():\n    return 1\n',
+    },
+    check: ({ result }) => {
+      // Builtin names, a chain rooted at an imported module and an in-scope
+      // resolved callee are all resolved call sites, so none is counted as
+      // unresolved and the function graph stays complete with no finding.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/boundaries.py', 'boundaries.builtin_calls').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/boundaries.py', 'boundaries.external_call').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/boundaries.py', 'boundaries.resolved_call').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/boundaries.py', 'boundaries.target').value, 1);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(blockingOutcome(result), false);
     },
   },
   {
     id: 'criticality.self_recursion_counts_once',
     capability: 'structure.function_graph',
     kind: 'boundary',
+    command: 'structure',
+    criticality: true,
     files: { 'src/recursion.py': 'def countdown(n):\n    if n <= 0:\n        return 0\n    return countdown(n - 1)\n' },
+    check: ({ result, criticality }) => {
+      // Documented divergence: criticality counts the self-call once, while
+      // function fan-in/fan-out exclude a self-call. The self-loop still forms
+      // exactly one recursive component and does not invent call depth.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/recursion.py', 'recursion.countdown').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/recursion.py', 'recursion.countdown').value, 0);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/recursion.py', 'recursion.countdown').value, 0);
+      assert.equal(structureMeasurement(result, 'function.recursive_components'), 1);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      complete(criticality);
+      assert.equal(inDegree(criticality, 'src/recursion.py', 'recursion.countdown'), 1, 'criticality.in_degree for recursion.countdown');
+      assert.equal(ranked(criticality, 'recursion.countdown').observed, 1, 'ranked criticality finding for recursion.countdown');
+    },
+  },
+  {
+    id: 'function_graph.mutual_recursion_depth',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/mutual.py': 'def start():\n    return even(2)\n\n\ndef even(n):\n    sink()\n    if n:\n        return odd(n - 1)\n    return True\n\n\ndef odd(n):\n    return even(n)\n\n\ndef sink():\n    return 0\n',
+    },
     check: ({ result }) => {
-      // Documented boundary: a self-call is one defined caller, so recursion
-      // scores exactly 1 — neither 0 (the function does call itself) nor a
-      // value that grows with recursion depth or repeated self-calls.
-      complete(result);
-      assert.equal(inDegree(result, 'src/recursion.py', 'recursion.countdown'), 1, 'criticality.in_degree for recursion.countdown');
-      assert.equal(ranked(result, 'recursion.countdown').observed, 1, 'ranked criticality finding for recursion.countdown');
+      // even <-> odd is one recursive SCC. Both members share the SCC's outgoing
+      // depth 1 (no invented depth inside the cycle), start sees the SCC then
+      // its outgoing sink edge (depth 2), and sink is depth 0.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'function.recursive_components'), 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/mutual.py', 'mutual.start').value, 2);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/mutual.py', 'mutual.even').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/mutual.py', 'mutual.odd').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/mutual.py', 'mutual.sink').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/mutual.py', 'mutual.even').value, 2);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/mutual.py', 'mutual.even').value, 2);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/mutual.py', 'mutual.odd').value, 1);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+    },
+  },
+  {
+    id: 'function_graph.unresolved_dynamic_call',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/dynamic.py': 'def dynamic(obj):\n    return getattr(obj, \'run\')()\n\n\ndef caller():\n    return dynamic(None)\n',
+    },
+    check: ({ result }) => {
+      // getattr(...)() cannot be resolved to a defined function. Its outer
+      // call site is counted as unresolved and creates no edge, but the
+      // assessment stays complete and no finding or exit change is produced.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/dynamic.py', 'dynamic.dynamic').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/dynamic.py', 'dynamic.dynamic').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/dynamic.py', 'dynamic.caller').value, 1);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.unparsable_is_not_evaluated',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/good.py': 'def target():\n    return 1\n',
+      'src/broken.py': 'def broken(:\n    pass\n',
+    },
+    check: ({ result }) => {
+      // pyan3 drops a file it cannot parse. Structure keeps the parseable
+      // function graph, reports the limitation as not_evaluated and leaves the
+      // assessment incomplete instead of exiting 0 as a clean result.
+      assert.equal(result.assessment, 'incomplete');
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.not_evaluated');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].status, 'advisory');
+      assert.equal(findings[0].severity, 'info');
+      assert.match(findings[0].evidence, /src\/broken\.py/);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/good.py', 'good.target').value, 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.encoded_source_preserves_import_root',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    dirs: 'src/pkg/a.py,src/pkg/b.py',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': utf8BomSource('from pkg.b import target\n\n\ndef run():\n    return target()\n'),
+      'src/pkg/b.py': utf8BomSource('def target():\n    return 1\n'),
+    },
+    check: ({ result }) => {
+      // The UTF-8 mirror must keep pyan3's original import root. The parent
+      // __init__.py is outside this narrowed file scope and is not copied, but
+      // the selected modules are still pkg.a/pkg.b, so the absolute import
+      // edge survives and fan-in/fan-out/depth stay correct.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/pkg/b.py', 'pkg.b.target').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/pkg/a.py', 'pkg.a.run').value, 1);
+      assert.equal(functionMeasurement(result, 'function.call_depth', 'src/pkg/a.py', 'pkg.a.run').value, 1);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.declared_non_utf8_bytes_are_not_utf8',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/latin1.py': latin1Source('# coding: latin-1\n\n\ndef \u00c2\u00aa():\n    return 1\n\n\ndef a():\n    return 2\n\n\ndef caller():\n    return \u00c2\u00aa() + a()\n'),
+    },
+    check: ({ result }) => {
+      // These bytes also decode as UTF-8, but the declared Latin-1 encoding
+      // makes Python see Âª (normalized to Âa), distinct from a. pyan3's
+      // forced UTF-8 read would see ª, normalize it to a and collapse the
+      // first function into a, so the mirror must follow the declared encoding.
+      complete(result, 'structure');
+      const latinFunctions = result.measurements.filter(m => m.metric === 'function.fan_in' && m.location.file === 'src/latin1.py');
+      assert.equal(latinFunctions.length, 3, JSON.stringify(result.measurements));
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/latin1.py', 'latin1.\u00c2a').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/latin1.py', 'latin1.a').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/latin1.py', 'latin1.caller').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/latin1.py', 'latin1.caller').value, 2);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.unresolved_indirect_and_closure_calls',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/unresolved.py': 'def first(items):\n    return items[0]()\n\n\ndef plain(items):\n    return items[0]\n\n\ndef outer(callback):\n    def inner():\n        return callback()\n    return inner()\n',
+    },
+    check: ({ result }) => {
+      // items[0]() has a Subscript target, and inner() calls a parameter bound
+      // by its enclosing function. Both are unresolved call sites; plain
+      // parameter reads have no call site. The assessment stays complete and
+      // no finding is produced.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 2);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.first').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.plain').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.outer').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.outer.inner').value, 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.unresolved_alias_and_receiver_calls',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/aliases.py': 'def invoke(callback):\n    saved = callback\n    return saved()\n\n\ndef indexed(items):\n    callback = items[0]\n    return callback()\n\n\ndef receiver(obj):\n    saved = obj\n    return obj.run()\n',
+    },
+    check: ({ result }) => {
+      // No alias or dataflow tracking: saved(), the aliased subscript call and
+      // obj.run() are each one syntactic unresolved call site. A receiver is
+      // never counted as a second call site.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 3);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/aliases.py', 'aliases.invoke').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/aliases.py', 'aliases.indexed').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/aliases.py', 'aliases.receiver').value, 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.unresolved_closure_alias',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/nested_alias.py': 'def outer(callback):\n    saved = callback\n    def inner():\n        return callback()\n    return inner()\n',
+    },
+    check: ({ result }) => {
+      // The nested body belongs to inner, which calls a parameter bound by its
+      // enclosing function. outer's own scope only has the resolved inner()
+      // call, so the whole fixture has exactly one unresolved call site.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/nested_alias.py', 'nested_alias.outer').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/nested_alias.py', 'nested_alias.outer.inner').value, 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
     },
   },
   {
@@ -1681,7 +2020,8 @@ function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
       const dirs = Array.isArray(definition.dirs) ? definition.dirs.join(',') : definition.dirs || 'src';
       const args = [definition.command || 'criticality', '--dirs', dirs, ...(definition.human ? [] : ['--output', 'json']), '--allow-pipe', '--timeout', '30'];
       try {
-        const response = execute({ project: project(definition, base), args });
+        const projectDir = project(definition, base);
+        const response = execute({ project: projectDir, args });
         assert.ok(!response.error, `pyguard could not be started: ${response.error}`);
         const expectedExit = definition.exitCode ?? 0;
         assert.equal(response.status, expectedExit, `pyguard ${args[0]} exited with ${response.status}, expected ${expectedExit}: ${String(response.stderr || '').slice(0, 1024)}`);
@@ -1696,7 +2036,18 @@ function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
             assert.equal(clean.status, 0, `clean baseline exited with ${clean.status}: ${String(clean.stderr || '').slice(0, 1024)}`);
             baseline = JSON.parse(clean.stdout);
           }
-          definition.check({ result, baseline });
+          let criticality;
+          if (definition.criticality) {
+            // The unchanged focused criticality command is evaluated on the same
+            // fixture so function-graph cases keep the original in-degree
+            // semantics alongside the new structure measurements.
+            const criticalityArgs = ['criticality', '--dirs', dirs, '--output', 'json', '--allow-pipe', '--timeout', '30'];
+            const criticalityResponse = execute({ project: projectDir, args: criticalityArgs });
+            assert.ok(!criticalityResponse.error, `pyguard criticality could not be started: ${criticalityResponse.error}`);
+            assert.equal(criticalityResponse.status, 0, `pyguard criticality exited with ${criticalityResponse.status}: ${String(criticalityResponse.stderr || '').slice(0, 1024)}`);
+            criticality = JSON.parse(criticalityResponse.stdout);
+          }
+          definition.check({ result, baseline, criticality });
         }
       } catch (failure) {
         outcome = 'fail';

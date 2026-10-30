@@ -32,6 +32,28 @@ const ANSWERS = {
 
 // Score-verified against complexipy 8.3.0 by the real-binary test: 0 flat,
 // 21 chain-of-six, 36 chain-of-eight, 20 two-chains-of-four, 21 in boundary.
+// Canned function-graph results keyed by case id for the stand-in structure
+// command. Rows are [file, symbol, line, fan_in, fan_out, call_depth].
+const FUNCTION_GRAPH = {
+  'criticality.distinct_callers_cross_module': { functions: [['src/core.py', 'core.target', 1, 3, 0, 0], ['src/caller_one.py', 'caller_one.one', 4, 0, 1, 1], ['src/caller_two.py', 'caller_two.two', 4, 0, 1, 1], ['src/caller_three.py', 'caller_three.three', 4, 0, 1, 1]], recursive: 0, unresolved: 0 },
+  'criticality.uncalled_function_zero': { functions: [['src/lonely.py', 'lonely.never_called', 1, 0, 0, 0]], recursive: 0, unresolved: 0 },
+  'criticality.same_caller_not_inflated': { functions: [['src/hub.py', 'hub.hub', 1, 1, 0, 0], ['src/busy.py', 'busy.busy', 4, 0, 1, 1]], recursive: 0, unresolved: 0 },
+  'criticality.self_recursion_counts_once': { functions: [['src/recursion.py', 'recursion.countdown', 1, 0, 0, 0]], recursive: 1, unresolved: 0 },
+  'function_graph.tsguard_parity': { functions: [['src/source.py', 'source.target', 1, 2, 0, 0], ['src/source.py', 'source.a', 5, 0, 1, 1], ['src/source.py', 'source.b', 10, 0, 1, 1], ['src/source.py', 'source.recursive', 14, 0, 0, 0]], recursive: 1, unresolved: 0 },
+  'function_graph.method_call': { functions: [['src/methods.py', 'methods.Worker.run', 2, 0, 1, 1], ['src/methods.py', 'methods.Worker.helper', 5, 1, 0, 0]], recursive: 0, unresolved: 0 },
+  'function_graph.nested_function': { functions: [['src/nested.py', 'nested.outer', 1, 0, 1, 2], ['src/nested.py', 'nested.outer.inner', 2, 1, 1, 1], ['src/nested.py', 'nested.target', 6, 1, 0, 0]], recursive: 0, unresolved: 0 },
+  'function_graph.test_file_exclusion': { functions: [['src/main.py', 'main.target', 1, 0, 0, 0]], recursive: 0, unresolved: 0 },
+  'function_graph.mutual_recursion_depth': { functions: [['src/mutual.py', 'mutual.start', 1, 0, 1, 2], ['src/mutual.py', 'mutual.even', 4, 2, 2, 1], ['src/mutual.py', 'mutual.odd', 10, 1, 1, 1], ['src/mutual.py', 'mutual.sink', 14, 1, 0, 0]], recursive: 1, unresolved: 0 },
+  'function_graph.unresolved_dynamic_call': { functions: [['src/dynamic.py', 'dynamic.dynamic', 1, 1, 0, 0], ['src/dynamic.py', 'dynamic.caller', 5, 0, 1, 1]], recursive: 0, unresolved: 1 },
+  'function_graph.encoded_source_preserves_import_root': { functions: [['src/pkg/a.py', 'pkg.a.run', 4, 0, 1, 1], ['src/pkg/b.py', 'pkg.b.target', 1, 1, 0, 0]], recursive: 0, unresolved: 0 },
+  'function_graph.declared_non_utf8_bytes_are_not_utf8': { functions: [['src/latin1.py', 'latin1.\u00c2a', 4, 1, 0, 0], ['src/latin1.py', 'latin1.a', 8, 1, 0, 0], ['src/latin1.py', 'latin1.caller', 12, 0, 2, 1]], recursive: 0, unresolved: 0 },
+  'function_graph.unresolved_indirect_and_closure_calls': { functions: [['src/unresolved.py', 'unresolved.first', 1, 0, 0, 0], ['src/unresolved.py', 'unresolved.plain', 5, 0, 0, 0], ['src/unresolved.py', 'unresolved.outer', 9, 0, 1, 1], ['src/unresolved.py', 'unresolved.outer.inner', 10, 0, 0, 0]], recursive: 0, unresolved: 2 },
+  'function_graph.builtin_import_and_resolved_calls': { functions: [['src/boundaries.py', 'boundaries.builtin_calls', 4, 0, 0, 0], ['src/boundaries.py', 'boundaries.external_call', 9, 0, 0, 0], ['src/boundaries.py', 'boundaries.resolved_call', 13, 0, 1, 1], ['src/boundaries.py', 'boundaries.target', 17, 1, 0, 0]], recursive: 0, unresolved: 0 },
+  'function_graph.unresolved_alias_and_receiver_calls': { functions: [['src/aliases.py', 'aliases.invoke', 1, 0, 0, 0], ['src/aliases.py', 'aliases.indexed', 6, 0, 0, 0], ['src/aliases.py', 'aliases.receiver', 11, 0, 0, 0]], recursive: 0, unresolved: 3 },
+  'function_graph.unresolved_closure_alias': { functions: [['src/nested_alias.py', 'nested_alias.outer', 1, 0, 1, 1], ['src/nested_alias.py', 'nested_alias.outer.inner', 3, 1, 0, 0]], recursive: 0, unresolved: 1 },
+  'function_graph.unparsable_is_not_evaluated': { functions: [['src/good.py', 'good.target', 1, 0, 0, 0]], recursive: 0, unresolved: 0, partial: 'Unparsable source: src/broken.py', status: 'advisory', gate: 'advisory', normalization: 'partial', assessment: 'incomplete' },
+};
+
 const COMPLEXIPI = {
   'complexipy.cognitive.exceeded_is_advisory_warning': [['src/complexity.py', 'flat', 0], ['src/complexity.py', 'above', 21]],
   'complexipy.cognitive.flat_function_no_finding': [['src/flat.py', 'flat', 0]],
@@ -109,8 +131,10 @@ const answers = ${JSON.stringify(ANSWERS)};
 const cognitive = ${JSON.stringify(COMPLEXIPI)};
 const ruff = ${JSON.stringify(RUFF)};
 const structure = ${JSON.stringify(STRUCTURE)};
+const functionGraph = ${JSON.stringify(FUNCTION_GRAPH)};
 const caseId = path.basename(path.dirname(process.cwd()));
 const variant = path.basename(process.cwd());
+const command = process.argv[2] || 'criticality';
 if (ruff[caseId]) {
   const spec = ruff[caseId];
   const findings = spec.findings.map(([rule, file, line]) => ({ rule, level: 'code', gate: 'ruff', severity: 'error', status: 'blocking', category: 'quality', location: { file, line, column: 5 }, evidence: rule + ' violation', diagnostics: [] }));
@@ -137,6 +161,22 @@ if (structure[caseId]) {
   process.stdout.write(JSON.stringify({ schema_version: '1', status: spec.status, assessment: spec.assessment, gates: [{ name: 'structure', status: spec.gate, normalization: spec.normalization }], exit_code: spec.exit, findings, measurements, artifacts: [], diagnostics: [] }));
   process.exit(spec.exit);
 }
+if (functionGraph[caseId] && command === 'structure') {
+  const spec = functionGraph[caseId];
+  const measurements = [];
+  for (const [file, symbol, line, fanIn, fanOut, depth] of spec.functions) {
+    measurements.push({ metric: 'function.fan_in', level: 'structure', location: { file, line, symbol }, value: fanIn, unit: 'callers' });
+    measurements.push({ metric: 'function.fan_out', level: 'structure', location: { file, line, symbol }, value: fanOut, unit: 'callees' });
+    measurements.push({ metric: 'function.call_depth', level: 'structure', location: { file, line, symbol }, value: depth, unit: 'edges' });
+  }
+  measurements.push({ metric: 'function.recursive_components', level: 'structure', location: { file: '.' }, value: spec.recursive, unit: 'components' });
+  measurements.push({ metric: 'calls.unresolved', level: 'structure', location: { file: '.' }, value: spec.unresolved, unit: 'calls' });
+  const findings = spec.partial ? [{ level: 'structure', gate: 'structure', rule: 'pyguard.structure.not_evaluated', severity: 'info', status: 'advisory', category: 'quality', evidence: spec.partial, diagnostics: [] }] : [];
+  const status = spec.status || (spec.partial ? 'advisory' : 'pass');
+  const gate = spec.gate || (spec.partial ? 'advisory' : 'passed');
+  process.stdout.write(JSON.stringify({ schema_version: '1', status, assessment: spec.assessment || 'complete', gates: [{ name: 'structure', status: gate, normalization: spec.normalization || 'complete' }], exit_code: 0, findings, measurements, artifacts: [], diagnostics: [] }));
+  process.exit(0);
+}
 if (variant === 'baseline' || cognitive[caseId]) {
   const rows = variant === 'baseline' ? [] : cognitive[caseId];
   const measurements = rows.map(([file, symbol, value]) => ({ metric: 'complexipy.cognitive', level: 'code', location: { file, symbol }, value, unit: 'score', threshold: 20 }));
@@ -158,8 +198,8 @@ process.stdout.write(JSON.stringify({ schema_version: '1', status, assessment: '
 }
 
 function standInInvoke(binary, env = {}) {
-  return ({ project }) => {
-    const response = spawnSync(process.execPath, [binary], { cwd: project, encoding: 'utf8', env: { ...process.env, ...env }, timeout: 30000 });
+  return ({ project, args }) => {
+    const response = spawnSync(process.execPath, [binary, ...(args || [])], { cwd: project, encoding: 'utf8', env: { ...process.env, ...env }, timeout: 30000 });
     return { status: response.status, stdout: response.stdout || '', stderr: response.stderr || '', error: response.error && response.error.message };
   };
 }

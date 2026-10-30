@@ -36,17 +36,48 @@ type structureCounts struct {
 	DeferredImports int `json:"deferred_imports"`
 }
 
+// structureFunction is one defined in-scope Python function. Depth is the
+// longest path between SCCs in the function-call condensation.
+type structureFunction struct {
+	File   string `json:"file"`
+	Line   int    `json:"line"`
+	Symbol string `json:"symbol"`
+	Depth  int    `json:"depth"`
+}
+
+type structureCall struct {
+	Caller int `json:"caller"`
+	Callee int `json:"callee"`
+}
+
+type structureFunctionComponent struct {
+	Functions []int `json:"functions"`
+	Cyclic    bool  `json:"cyclic"`
+}
+
+type structureFunctionCounts struct {
+	Functions           int `json:"functions"`
+	Calls               int `json:"calls"`
+	RecursiveComponents int `json:"recursive_components"`
+	UnresolvedCalls     int `json:"unresolved_calls"`
+}
+
 // structureReport is the owned analyzer payload. Python builds the runtime
-// graph with grimp and networkx; Go validates it and owns findings/policy.
+// module graph with grimp and the function graph with pyan3/networkx; Go
+// validates both and owns measurements, findings and policy.
 type structureReport struct {
-	SchemaVersion string               `json:"schema_version"`
-	Modules       []structureModule    `json:"modules"`
-	Imports       []structureImport    `json:"imports"`
-	Components    []structureComponent `json:"components"`
-	Counts        structureCounts      `json:"counts"`
-	Partial       bool                 `json:"partial"`
-	Limitation    string               `json:"limitation"`
-	Error         *struct {
+	SchemaVersion      string                       `json:"schema_version"`
+	Modules            []structureModule            `json:"modules"`
+	Imports            []structureImport            `json:"imports"`
+	Components         []structureComponent         `json:"components"`
+	Counts             structureCounts              `json:"counts"`
+	Functions          []structureFunction          `json:"functions"`
+	Calls              []structureCall              `json:"calls"`
+	FunctionComponents []structureFunctionComponent `json:"function_components"`
+	FunctionCounts     structureFunctionCounts      `json:"function_counts"`
+	Partial            bool                         `json:"partial"`
+	Limitation         string                       `json:"limitation"`
+	Error              *struct {
 		Category string `json:"category"`
 		Message  string `json:"message"`
 	} `json:"error,omitempty"`
@@ -75,6 +106,22 @@ func structureFanCounts(report structureReport) (map[string]int, map[string]int)
 	return fanIn, fanOut
 }
 
+// structureFunctionFanCounts counts distinct in-scope defined callers and
+// callees per function. A self-call remains one call edge and one recursive
+// component, but a function is neither its own caller nor its own callee.
+func structureFunctionFanCounts(report structureReport) (map[int]int, map[int]int) {
+	fanIn := map[int]int{}
+	fanOut := map[int]int{}
+	for _, call := range report.Calls {
+		if call.Caller == call.Callee {
+			continue
+		}
+		fanOut[call.Caller]++
+		fanIn[call.Callee]++
+	}
+	return fanIn, fanOut
+}
+
 // parseStructureReport rejects missing, malformed or internally inconsistent
 // graph payloads. A partial report is valid evidence, but never a complete one.
 func parseStructureReport(data []byte) (structureReport, error) {
@@ -91,6 +138,9 @@ func parseStructureReport(data []byte) (structureReport, error) {
 	}
 	if report.Modules == nil || report.Imports == nil || report.Components == nil {
 		return report, fmt.Errorf("structure report arrays are missing")
+	}
+	if report.Functions == nil || report.Calls == nil || report.FunctionComponents == nil {
+		return report, fmt.Errorf("structure function graph arrays are missing")
 	}
 	if report.Counts.TypeImports < 0 || report.Counts.DeferredImports < 0 {
 		return report, fmt.Errorf("negative import count")
@@ -152,6 +202,69 @@ func parseStructureReport(data []byte) (structureReport, error) {
 	if len(seenModules) != len(report.Modules) || report.Counts.Cycles != cycles {
 		return report, fmt.Errorf("component coverage disagrees with graph facts")
 	}
+	if report.FunctionCounts.Functions != len(report.Functions) || report.FunctionCounts.Calls != len(report.Calls) || report.FunctionCounts.UnresolvedCalls < 0 {
+		return report, fmt.Errorf("function counts disagree with graph facts")
+	}
+	seenFunctionFacts := map[struct {
+		file   string
+		line   int
+		symbol string
+	}]bool{}
+	for _, function := range report.Functions {
+		if function.File == "" || function.Line < 1 || function.Symbol == "" || function.Depth < 0 {
+			return report, fmt.Errorf("invalid function fact")
+		}
+		key := struct {
+			file   string
+			line   int
+			symbol string
+		}{function.File, function.Line, function.Symbol}
+		if seenFunctionFacts[key] {
+			return report, fmt.Errorf("duplicate function fact")
+		}
+		seenFunctionFacts[key] = true
+	}
+	seenCalls := map[[2]int]bool{}
+	selfCalls := map[int]bool{}
+	for _, call := range report.Calls {
+		if call.Caller < 0 || call.Caller >= len(report.Functions) || call.Callee < 0 || call.Callee >= len(report.Functions) {
+			return report, fmt.Errorf("unknown function call endpoint")
+		}
+		key := [2]int{call.Caller, call.Callee}
+		if seenCalls[key] {
+			return report, fmt.Errorf("duplicate function call")
+		}
+		seenCalls[key] = true
+		if call.Caller == call.Callee {
+			selfCalls[call.Caller] = true
+		}
+	}
+	seenFunctions := map[int]bool{}
+	functionCycles := 0
+	for _, component := range report.FunctionComponents {
+		if len(component.Functions) == 0 {
+			return report, fmt.Errorf("empty function component")
+		}
+		cyclic := len(component.Functions) > 1 || selfCalls[component.Functions[0]]
+		if component.Cyclic != cyclic {
+			return report, fmt.Errorf("function component cycle flag disagrees with graph facts")
+		}
+		if cyclic {
+			functionCycles++
+		}
+		for _, index := range component.Functions {
+			if index < 0 || index >= len(report.Functions) {
+				return report, fmt.Errorf("unknown function component member")
+			}
+			if seenFunctions[index] {
+				return report, fmt.Errorf("function appears in multiple components")
+			}
+			seenFunctions[index] = true
+		}
+	}
+	if len(seenFunctions) != len(report.Functions) || report.FunctionCounts.RecursiveComponents != functionCycles {
+		return report, fmt.Errorf("function component coverage disagrees with graph facts")
+	}
 	return report, nil
 }
 
@@ -190,6 +303,7 @@ func (r *Runner) normalizeStructure(spec toolSpec, res Result, stdout io.Reader,
 	}
 
 	fanIn, fanOut := structureFanCounts(report)
+	functionFanIn, functionFanOut := structureFunctionFanCounts(report)
 	status := StatusAdvisory
 	if !spec.advisory {
 		status = StatusBlocking
@@ -242,6 +356,18 @@ func (r *Runner) normalizeStructure(spec toolSpec, res Result, stdout io.Reader,
 		Measurement{Metric: "module.cycles", Level: "structure", Location: Location{File: "."}, Value: float64(report.Counts.Cycles), Unit: "components"},
 		Measurement{Metric: "module.type_imports", Level: "structure", Location: Location{File: "."}, Value: float64(report.Counts.TypeImports), Unit: "references"},
 		Measurement{Metric: "module.deferred_imports", Level: "structure", Location: Location{File: "."}, Value: float64(report.Counts.DeferredImports), Unit: "references"},
+	)
+	for index, function := range report.Functions {
+		location := Location{File: relativePath(r.root, function.File), Line: function.Line, Symbol: function.Symbol}
+		r.result.Measurements = append(r.result.Measurements,
+			Measurement{Metric: "function.fan_in", Level: "structure", Location: location, Value: float64(functionFanIn[index]), Unit: "callers"},
+			Measurement{Metric: "function.fan_out", Level: "structure", Location: location, Value: float64(functionFanOut[index]), Unit: "callees"},
+			Measurement{Metric: "function.call_depth", Level: "structure", Location: location, Value: float64(function.Depth), Unit: "edges"},
+		)
+	}
+	r.result.Measurements = append(r.result.Measurements,
+		Measurement{Metric: "function.recursive_components", Level: "structure", Location: Location{File: "."}, Value: float64(report.FunctionCounts.RecursiveComponents), Unit: "components"},
+		Measurement{Metric: "calls.unresolved", Level: "structure", Location: Location{File: "."}, Value: float64(report.FunctionCounts.UnresolvedCalls), Unit: "calls"},
 	)
 	if report.Partial {
 		limitation := strings.TrimSpace(report.Limitation)
