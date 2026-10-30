@@ -267,21 +267,35 @@ def failure_handlers(path: Path, tree: ast.Module) -> list[dict[str, object]]:
             broad = handler.type is None or broad_type(handler.type)
             tokens: list[str] = []
             if body and source_tokens:
-                # Locate the terminating colon of this except header while
-                # respecting bracketed/multiline exception expressions.
-                depth = 0
+                # The exception expression can itself contain a lambda
+                # colon. Start searching after the AST expression (or after
+                # the ``except`` keyword for a bare handler) so only the
+                # header's terminating colon can match.
+                header_start: tuple[int, int] | None = None
+                if handler.type is not None:
+                    type_end_line = handler.type.end_lineno or handler.type.lineno
+                    type_end_byte_col = handler.type.end_col_offset
+                    if type_end_byte_col is not None:
+                        header_start = (
+                            type_end_line,
+                            character_column(type_end_line, type_end_byte_col),
+                        )
+                else:
+                    for token in source_tokens:
+                        if (
+                            token.type == tokenize.NAME
+                            and token.string == "except"
+                            and token.start[0] == handler.lineno
+                        ):
+                            header_start = token.end
+                            break
                 colon_end: tuple[int, int] | None = None
                 for token in source_tokens:
-                    if token.start < (handler.lineno, 0):
+                    if header_start is None or token.start < header_start:
                         continue
-                    if token.type == tokenize.OP:
-                        if token.string in "([{":
-                            depth += 1
-                        elif token.string in ")]}":
-                            depth = max(0, depth - 1)
-                        elif token.string == ":" and depth == 0:
-                            colon_end = token.end
-                            break
+                    if token.type == tokenize.OP and token.string == ":":
+                        colon_end = token.end
+                        break
                 end_line = handler.end_lineno or body[-1].end_lineno or body[-1].lineno
                 end_byte_col = handler.end_col_offset
                 end_col = (

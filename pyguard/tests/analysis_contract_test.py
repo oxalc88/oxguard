@@ -577,6 +577,34 @@ class StructureDelegationContract(unittest.TestCase):
         self.assertEqual(facts[0]["fingerprint"], facts[1]["fingerprint"])
         self.assertEqual(facts[0]["token_count"], 2)
 
+    def test_failure_handler_fingerprint_skips_lambda_colon_in_header(self):
+        body = """        record(error)
+        retry(error)
+        report(error)
+        recover(error)
+        annotate(error)
+        retain(error)
+        update(error)
+        notify(error)
+        measure(error)
+        finish(error)
+        return None
+"""
+        headers = (
+            "except ValueError if enabled else lambda: Exception:",
+            "except ValueError:",
+            "except Exception:",
+        )
+        facts = []
+        for header in headers:
+            source_text = "def run():\n    try:\n        work()\n    " + header + "\n" + body
+            with tempfile.TemporaryDirectory() as root:
+                source = Path(root) / "handlers.py"
+                source.write_text(source_text)
+                facts.extend(analyze_structure.failure_handlers(source, analyze_structure.read_tree(source)))
+        self.assertEqual([fact["token_count"] for fact in facts], [42, 42, 42])
+        self.assertEqual(len({fact["fingerprint"] for fact in facts}), 1)
+
     def test_failure_handler_fingerprint_includes_nested_decorators(self):
         source_text = """def run():
     try:
