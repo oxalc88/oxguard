@@ -37,12 +37,17 @@ type structureCounts struct {
 }
 
 // structureFunction is one defined in-scope Python function. Depth is the
-// longest path between SCCs in the function-call condensation.
+// longest path between SCCs in the function-call condensation. Forwarding is
+// only meaningful for module-level definitions; the target is the
+// module-qualified symbol of the single resolved in-scope function.
 type structureFunction struct {
-	File   string `json:"file"`
-	Line   int    `json:"line"`
-	Symbol string `json:"symbol"`
-	Depth  int    `json:"depth"`
+	File           string `json:"file"`
+	Line           int    `json:"line"`
+	Symbol         string `json:"symbol"`
+	Depth          int    `json:"depth"`
+	ModuleLevel    bool   `json:"module_level"`
+	ForwardingMode string `json:"forwarding_mode"`
+	ForwardTarget  string `json:"forward_target"`
 }
 
 type structureCall struct {
@@ -120,6 +125,137 @@ func structureFunctionFanCounts(report structureReport) (map[int]int, map[int]in
 		fanIn[call.Callee]++
 	}
 	return fanIn, fanOut
+}
+
+// structureDelegationDepths memoizes the suffix length of each forwarding
+// chain. A forwarding cycle has no finite delegation chain, so its depth is
+// reported as zero instead of an invented value.
+func structureDelegationDepths(report structureReport) []int {
+	index := make(map[string]int, len(report.Functions))
+	for position, function := range report.Functions {
+		index[function.Symbol] = position
+	}
+	lengths := map[int]int{}
+	active := map[int]bool{}
+	var depth func(int) int
+	depth = func(position int) int {
+		if length, ok := lengths[position]; ok {
+			return length
+		}
+		if active[position] {
+			return -1
+		}
+		function := report.Functions[position]
+		if function.ForwardTarget == "" {
+			lengths[position] = 0
+			return 0
+		}
+		target, ok := index[function.ForwardTarget]
+		if !ok {
+			lengths[position] = 0
+			return 0
+		}
+		active[position] = true
+		length := depth(target)
+		delete(active, position)
+		if length >= 0 {
+			length++
+		}
+		lengths[position] = length
+		return length
+	}
+	depths := make([]int, len(report.Functions))
+	for position := range report.Functions {
+		depths[position] = max(0, depth(position))
+	}
+	return depths
+}
+
+func structureFunctionLocation(root string, function structureFunction) Location {
+	return Location{File: relativePath(root, function.File), Line: function.Line, Symbol: function.Symbol}
+}
+
+// structureDelegationFindings mirrors Tsguard's fixed-threshold delegation
+// review cues. A chain shorter than three layers stays silent, and a chain in
+// which any forwarding module also has a non-forwarding module-level function
+// is not fragmented.
+func (r *Runner) structureDelegationFindings(gate string, report structureReport, depths []int, status Status, refs []string) {
+	if len(report.Functions) == 0 {
+		return
+	}
+	index := make(map[string]int, len(report.Functions))
+	for position, function := range report.Functions {
+		index[function.Symbol] = position
+	}
+	for position, function := range report.Functions {
+		depth := depths[position]
+		if depth < 3 {
+			continue
+		}
+		locations := []Location{}
+		seen := map[string]bool{}
+		for next := function.ForwardTarget; next != ""; {
+			target, ok := index[next]
+			if !ok || seen[next] {
+				break
+			}
+			seen[next] = true
+			locations = append(locations, structureFunctionLocation(r.root, report.Functions[target]))
+			next = report.Functions[target].ForwardTarget
+		}
+		location := structureFunctionLocation(r.root, function)
+		value, threshold := float64(depth), float64(3)
+		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "pyguard.structure.LONG_DELEGATION_CHAIN", Status: status, Severity: "warning", Category: "quality", Location: &location, Related: locations, Observed: &value, Threshold: &threshold,
+			Evidence:    fmt.Sprintf("%d resolved single-return layers forward unchanged positional arguments and an identical textual return annotation; async modes are recorded in the graph and may preserve intentional timing or stack boundaries.", depth),
+			Remediation: "Review whether intermediate layers provide a required boundary; preserve deliberate interfaces and failure policies.",
+			Diagnostics: refs})
+	}
+
+	total, wrappers := map[string]int{}, map[string]int{}
+	for _, function := range report.Functions {
+		if !function.ModuleLevel {
+			continue
+		}
+		total[function.File]++
+		if function.ForwardTarget != "" {
+			wrappers[function.File]++
+		}
+	}
+	for _, start := range report.Functions {
+		chain := []Location{}
+		seen, files := map[string]bool{}, map[string]bool{}
+		cyclic := false
+		for next := start.Symbol; next != ""; {
+			if seen[next] {
+				cyclic = true
+				break
+			}
+			seen[next] = true
+			position, ok := index[next]
+			if !ok {
+				break
+			}
+			function := report.Functions[position]
+			if function.ForwardTarget == "" {
+				break
+			}
+			if total[function.File] == 0 || total[function.File] != wrappers[function.File] {
+				chain = nil
+				break
+			}
+			chain = append(chain, structureFunctionLocation(r.root, function))
+			files[function.File] = true
+			next = function.ForwardTarget
+		}
+		if cyclic || len(chain) < 3 || len(files) < 3 {
+			continue
+		}
+		location := chain[0]
+		r.result.AddFinding(Finding{Gate: gate, Level: "structure", Rule: "pyguard.structure.FRAGMENTED_DELEGATION", Status: status, Severity: "warning", Category: "quality", Location: &location, Related: chain[1:],
+			Evidence:    fmt.Sprintf("An unchanged forwarding chain crosses %d modules whose analyzed module-level functions only forward calls.", len(files)),
+			Remediation: "Review whether these modules express separate responsibilities; file count alone is not a violation.",
+			Diagnostics: refs})
+	}
 }
 
 // parseStructureReport rejects missing, malformed or internally inconsistent
@@ -210,7 +346,9 @@ func parseStructureReport(data []byte) (structureReport, error) {
 		line   int
 		symbol string
 	}]bool{}
-	for _, function := range report.Functions {
+	functionSymbols := map[string]int{}
+	ambiguousSymbols := map[string]bool{}
+	for index, function := range report.Functions {
 		if function.File == "" || function.Line < 1 || function.Symbol == "" || function.Depth < 0 {
 			return report, fmt.Errorf("invalid function fact")
 		}
@@ -223,6 +361,38 @@ func parseStructureReport(data []byte) (structureReport, error) {
 			return report, fmt.Errorf("duplicate function fact")
 		}
 		seenFunctionFacts[key] = true
+		if _, exists := functionSymbols[function.Symbol]; exists {
+			ambiguousSymbols[function.Symbol] = true
+		} else {
+			functionSymbols[function.Symbol] = index
+		}
+		if function.ForwardTarget == "" {
+			if function.ForwardingMode != "" {
+				return report, fmt.Errorf("forwarding mode without target")
+			}
+			continue
+		}
+		if function.ForwardingMode != "sync" && function.ForwardingMode != "async-return-await" {
+			return report, fmt.Errorf("invalid forwarding mode")
+		}
+		if !function.ModuleLevel {
+			return report, fmt.Errorf("non-module forwarding function")
+		}
+	}
+	for index, function := range report.Functions {
+		if function.ForwardTarget == "" {
+			continue
+		}
+		target, exists := functionSymbols[function.ForwardTarget]
+		if !exists {
+			return report, fmt.Errorf("unknown forwarding target %q", function.ForwardTarget)
+		}
+		if ambiguousSymbols[function.ForwardTarget] {
+			return report, fmt.Errorf("ambiguous forwarding target %q", function.ForwardTarget)
+		}
+		if target == index {
+			return report, fmt.Errorf("self forwarding function")
+		}
 	}
 	seenCalls := map[[2]int]bool{}
 	selfCalls := map[int]bool{}
@@ -304,6 +474,7 @@ func (r *Runner) normalizeStructure(spec toolSpec, res Result, stdout io.Reader,
 
 	fanIn, fanOut := structureFanCounts(report)
 	functionFanIn, functionFanOut := structureFunctionFanCounts(report)
+	delegationDepths := structureDelegationDepths(report)
 	status := StatusAdvisory
 	if !spec.advisory {
 		status = StatusBlocking
@@ -363,8 +534,13 @@ func (r *Runner) normalizeStructure(spec toolSpec, res Result, stdout io.Reader,
 			Measurement{Metric: "function.fan_in", Level: "structure", Location: location, Value: float64(functionFanIn[index]), Unit: "callers"},
 			Measurement{Metric: "function.fan_out", Level: "structure", Location: location, Value: float64(functionFanOut[index]), Unit: "callees"},
 			Measurement{Metric: "function.call_depth", Level: "structure", Location: location, Value: float64(function.Depth), Unit: "edges"},
+			Measurement{Metric: "delegation.depth", Level: "structure", Location: location, Value: float64(delegationDepths[index]), Unit: "layers"},
 		)
+		if function.ForwardTarget != "" {
+			r.result.Measurements = append(r.result.Measurements, Measurement{Metric: "delegation.forwarding", Level: "structure", Location: location, Value: 1, Unit: "calls", ForwardingMode: function.ForwardingMode, ForwardTarget: function.ForwardTarget})
+		}
 	}
+	r.structureDelegationFindings(spec.gate, report, delegationDepths, status, refs)
 	r.result.Measurements = append(r.result.Measurements,
 		Measurement{Metric: "function.recursive_components", Level: "structure", Location: Location{File: "."}, Value: float64(report.FunctionCounts.RecursiveComponents), Unit: "components"},
 		Measurement{Metric: "calls.unresolved", Level: "structure", Location: Location{File: "."}, Value: float64(report.FunctionCounts.UnresolvedCalls), Unit: "calls"},

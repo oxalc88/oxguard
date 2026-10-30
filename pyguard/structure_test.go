@@ -596,3 +596,228 @@ func TestStructureAdapterRejectsMalformedFunctionGraphs(t *testing.T) {
 		}
 	}
 }
+
+// structureDelegationReport builds a valid module/function payload from the
+// supplied facts. Calls are derived from forwarding targets when includeCalls
+// is set; the forwarding graph itself is always acyclic in those cases.
+func structureDelegationReport(t *testing.T, functions []structureFunction, includeCalls bool) string {
+	t.Helper()
+	modules := []structureModule{}
+	components := []structureComponent{}
+	files := map[string]bool{}
+	for _, function := range functions {
+		if files[function.File] {
+			continue
+		}
+		files[function.File] = true
+		modules = append(modules, structureModule{Name: function.Symbol, File: function.File})
+		components = append(components, structureComponent{Modules: []string{function.Symbol}, Cyclic: false})
+	}
+	calls := []structureCall{}
+	if includeCalls {
+		index := map[string]int{}
+		for position, function := range functions {
+			index[function.Symbol] = position
+		}
+		for position, function := range functions {
+			if target, ok := index[function.ForwardTarget]; ok && function.ForwardTarget != "" {
+				calls = append(calls, structureCall{Caller: position, Callee: target})
+			}
+		}
+	}
+	functionComponents := make([]structureFunctionComponent, len(functions))
+	for position := range functions {
+		functionComponents[position] = structureFunctionComponent{Functions: []int{position}, Cyclic: false}
+	}
+	report := structureReport{
+		SchemaVersion:      "1",
+		Modules:            modules,
+		Imports:            []structureImport{},
+		Components:         components,
+		Counts:             structureCounts{Modules: len(modules)},
+		Functions:          functions,
+		Calls:              calls,
+		FunctionComponents: functionComponents,
+		FunctionCounts:     structureFunctionCounts{Functions: len(functions), Calls: len(calls)},
+	}
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func delegationFindings(result *RunResult, rule string) []Finding {
+	findings := []Finding{}
+	for _, finding := range result.Findings {
+		if finding.Rule == "pyguard.structure."+rule {
+			findings = append(findings, finding)
+		}
+	}
+	return findings
+}
+
+func TestStructureAdapterReportsDelegationDepthAndFindings(t *testing.T) {
+	functions := []structureFunction{
+		{File: "src/pkg/a.py", Line: 1, Symbol: "pkg.a.a", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.b.b"},
+		{File: "src/pkg/b.py", Line: 1, Symbol: "pkg.b.b", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.c.c"},
+		{File: "src/pkg/c.py", Line: 1, Symbol: "pkg.c.c", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.real.real"},
+		{File: "src/pkg/real.py", Line: 1, Symbol: "pkg.real.real", ModuleLevel: true},
+	}
+	r := contractRunner(t)
+	r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureDelegationReport(t, functions, true)), nil)
+	if err := r.result.Finish(0); err != nil {
+		t.Fatal(err)
+	}
+	if r.result.ExitCode != 0 || r.result.Status != StatusAdvisory || r.result.Assessment != Complete {
+		t.Fatalf("delegation changed policy: exit=%d status=%s assessment=%s", r.result.ExitCode, r.result.Status, r.result.Assessment)
+	}
+	if len(r.result.Gates) != 1 || r.result.Gates[0].Status != StatusAdvisory || r.result.Gates[0].Normalization != Complete {
+		t.Fatalf("gate: %+v", r.result.Gates)
+	}
+	for symbol, want := range map[string]float64{"pkg.a.a": 3, "pkg.b.b": 2, "pkg.c.c": 1, "pkg.real.real": 0} {
+		file := "src/pkg/" + map[string]string{"pkg.a.a": "a", "pkg.b.b": "b", "pkg.c.c": "c", "pkg.real.real": "real"}[symbol] + ".py"
+		measurement := functionMeasurement(r.result, "delegation.depth", file, symbol)
+		if measurement == nil || measurement.Value != want || measurement.Unit != "layers" || measurement.Level != "structure" {
+			t.Fatalf("delegation.depth for %s: %+v", symbol, measurement)
+		}
+	}
+	forwarding := functionMeasurement(r.result, "delegation.forwarding", "src/pkg/a.py", "pkg.a.a")
+	if forwarding == nil || forwarding.Value != 1 || forwarding.Unit != "calls" || forwarding.ForwardingMode != "sync" || forwarding.ForwardTarget != "pkg.b.b" {
+		t.Fatalf("delegation.forwarding for pkg.a.a: %+v", forwarding)
+	}
+	if functionMeasurement(r.result, "delegation.forwarding", "src/pkg/real.py", "pkg.real.real") != nil {
+		t.Fatalf("non-forwarding function has forwarding measurement: %+v", r.result.Measurements)
+	}
+	long := delegationFindings(r.result, "LONG_DELEGATION_CHAIN")
+	if len(long) != 1 {
+		t.Fatalf("long delegation findings: %+v", r.result.Findings)
+	}
+	finding := long[0]
+	if finding.Level != "structure" || finding.Gate != "structure" || finding.Severity != "warning" || finding.Status != StatusAdvisory || finding.Category != "quality" {
+		t.Fatalf("long delegation contract: %+v", finding)
+	}
+	if finding.Location == nil || finding.Location.File != "src/pkg/a.py" || finding.Location.Symbol != "pkg.a.a" {
+		t.Fatalf("long delegation location: %+v", finding.Location)
+	}
+	if finding.Observed == nil || *finding.Observed != 3 || finding.Threshold == nil || *finding.Threshold != 3 {
+		t.Fatalf("long delegation threshold: %+v", finding)
+	}
+	if len(finding.Related) != 3 || finding.Related[0].Symbol != "pkg.b.b" || finding.Related[2].Symbol != "pkg.real.real" {
+		t.Fatalf("long delegation related: %+v", finding.Related)
+	}
+	fragmented := delegationFindings(r.result, "FRAGMENTED_DELEGATION")
+	if len(fragmented) != 1 {
+		t.Fatalf("fragmented delegation findings: %+v", r.result.Findings)
+	}
+	if fragmented[0].Location == nil || fragmented[0].Location.File != "src/pkg/a.py" || len(fragmented[0].Related) != 2 {
+		t.Fatalf("fragmented delegation shape: %+v", fragmented[0])
+	}
+	for _, finding := range r.result.Findings {
+		if finding.Status != StatusAdvisory {
+			t.Fatalf("delegation finding is not advisory: %+v", finding)
+		}
+	}
+}
+
+func TestStructureAdapterDelegationBoundaries(t *testing.T) {
+	t.Run("depth two is not long", func(t *testing.T) {
+		functions := []structureFunction{
+			{File: "src/pkg/a.py", Line: 1, Symbol: "pkg.a.a", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.b.b"},
+			{File: "src/pkg/b.py", Line: 1, Symbol: "pkg.b.b", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.real.real"},
+			{File: "src/pkg/real.py", Line: 1, Symbol: "pkg.real.real", ModuleLevel: true},
+		}
+		r := contractRunner(t)
+		r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureDelegationReport(t, functions, true)), nil)
+		if err := r.result.Finish(0); err != nil {
+			t.Fatal(err)
+		}
+		if len(r.result.Findings) != 0 {
+			t.Fatalf("depth two emitted findings: %+v", r.result.Findings)
+		}
+		if measurement := functionMeasurement(r.result, "delegation.depth", "src/pkg/a.py", "pkg.a.a"); measurement == nil || measurement.Value != 2 {
+			t.Fatalf("depth two measurement: %+v", measurement)
+		}
+	})
+	t.Run("module with a real function is not fragmented", func(t *testing.T) {
+		functions := []structureFunction{
+			{File: "src/pkg/a.py", Line: 1, Symbol: "pkg.a.a", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.b.b"},
+			{File: "src/pkg/b.py", Line: 1, Symbol: "pkg.b.b", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.c.c"},
+			{File: "src/pkg/b.py", Line: 8, Symbol: "pkg.b.helper", ModuleLevel: true},
+			{File: "src/pkg/c.py", Line: 1, Symbol: "pkg.c.c", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.real.real"},
+			{File: "src/pkg/real.py", Line: 1, Symbol: "pkg.real.real", ModuleLevel: true},
+		}
+		r := contractRunner(t)
+		r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureDelegationReport(t, functions, true)), nil)
+		if err := r.result.Finish(0); err != nil {
+			t.Fatal(err)
+		}
+		if len(delegationFindings(r.result, "LONG_DELEGATION_CHAIN")) != 1 {
+			t.Fatalf("missing long delegation: %+v", r.result.Findings)
+		}
+		if len(delegationFindings(r.result, "FRAGMENTED_DELEGATION")) != 0 {
+			t.Fatalf("non-forwarding module counted as fragmented: %+v", r.result.Findings)
+		}
+	})
+	t.Run("forwarding cycle has depth zero and no finding", func(t *testing.T) {
+		functions := []structureFunction{
+			{File: "src/pkg/a.py", Line: 1, Symbol: "pkg.a.a", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.b.b"},
+			{File: "src/pkg/b.py", Line: 1, Symbol: "pkg.b.b", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.c.c"},
+			{File: "src/pkg/c.py", Line: 1, Symbol: "pkg.c.c", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.a.a"},
+		}
+		r := contractRunner(t)
+		r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureDelegationReport(t, functions, false)), nil)
+		if err := r.result.Finish(0); err != nil {
+			t.Fatal(err)
+		}
+		if len(r.result.Findings) != 0 {
+			t.Fatalf("forwarding cycle emitted findings: %+v", r.result.Findings)
+		}
+		for _, function := range functions {
+			if measurement := functionMeasurement(r.result, "delegation.depth", function.File, function.Symbol); measurement == nil || measurement.Value != 0 {
+				t.Fatalf("cycle depth for %s: %+v", function.Symbol, measurement)
+			}
+		}
+	})
+	t.Run("async return await chain", func(t *testing.T) {
+		functions := []structureFunction{
+			{File: "src/pkg/a.py", Line: 1, Symbol: "pkg.a.a", ModuleLevel: true, ForwardingMode: "async-return-await", ForwardTarget: "pkg.b.b"},
+			{File: "src/pkg/b.py", Line: 1, Symbol: "pkg.b.b", ModuleLevel: true, ForwardingMode: "async-return-await", ForwardTarget: "pkg.c.c"},
+			{File: "src/pkg/c.py", Line: 1, Symbol: "pkg.c.c", ModuleLevel: true, ForwardingMode: "async-return-await", ForwardTarget: "pkg.work.work"},
+			{File: "src/pkg/work.py", Line: 1, Symbol: "pkg.work.work", ModuleLevel: true},
+		}
+		r := contractRunner(t)
+		r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureDelegationReport(t, functions, true)), nil)
+		if err := r.result.Finish(0); err != nil {
+			t.Fatal(err)
+		}
+		if len(delegationFindings(r.result, "LONG_DELEGATION_CHAIN")) != 1 {
+			t.Fatalf("missing async long delegation: %+v", r.result.Findings)
+		}
+		measurement := functionMeasurement(r.result, "delegation.forwarding", "src/pkg/c.py", "pkg.c.c")
+		if measurement == nil || measurement.ForwardingMode != "async-return-await" || measurement.ForwardTarget != "pkg.work.work" {
+			t.Fatalf("async forwarding measurement: %+v", measurement)
+		}
+	})
+}
+
+func TestStructureAdapterRejectsMalformedForwarding(t *testing.T) {
+	valid := []structureFunction{
+		{File: "src/pkg/a.py", Line: 1, Symbol: "pkg.a.a", ModuleLevel: true, ForwardingMode: "sync", ForwardTarget: "pkg.b.b"},
+		{File: "src/pkg/b.py", Line: 1, Symbol: "pkg.b.b", ModuleLevel: true},
+	}
+	cases := []string{
+		strings.Replace(structureDelegationReport(t, valid, false), `"forward_target":"pkg.b.b"`, `"forward_target":"pkg.missing.missing"`, 1),
+		strings.Replace(structureDelegationReport(t, valid, false), `"forwarding_mode":"sync"`, `"forwarding_mode":""`, 1),
+		strings.Replace(structureDelegationReport(t, valid, false), `"forwarding_mode":"sync"`, `"forwarding_mode":"async-return"`, 1),
+		strings.Replace(structureDelegationReport(t, valid, false), `"module_level":true`, `"module_level":false`, 1),
+		strings.Replace(structureDelegationReport(t, valid, false), `"forward_target":"pkg.b.b"`, `"forward_target":"pkg.a.a"`, 1),
+	}
+	for _, data := range cases {
+		r := contractRunner(t)
+		r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(data), nil)
+		if len(r.result.Findings) != 1 || r.result.Findings[0].Status != StatusExecutionError || r.result.Findings[0].Category != "adapter_failure" {
+			t.Fatalf("accepted malformed forwarding %q: %+v", data, r.result.Findings)
+		}
+	}
+}

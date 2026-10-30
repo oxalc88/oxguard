@@ -65,7 +65,7 @@ test('a passing Python report is accepted as not_implemented without claiming re
   const implemented=result.capabilities.find(c=>c.id==='structure.function_graph');
   assert.equal(implemented.pyguard,'pass');
   assert.deepEqual(implemented.pyguard_cases,Object.fromEntries(declared().filter(d=>d.capability==='structure.function_graph').map(d=>[d.id,'pass'])));
-  const planned=result.capabilities.find(c=>c.id==='maintainability.delegation');
+  const planned=result.capabilities.find(c=>c.id==='maintainability.failure_policies');
   assert.equal(planned.pyguard,'not_implemented');
   assert.deepEqual(planned.pyguard_cases,{});
   assert.equal(result.capabilities.find(c=>c.id==='change.native_duplication').pyguard,'deferred');

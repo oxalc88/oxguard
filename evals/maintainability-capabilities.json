@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "scope": "Tsguard v0.8 code, structure and change implementation; Python maintainability parity is deferred independently",
+  "scope": "Tsguard v0.8 code, structure and change implementation; Python maintainability parity is implemented incrementally and otherwise deferred independently",
   "capabilities": [
     {
       "id": "quality.zero_config_exception_handling",
@@ -31,14 +31,28 @@
       "id": "maintainability.delegation",
       "tsguard": "smells.resolved_chain",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "delegation.resolved_chain"
+          ],
+          "negative": [
+            "delegation.equivalent_simplification_control",
+            "delegation.legitimate_di_validation_and_boundary",
+            "delegation.argument_transformation_control",
+            "delegation.return_annotation_mismatch_control"
+          ],
+          "boundary": [
+            "delegation.parameter_boundary",
+            "delegation.decorated_wrapper_control",
+            "delegation.threshold_boundary",
+            "delegation.forwarding_cycle",
+            "delegation.test_file_exclusion",
+            "delegation.module_with_real_function"
+          ]
         }
       },
-      "python_candidate": "Python ast with resolved local callable identities"
+      "python_candidate": "Python AST forwarding facts over pyan3-resolved in-scope calls, normalized by Go in pyguard structure"
     },
     {
       "id": "maintainability.failure_policies",
@@ -283,14 +297,20 @@
       "id": "maintainability.async_delegation",
       "tsguard": "smells.async_forwarding_and_boundary_controls",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "async_delegation.return_await_chain"
+          ],
+          "negative": [
+            "async_delegation.without_await_control"
+          ],
+          "boundary": [
+            "async_delegation.non_async_target_control"
+          ]
         }
       },
-      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+      "python_candidate": "Python `return await` async forwarding with module-level, async-target and boundary controls in pyguard structure"
     },
     {
       "id": "quality.cognitive_complexity",

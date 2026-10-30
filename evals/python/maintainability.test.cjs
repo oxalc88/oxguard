@@ -54,6 +54,65 @@ const FUNCTION_GRAPH = {
   'function_graph.unparsable_is_not_evaluated': { functions: [['src/good.py', 'good.target', 1, 0, 0, 0]], recursive: 0, unresolved: 0, partial: 'Unparsable source: src/broken.py', status: 'advisory', gate: 'advisory', normalization: 'partial', assessment: 'incomplete' },
 };
 
+// Canned delegation facts for the stand-in structure command. Rows are
+// [file, symbol, line, delegation_depth, module_level, forward_target, mode].
+const DELEGATION = {
+  'delegation.resolved_chain': {
+    functions: [['src/pkg/a.py', 'pkg.a.a', 4, 3, true, 'pkg.b.b', 'sync'], ['src/pkg/b.py', 'pkg.b.b', 4, 2, true, 'pkg.c.c', 'sync'], ['src/pkg/c.py', 'pkg.c.c', 4, 1, true, 'pkg.real.real', 'sync'], ['src/pkg/real.py', 'pkg.real.real', 1, 0, true, '', '']],
+    findings: [{ rule: 'LONG_DELEGATION_CHAIN', file: 'src/pkg/a.py', symbol: 'pkg.a.a', related: ['src/pkg/b.py', 'src/pkg/c.py', 'src/pkg/real.py'], observed: 3, threshold: 3 }, { rule: 'FRAGMENTED_DELEGATION', file: 'src/pkg/a.py', symbol: 'pkg.a.a', related: ['src/pkg/b.py', 'src/pkg/c.py'] }],
+  },
+  'delegation.equivalent_simplification_control': {
+    functions: [['src/pkg/direct.py', 'pkg.direct.a', 1, 0, true, '', '']], findings: [],
+  },
+  'delegation.legitimate_di_validation_and_boundary': {
+    functions: [['src/pkg/service.py', 'pkg.service.Dependency.load', 2, 0, false, '', ''], ['src/pkg/service.py', 'pkg.service.Service.__init__', 7, 0, false, '', ''], ['src/pkg/service.py', 'pkg.service.Service.load', 10, 0, false, '', ''], ['src/pkg/service.py', 'pkg.service.domain', 14, 0, true, '', ''], ['src/pkg/service.py', 'pkg.service.boundary', 24, 1, true, 'pkg.service.domain', 'sync'], ['src/pkg/service.py', 'pkg.service.transform', 28, 0, true, '', '']],
+    findings: [],
+  },
+  'delegation.argument_transformation_control': {
+    functions: [['src/pkg/transform.py', 'pkg.transform.real', 1, 0, true, '', ''], ['src/pkg/transform.py', 'pkg.transform.reordered', 5, 0, true, '', ''], ['src/pkg/transform.py', 'pkg.transform.transformed', 9, 0, true, '', ''], ['src/pkg/transform.py', 'pkg.transform.keyword', 13, 0, true, '', '']],
+    findings: [],
+  },
+  'delegation.return_annotation_mismatch_control': {
+    functions: [['src/pkg/annotations.py', 'pkg.annotations.real', 1, 0, true, '', ''], ['src/pkg/annotations.py', 'pkg.annotations.mismatched', 5, 0, true, '', ''], ['src/pkg/annotations.py', 'pkg.annotations.missing', 9, 0, true, '', '']],
+    findings: [],
+  },
+  'delegation.parameter_boundary': {
+    functions: [['src/pkg/parameters.py', 'pkg.parameters.real', 1, 0, true, '', ''], ['src/pkg/parameters.py', 'pkg.parameters.defaults', 5, 0, true, '', ''], ['src/pkg/parameters.py', 'pkg.parameters.varargs', 9, 0, true, '', ''], ['src/pkg/parameters.py', 'pkg.parameters.kwargs', 13, 0, true, '', ''], ['src/pkg/parameters.py', 'pkg.parameters.kwonly', 17, 0, true, '', ''], ['src/pkg/parameters.py', 'pkg.parameters.posonly', 21, 0, true, '', '']],
+    findings: [],
+  },
+  'delegation.decorated_wrapper_control': {
+    functions: [['src/pkg/decorated.py', 'pkg.decorated.real', 1, 0, true, '', ''], ['src/pkg/decorated.py', 'pkg.decorated.marker', 5, 0, true, '', ''], ['src/pkg/decorated.py', 'pkg.decorated.decorated', 10, 0, true, '', '']],
+    findings: [],
+  },
+  'delegation.threshold_boundary': {
+    functions: [['src/pkg/chains.py', 'pkg.chains.real', 1, 0, true, '', ''], ['src/pkg/chains.py', 'pkg.chains.one', 5, 1, true, 'pkg.chains.real', 'sync'], ['src/pkg/chains.py', 'pkg.chains.depth_two', 9, 2, true, 'pkg.chains.one', 'sync'], ['src/pkg/chains.py', 'pkg.chains.two', 13, 2, true, 'pkg.chains.one', 'sync'], ['src/pkg/chains.py', 'pkg.chains.depth_three', 17, 3, true, 'pkg.chains.two', 'sync']],
+    findings: [{ rule: 'LONG_DELEGATION_CHAIN', file: 'src/pkg/chains.py', symbol: 'pkg.chains.depth_three', related: ['src/pkg/chains.py', 'src/pkg/chains.py', 'src/pkg/chains.py'], observed: 3, threshold: 3 }],
+  },
+  'delegation.forwarding_cycle': {
+    functions: [['src/pkg/cycle.py', 'pkg.cycle.a', 1, 0, true, 'pkg.cycle.b', 'sync'], ['src/pkg/cycle.py', 'pkg.cycle.b', 5, 0, true, 'pkg.cycle.c', 'sync'], ['src/pkg/cycle.py', 'pkg.cycle.c', 9, 0, true, 'pkg.cycle.a', 'sync']],
+    findings: [],
+  },
+  'delegation.test_file_exclusion': {
+    functions: [['src/pkg/real.py', 'pkg.real.real', 1, 0, true, '', '']], findings: [],
+  },
+  'delegation.module_with_real_function': {
+    functions: [['src/pkg/a.py', 'pkg.a.a', 4, 3, true, 'pkg.b.b', 'sync'], ['src/pkg/b.py', 'pkg.b.b', 4, 2, true, 'pkg.c.c', 'sync'], ['src/pkg/b.py', 'pkg.b.helper', 8, 0, true, '', ''], ['src/pkg/c.py', 'pkg.c.c', 4, 1, true, 'pkg.real.real', 'sync'], ['src/pkg/real.py', 'pkg.real.real', 1, 0, true, '', '']],
+    findings: [{ rule: 'LONG_DELEGATION_CHAIN', file: 'src/pkg/a.py', symbol: 'pkg.a.a', related: ['src/pkg/b.py', 'src/pkg/c.py', 'src/pkg/real.py'], observed: 3, threshold: 3 }],
+  },
+  'async_delegation.return_await_chain': {
+    functions: [['src/pkg/async_chain.py', 'pkg.async_chain.work', 1, 0, true, '', ''], ['src/pkg/async_chain.py', 'pkg.async_chain.c', 5, 1, true, 'pkg.async_chain.work', 'async-return-await'], ['src/pkg/async_chain.py', 'pkg.async_chain.b', 9, 2, true, 'pkg.async_chain.c', 'async-return-await'], ['src/pkg/async_chain.py', 'pkg.async_chain.a', 13, 3, true, 'pkg.async_chain.b', 'async-return-await'], ['src/pkg/async_chain.py', 'pkg.async_chain.boundary', 17, 0, true, '', '']],
+    findings: [{ rule: 'LONG_DELEGATION_CHAIN', file: 'src/pkg/async_chain.py', symbol: 'pkg.async_chain.a', related: ['src/pkg/async_chain.py', 'src/pkg/async_chain.py', 'src/pkg/async_chain.py'], observed: 3, threshold: 3 }],
+  },
+  'async_delegation.without_await_control': {
+    functions: [['src/pkg/async_plain.py', 'pkg.async_plain.work', 1, 0, true, '', ''], ['src/pkg/async_plain.py', 'pkg.async_plain.c', 5, 0, true, '', ''], ['src/pkg/async_plain.py', 'pkg.async_plain.b', 9, 0, true, '', ''], ['src/pkg/async_plain.py', 'pkg.async_plain.a', 13, 0, true, '', '']],
+    findings: [],
+  },
+  'async_delegation.non_async_target_control': {
+    functions: [['src/pkg/async_sync.py', 'pkg.async_sync.sync_work', 1, 0, true, '', ''], ['src/pkg/async_sync.py', 'pkg.async_sync.awaits_sync', 5, 0, true, '', '']],
+    findings: [],
+  },
+};
+
 const COMPLEXIPI = {
   'complexipy.cognitive.exceeded_is_advisory_warning': [['src/complexity.py', 'flat', 0], ['src/complexity.py', 'above', 21]],
   'complexipy.cognitive.flat_function_no_finding': [['src/flat.py', 'flat', 0]],
@@ -132,6 +191,7 @@ const cognitive = ${JSON.stringify(COMPLEXIPI)};
 const ruff = ${JSON.stringify(RUFF)};
 const structure = ${JSON.stringify(STRUCTURE)};
 const functionGraph = ${JSON.stringify(FUNCTION_GRAPH)};
+const delegation = ${JSON.stringify(DELEGATION)};
 const caseId = path.basename(path.dirname(process.cwd()));
 const variant = path.basename(process.cwd());
 const command = process.argv[2] || 'criticality';
@@ -141,6 +201,22 @@ if (ruff[caseId]) {
   const measurements = spec.measurement ? [{ metric: 'ruff.baseline_version', level: 'code', location: { file: '.' }, value: 1, unit: 'version' }] : [];
   process.stdout.write(JSON.stringify({ schema_version: '1', status: spec.status, assessment: 'complete', gates: [{ name: 'ruff', status: spec.gate, normalization: 'complete' }], exit_code: spec.exit, findings, measurements, artifacts: [], diagnostics: [] }));
   process.exit(spec.exit);
+}
+if (delegation[caseId] && command === 'structure') {
+  const spec = delegation[caseId];
+  const measurements = [];
+  for (const [file, symbol, line, depth, moduleLevel, target, mode] of spec.functions) {
+    measurements.push({ metric: 'delegation.depth', level: 'structure', location: { file, line, symbol }, value: depth, unit: 'layers' });
+    if (target) measurements.push({ metric: 'delegation.forwarding', level: 'structure', location: { file, line, symbol }, value: 1, unit: 'calls', forwarding_mode: mode, forward_target: target });
+    measurements.push({ metric: 'function.fan_in', level: 'structure', location: { file, line, symbol }, value: 0, unit: 'callers' });
+    measurements.push({ metric: 'function.fan_out', level: 'structure', location: { file, line, symbol }, value: target ? 1 : 0, unit: 'callees' });
+    measurements.push({ metric: 'function.call_depth', level: 'structure', location: { file, line, symbol }, value: 0, unit: 'edges' });
+  }
+  const findings = spec.findings.map(finding => ({ level: 'structure', gate: 'structure', rule: 'pyguard.structure.' + finding.rule, severity: 'warning', status: 'advisory', category: 'quality', location: { file: finding.file, line: finding.line || 1, symbol: finding.symbol }, related: (finding.related || []).map(file => ({ file })), ...(finding.observed !== undefined ? { observed: finding.observed } : {}), ...(finding.threshold !== undefined ? { threshold: finding.threshold } : {}), evidence: finding.rule + ' advisory', diagnostics: [] }));
+  const status = findings.length ? 'advisory' : 'pass';
+  const gate = findings.length ? 'advisory' : 'passed';
+  process.stdout.write(JSON.stringify({ schema_version: '1', status, assessment: 'complete', gates: [{ name: 'structure', status: gate, normalization: 'complete' }], exit_code: 0, findings, measurements, artifacts: [], diagnostics: [] }));
+  process.exit(0);
 }
 if (structure[caseId]) {
   const spec = structure[caseId];
@@ -217,7 +293,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'structure.runtime_graph', 'structure.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'quality.cognitive_complexity']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'structure.runtime_graph', 'structure.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 

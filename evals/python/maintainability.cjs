@@ -370,6 +370,297 @@ const definitions = [
     },
   },
   {
+    id: 'delegation.resolved_chain',
+    capability: 'maintainability.delegation',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/real.py': 'def real(x: int) -> int:\n    return x * 2\n',
+      'src/pkg/c.py': 'from .real import real\n\n\ndef c(x: int) -> int:\n    return real(x)\n',
+      'src/pkg/b.py': 'from .c import c\n\n\ndef b(x: int) -> int:\n    return c(x)\n',
+      'src/pkg/a.py': 'from .b import b\n\n\ndef a(x: int) -> int:\n    return b(x)\n',
+    },
+    check: ({ result }) => {
+      // The Python port of Tsguard's resolved chain: four files, three
+      // unchanged forwarding layers and a real implementation. Both delegation
+      // reviews are advisory and never change the exit code.
+      complete(result, 'structure');
+      assert.equal(result.findings.filter(f => f.rule === 'pyguard.structure.LONG_DELEGATION_CHAIN').length, 1, JSON.stringify(result.findings));
+      assert.equal(result.findings.filter(f => f.rule === 'pyguard.structure.FRAGMENTED_DELEGATION').length, 1, JSON.stringify(result.findings));
+      assert.ok(result.findings.every(f => f.status === 'advisory'));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/a.py', 'pkg.a.a').value, 3);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/b.py', 'pkg.b.b').value, 2);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/c.py', 'pkg.c.c').value, 1);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/real.py', 'pkg.real.real').value, 0);
+      const forwarding = functionMeasurement(result, 'delegation.forwarding', 'src/pkg/a.py', 'pkg.a.a');
+      assert.equal(forwarding.value, 1);
+      assert.equal(forwarding.unit, 'calls');
+      assert.equal(forwarding.forwarding_mode, 'sync');
+      assert.equal(forwarding.forward_target, 'pkg.b.b');
+      const long = result.findings.find(f => f.rule === 'pyguard.structure.LONG_DELEGATION_CHAIN');
+      assert.equal(long.observed, 3);
+      assert.equal(long.threshold, 3);
+      assert.equal(long.location.file, 'src/pkg/a.py');
+      assert.deepEqual(long.related.map(location => location.file), ['src/pkg/b.py', 'src/pkg/c.py', 'src/pkg/real.py']);
+      const fragmented = result.findings.find(f => f.rule === 'pyguard.structure.FRAGMENTED_DELEGATION');
+      assert.equal(fragmented.location.file, 'src/pkg/a.py');
+      assert.deepEqual(fragmented.related.map(location => location.file), ['src/pkg/b.py', 'src/pkg/c.py']);
+    },
+  },
+  {
+    id: 'delegation.equivalent_simplification_control',
+    capability: 'maintainability.delegation',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/direct.py': 'def a(x: int) -> int:\n    return x * 2\n',
+    },
+    check: ({ result }) => {
+      // Direct implementation of the same behavior has no forwarding layer.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/direct.py', 'pkg.direct.a').value, 0);
+      assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.file === 'src/pkg/direct.py'), undefined);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.legitimate_di_validation_and_boundary',
+    capability: 'maintainability.delegation',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/service.py': [
+        'class Dependency:',
+        '    def load(self, x: int) -> int:',
+        '        return x',
+        '',
+        '',
+        'class Service:',
+        '    def __init__(self, dependency: Dependency) -> None:',
+        '        self.dependency = dependency',
+        '',
+        '    def load(self, x: int) -> int:',
+        '        return self.dependency.load(x)',
+        '',
+        '',
+        'def domain(x: int) -> int:',
+        '    if x < 0:',
+        '        return -1',
+        '    if x == 0:',
+        '        return 0',
+        '    if x > 100:',
+        '        return 100',
+        '    return x',
+        '',
+        '',
+        'def boundary(x: int) -> int:',
+        '    return domain(x)',
+        '',
+        '',
+        'def transform(x: int) -> int:',
+        '    return boundary(x) + 1',
+        '',
+      ].join('\n'),
+    },
+    check: ({ result }) => {
+      // A method wrapper, a validation function and a single boundary are not
+      // a long chain; a transform is not forwarding at all.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/service.py', 'pkg.service.boundary').value, 1);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/service.py', 'pkg.service.transform').value, 0);
+      assert.equal(functionMeasurement(result, 'delegation.forwarding', 'src/pkg/service.py', 'pkg.service.boundary').forward_target, 'pkg.service.domain');
+      assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === 'pkg.service.Service.load'), undefined);
+      assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === 'pkg.service.transform'), undefined);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.argument_transformation_control',
+    capability: 'maintainability.delegation',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/transform.py': 'def real(x: int, y: int) -> int:\n    return x + y\n\n\ndef reordered(x: int, y: int) -> int:\n    return real(y, x)\n\n\ndef transformed(x: int) -> int:\n    return real(x, 1)\n\n\ndef keyword(x: int, y: int) -> int:\n    return real(x=x, y=y)\n',
+    },
+    check: ({ result }) => {
+      // Reordered, partial and keyword arguments are transformations, not
+      // unchanged positional forwarding.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      for (const symbol of ['pkg.transform.reordered', 'pkg.transform.transformed', 'pkg.transform.keyword']) {
+        assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/transform.py', symbol).value, 0);
+        assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === symbol), undefined);
+      }
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.return_annotation_mismatch_control',
+    capability: 'maintainability.delegation',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/annotations.py': 'def real(x: int) -> int:\n    return x\n\n\ndef mismatched(x: int) -> str:\n    return real(x)\n\n\ndef missing(x):\n    return real(x)\n',
+    },
+    check: ({ result }) => {
+      // Return annotations are compared as AST text: a different annotation or
+      // one-sided annotation is not an unchanged forwarding layer.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      for (const symbol of ['pkg.annotations.mismatched', 'pkg.annotations.missing']) {
+        assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/annotations.py', symbol).value, 0);
+        assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === symbol), undefined);
+      }
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.parameter_boundary',
+    capability: 'maintainability.delegation',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/parameters.py': 'def real(x: int) -> int:\n    return x\n\n\ndef defaults(x: int, y: int = 0) -> int:\n    return real(x)\n\n\ndef varargs(*args: int) -> int:\n    return real(args[0])\n\n\ndef kwargs(**values: int) -> int:\n    return real(values["x"])\n\n\ndef kwonly(x: int, *, y: int) -> int:\n    return real(x)\n\n\ndef posonly(x: int, /) -> int:\n    return real(x)\n',
+    },
+    check: ({ result }) => {
+      // Defaults, *args, **kwargs, keyword-only and positional-only parameters
+      // are excluded from the unchanged positional shape.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      for (const symbol of ['pkg.parameters.defaults', 'pkg.parameters.varargs', 'pkg.parameters.kwargs', 'pkg.parameters.kwonly', 'pkg.parameters.posonly']) {
+        assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/parameters.py', symbol).value, 0);
+        assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === symbol), undefined);
+      }
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.decorated_wrapper_control',
+    capability: 'maintainability.delegation',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/decorated.py': 'def real(x: int) -> int:\n    return x\n\n\ndef marker(function):\n    return function\n\n\n@marker\ndef decorated(x: int) -> int:\n    return real(x)\n',
+    },
+    check: ({ result }) => {
+      // Decorators may add behavior, so decorated functions are never claimed
+      // as unchanged forwarding layers.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/decorated.py', 'pkg.decorated.decorated').value, 0);
+      assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === 'pkg.decorated.decorated'), undefined);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.threshold_boundary',
+    capability: 'maintainability.delegation',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/chains.py': 'def real(x: int) -> int:\n    return x\n\n\ndef one(x: int) -> int:\n    return real(x)\n\n\ndef depth_two(x: int) -> int:\n    return one(x)\n\n\ndef two(x: int) -> int:\n    return one(x)\n\n\ndef depth_three(x: int) -> int:\n    return two(x)\n',
+    },
+    check: ({ result }) => {
+      // Two layers stay silent; three layers cross the fixed review threshold.
+      complete(result, 'structure');
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/chains.py', 'pkg.chains.depth_two').value, 2);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/chains.py', 'pkg.chains.depth_three').value, 3);
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.LONG_DELEGATION_CHAIN');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.symbol, 'pkg.chains.depth_three');
+      assert.equal(findings[0].observed, 3);
+      assert.equal(result.findings.filter(f => f.rule === 'pyguard.structure.FRAGMENTED_DELEGATION').length, 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.forwarding_cycle',
+    capability: 'maintainability.delegation',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/cycle.py': 'def a(x: int) -> int:\n    return b(x)\n\n\ndef b(x: int) -> int:\n    return c(x)\n\n\ndef c(x: int) -> int:\n    return a(x)\n',
+    },
+    check: ({ result }) => {
+      // A forwarding cycle has no finite suffix length: depth is 0 and no
+      // delegation finding is invented. One file keeps the module graph acyclic.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      for (const symbol of ['pkg.cycle.a', 'pkg.cycle.b', 'pkg.cycle.c']) {
+        assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/cycle.py', symbol).value, 0);
+        assert.equal(functionMeasurement(result, 'delegation.forwarding', 'src/pkg/cycle.py', symbol).forwarding_mode, 'sync');
+      }
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.test_file_exclusion',
+    capability: 'maintainability.delegation',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/real.py': 'def real(x: int) -> int:\n    return x\n',
+      'src/pkg/tests/__init__.py': '',
+      'src/pkg/tests/test_chain.py': 'from ..real import real\n\n\ndef a(x: int) -> int:\n    return real(x)\n',
+    },
+    check: ({ result }) => {
+      // Conventional test files are outside the analyzed function graph, so
+      // their wrappers cannot create delegation evidence.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.measurements.find(m => m.metric === 'delegation.depth' && m.location.symbol === 'pkg.tests.test_chain.a'), undefined);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/real.py', 'pkg.real.real').value, 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'delegation.module_with_real_function',
+    capability: 'maintainability.delegation',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/real.py': 'def real(x: int) -> int:\n    return x * 2\n',
+      'src/pkg/c.py': 'from .real import real\n\n\ndef c(x: int) -> int:\n    return real(x)\n',
+      'src/pkg/b.py': 'from .c import c\n\n\ndef b(x: int) -> int:\n    return c(x)\n\n\ndef helper(x: int) -> int:\n    return x + 1\n',
+      'src/pkg/a.py': 'from .b import b\n\n\ndef a(x: int) -> int:\n    return b(x)\n',
+    },
+    check: ({ result }) => {
+      // A module that also has a real function is still a long chain, but it is
+      // not a fragmented all-forwarding module.
+      complete(result, 'structure');
+      assert.equal(result.findings.filter(f => f.rule === 'pyguard.structure.LONG_DELEGATION_CHAIN').length, 1, JSON.stringify(result.findings));
+      assert.equal(result.findings.filter(f => f.rule === 'pyguard.structure.FRAGMENTED_DELEGATION').length, 0);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/a.py', 'pkg.a.a').value, 3);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/b.py', 'pkg.b.helper').value, 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
     id: 'structure.runtime_cycle',
     capability: 'structure.runtime_graph',
     kind: 'positive',
@@ -1795,6 +2086,99 @@ const definitions = [
       assert.equal(findModuleMeasurement(result, 'module.fan_in', 'src/pkg/tests/test_helper.py'), undefined);
       assert.equal(structureMeasurement(result, 'module.count'), 11);
       assert.equal(structureMeasurement(result, 'module.edges'), 9);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'async_delegation.return_await_chain',
+    capability: 'maintainability.async_delegation',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/async_chain.py': [
+        'async def work(x: int) -> int:',
+        '    return x * 2',
+        '',
+        '',
+        'async def c(x: int) -> int:',
+        '    return await work(x)',
+        '',
+        '',
+        'async def b(x: int) -> int:',
+        '    return await c(x)',
+        '',
+        '',
+        'async def a(x: int) -> int:',
+        '    return await b(x)',
+        '',
+        '',
+        'async def boundary(x: int) -> int:',
+        '    try:',
+        '        return await work(x)',
+        '    except Exception as error:',
+        '        raise RuntimeError("boundary") from error',
+        '',
+      ].join('\n'),
+    },
+    check: ({ result }) => {
+      // Async layers forward only as `return await`, to another async
+      // definition. The try/except boundary is not a single-return call.
+      complete(result, 'structure');
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.LONG_DELEGATION_CHAIN');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.symbol, 'pkg.async_chain.a');
+      assert.equal(findings[0].observed, 3);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/async_chain.py', 'pkg.async_chain.a').value, 3);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/async_chain.py', 'pkg.async_chain.b').value, 2);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/async_chain.py', 'pkg.async_chain.c').value, 1);
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/async_chain.py', 'pkg.async_chain.work').value, 0);
+      assert.equal(functionMeasurement(result, 'delegation.forwarding', 'src/pkg/async_chain.py', 'pkg.async_chain.c').forwarding_mode, 'async-return-await');
+      assert.equal(functionMeasurement(result, 'delegation.forwarding', 'src/pkg/async_chain.py', 'pkg.async_chain.c').forward_target, 'pkg.async_chain.work');
+      assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === 'pkg.async_chain.boundary'), undefined);
+      assert.equal(result.findings.filter(f => f.rule === 'pyguard.structure.FRAGMENTED_DELEGATION').length, 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'async_delegation.without_await_control',
+    capability: 'maintainability.async_delegation',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/async_plain.py': 'async def work(x: int) -> int:\n    return x\n\n\nasync def c(x: int) -> int:\n    return work(x)\n\n\nasync def b(x: int) -> int:\n    return c(x)\n\n\nasync def a(x: int) -> int:\n    return b(x)\n',
+    },
+    check: ({ result }) => {
+      // An async function that returns a coroutine without awaiting it changes
+      // the boundary and is not unchanged forwarding.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      for (const symbol of ['pkg.async_plain.a', 'pkg.async_plain.b', 'pkg.async_plain.c']) {
+        assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/async_plain.py', symbol).value, 0);
+        assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === symbol), undefined);
+      }
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'async_delegation.non_async_target_control',
+    capability: 'maintainability.async_delegation',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/async_sync.py': 'def sync_work(x: int) -> int:\n    return x\n\n\nasync def awaits_sync(x: int) -> int:\n    return await sync_work(x)\n',
+    },
+    check: ({ result }) => {
+      // Awaiting a plain sync target is not an async forwarding layer.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(functionMeasurement(result, 'delegation.depth', 'src/pkg/async_sync.py', 'pkg.async_sync.awaits_sync').value, 0);
+      assert.equal(result.measurements.find(m => m.metric === 'delegation.forwarding' && m.location.symbol === 'pkg.async_sync.awaits_sync'), undefined);
       assert.equal(result.exit_code, 0);
       assert.equal(blockingOutcome(result), false);
     },
