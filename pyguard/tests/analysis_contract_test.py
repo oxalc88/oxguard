@@ -116,6 +116,95 @@ class StructureFunctionGraphContract(unittest.TestCase):
             )
             self.assertEqual(graph["calls"], [{"caller": 2, "callee": 3}])
 
+    def test_local_aliases_and_receiver_reads_each_count_one_call_site(self):
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "aliases.py"
+            source.write_text(
+                "def invoke(callback):\n"
+                "    saved = callback\n"
+                "    return saved()\n\n\n"
+                "def indexed(items):\n"
+                "    callback = items[0]\n"
+                "    return callback()\n\n\n"
+                "def receiver(obj):\n"
+                "    saved = obj\n"
+                "    return obj.run()\n"
+            )
+            graph, skipped = analyze_structure.build_function_graph(
+                [str(source.resolve())], Path(root).resolve()
+            )
+            self.assertEqual(skipped, [])
+            # There is no alias or dataflow tracking: each alias/receiver call
+            # is one syntactic call site that does not name an in-scope callee,
+            # builtin or import, and a receiver is never a second call site.
+            self.assertEqual(graph["function_counts"]["unresolved_calls"], 3)
+            self.assertEqual(
+                [function["symbol"] for function in graph["functions"]],
+                ["aliases.invoke", "aliases.indexed", "aliases.receiver"],
+            )
+            self.assertEqual(graph["calls"], [])
+
+    def test_nested_definition_bodies_belong_to_their_own_caller(self):
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "closure.py"
+            source.write_text(
+                "def outer(callback):\n"
+                "    saved = callback\n"
+                "    def inner():\n"
+                "        return callback()\n"
+                "    return inner()\n"
+            )
+            graph, skipped = analyze_structure.build_function_graph(
+                [str(source.resolve())], Path(root).resolve()
+            )
+            self.assertEqual(skipped, [])
+            # Only inner calls the parameter. outer's own scope contains the
+            # resolved inner() call, not inner's body or the saved alias.
+            self.assertEqual(graph["function_counts"]["unresolved_calls"], 1)
+            self.assertEqual(graph["calls"], [{"caller": 0, "callee": 1}])
+
+    def test_builtin_import_and_resolved_in_scope_calls_are_not_unresolved(self):
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "boundaries.py"
+            source.write_text(
+                "import os\n\n\n"
+                "def builtin_calls(value):\n"
+                "    print(value)\n"
+                "    return len(value)\n\n\n"
+                "def external_call():\n"
+                "    return os.getcwd()\n\n\n"
+                "def resolved_call():\n"
+                "    return target()\n\n\n"
+                "def target():\n"
+                "    return 1\n"
+            )
+            graph, skipped = analyze_structure.build_function_graph(
+                [str(source.resolve())], Path(root).resolve()
+            )
+            self.assertEqual(skipped, [])
+            self.assertEqual(graph["function_counts"]["unresolved_calls"], 0)
+            self.assertEqual(graph["calls"], [{"caller": 2, "callee": 3}])
+
+    def test_nested_definition_headers_belong_to_the_enclosing_scope(self):
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "headers.py"
+            source.write_text(
+                "def deco(fn):\n"
+                "    return fn\n\n\n"
+                "def outer(callback):\n"
+                "    @deco()\n"
+                "    def inner(value=callback()):\n"
+                "        return callback()\n"
+                "    return inner()\n"
+            )
+            graph, skipped = analyze_structure.build_function_graph(
+                [str(source.resolve())], Path(root).resolve()
+            )
+            self.assertEqual(skipped, [])
+            # deco() resolves to the defined function; the nested default and
+            # inner's own body are the two unresolved parameter call sites.
+            self.assertEqual(graph["function_counts"]["unresolved_calls"], 2)
+
 
 class DeepAnnotationContract(unittest.TestCase):
     """Recursion-limit blowups are reported violations, never skipped passes."""

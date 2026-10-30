@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import builtins
 import fnmatch
 import io
 import json
@@ -17,6 +18,7 @@ from pathlib import Path
 # root so relative imports resolve exactly as Python does.
 TEST_FILE_PATTERNS = ("test_*.py", "*_test.py", "conftest.py")
 TEST_DIRECTORY_NAMES = {"test", "tests"}
+BUILTIN_NAMES = frozenset(dir(builtins))
 ENVIRONMENT_DIRECTORY_NAMES = {
     "__pycache__",
     ".git",
@@ -624,97 +626,83 @@ def build_graph(
     return sorted(edges), ordered_components, module_depth, cycles, resolver_reason
 
 
-def called_identifier_names(node: ast.AST) -> set[str]:
-    """Return identifiers that participate in a call expression in *node*.
+def import_bound_names(tree: ast.Module) -> set[str]:
+    """Return every name bound by an import statement anywhere in the module.
 
-    pyan3's use edges include ordinary name reads and a placeholder for every
-    function parameter. Only an unresolved callee whose name is actually used
-    in a call expression is a call reference for the unresolved-call count.
-    For ``helpers.run()`` both ``helpers`` and ``run`` participate in the call.
-    A subscript callee such as ``items[0]()`` is a call through ``items``, and
-    a boolean/conditional callee is a call through every operand that can
-    supply the callable. Arguments of nested calls are not call targets.
+    This is a syntactic boundary, not scope resolution: a name imported by any
+    statement in the module marks a call chain as an imported/external API.
+    Star imports bind no specific name and therefore contribute nothing.
     """
     names: set[str] = set()
-    composite = (
-        ast.Await,
-        ast.BinOp,
-        ast.BoolOp,
-        ast.Compare,
-        ast.Dict,
-        ast.IfExp,
-        ast.List,
-        ast.Set,
-        ast.Starred,
-        ast.Tuple,
-        ast.UnaryOp,
-    )
-    for child in ast.walk(node):
-        if not isinstance(child, ast.Call):
-            continue
-        pending = [child.func]
-        while pending:
-            current = pending.pop()
-            if isinstance(current, ast.Name):
-                names.add(current.id)
-            elif isinstance(current, ast.Attribute):
-                names.add(current.attr)
-                pending.append(current.value)
-            elif isinstance(current, ast.Subscript):
-                pending.append(current.value)
-            elif isinstance(current, ast.Call):
-                pending.append(current.func)
-            elif isinstance(current, composite):
-                pending.extend(ast.iter_child_nodes(current))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                names.add(alias.asname or alias.name.split(".", 1)[0])
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name != "*":
+                    names.add(alias.asname or alias.name)
     return names
 
 
-def parameter_names(
-    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
-) -> set[str]:
-    """Return every bound parameter name, including positional-only and variadic."""
-    arguments = node.args
-    names = {
-        argument.arg
-        for argument in (
-            list(arguments.posonlyargs)
-            + list(arguments.args)
-            + list(arguments.kwonlyargs)
-        )
-    }
-    if arguments.vararg is not None:
-        names.add(arguments.vararg.arg)
-    if arguments.kwarg is not None:
-        names.add(arguments.kwarg.arg)
-    return names
+def call_target_names(func: ast.expr) -> tuple[str | None, str | None]:
+    """Return the terminal and root names of a Name/Attribute call target.
 
-
-def function_parameter_scopes(trees: list[ast.Module]) -> dict[ast.AST, set[str]]:
-    """Map each function node to the parameters visible in its lexical scope.
-
-    pyan3 reports a called parameter through one shared placeholder, including
-    when a nested function calls a parameter bound by an enclosing function.
-    Tracking enclosing parameter names keeps those calls as call references
-    without treating a parameter read as one. Class bodies pass the enclosing
-    function scope through: a method defined inside a function can close over
-    that function's parameters.
+    A subscript, call result or other expression has no terminal name and is
+    therefore never resolvable by this syntactic rule.
     """
-    scopes: dict[ast.AST, set[str]] = {}
+    if isinstance(func, ast.Name):
+        return func.id, func.id
+    if isinstance(func, ast.Attribute):
+        current = func.value
+        while isinstance(current, ast.Attribute):
+            current = current.value
+        root = current.id if isinstance(current, ast.Name) else None
+        return func.attr, root
+    return None, None
 
-    def visit(node: ast.AST, inherited: set[str]) -> None:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
-            visible = inherited | parameter_names(node)
-            if not isinstance(node, ast.Lambda):
-                scopes[node] = visible
-            for child in ast.iter_child_nodes(node):
-                visit(child, visible)
+
+def call_is_resolved(
+    func: ast.expr, callee_names: set[str], imported_names: set[str]
+) -> bool:
+    """Decide one call site from names alone; there is no alias/dataflow tracking."""
+    terminal, root = call_target_names(func)
+    if terminal is None:
+        return False
+    if terminal in callee_names:
+        return True
+    if isinstance(func, ast.Name) and terminal in BUILTIN_NAMES:
+        return True
+    return root is not None and root in imported_names
+
+
+def own_scope_calls(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> list[ast.Call]:
+    """Visit calls in one function's own scope, never its nested definitions.
+
+    Nested functions and classes are their own callers, so their bodies are not
+    descended into. A nested definition's header (decorators, defaults and
+    annotations) executes in the enclosing scope and is visited. Lambda and
+    comprehension bodies have no caller of their own and stay in this scope.
+    """
+    calls: list[ast.Call] = []
+
+    def visit(current: ast.AST) -> None:
+        if isinstance(current, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            body_ids = {id(statement) for statement in current.body}
+            for child in ast.iter_child_nodes(current):
+                if id(child) not in body_ids:
+                    visit(child)
             return
-        for child in ast.iter_child_nodes(node):
-            visit(child, inherited)
+        if isinstance(current, ast.Call):
+            calls.append(current)
+        for child in ast.iter_child_nodes(current):
+            visit(child)
 
-    for tree in trees:
-        visit(tree, set())
-    return scopes
+    for statement in node.body:
+        visit(statement)
+    return calls
 
 
 def empty_function_graph() -> dict[str, object]:
@@ -817,9 +805,9 @@ def _build_function_graph(
     Node and edge selection matches the criticality analyzer: defined
     ``FunctionDef``/``AsyncFunctionDef`` nodes in the requested files, and pyan3
     ``uses_edges`` whose caller and callee are both selected functions. SCCs and
-    condensation depth come from NetworkX. A parameter placeholder is only
-    counted as unresolved when a call target names a parameter visible in the
-    caller's lexical scope; plain parameter reads are not call references.
+    condensation depth come from NetworkX. ``calls.unresolved`` is measured
+    separately by visiting the caller's own-scope ``ast.Call`` sites, not from
+    pyan3 placeholder or wildcard edges.
     """
     from pyan.analyzer import CallGraphVisitor
 
@@ -843,39 +831,29 @@ def _build_function_graph(
             node.get_name(),
         ),
     )
-    module_trees: list[ast.Module] = []
-    seen_trees: set[int] = set()
+    module_trees: dict[str, ast.Module] = {}
     for group in visitor.nodes.values():
         for node in group:
-            if not isinstance(node.ast_node, ast.Module):
-                continue
-            if id(node.ast_node) in seen_trees:
-                continue
-            seen_trees.add(id(node.ast_node))
-            module_trees.append(node.ast_node)
-    parameter_scopes = function_parameter_scopes(module_trees)
+            if isinstance(node.ast_node, ast.Module):
+                module_trees.setdefault(node.filename, node.ast_node)
+    imported_by_module = {
+        filename: import_bound_names(tree) for filename, tree in module_trees.items()
+    }
     index = {node: position for position, node in enumerate(ordered)}
     calls: set[tuple[int, int]] = set()
     unresolved = 0
-    for caller, callees in visitor.uses_edges.items():
-        if caller not in index:
-            continue
-        called = called_identifier_names(caller.ast_node)
-        parameters = parameter_scopes.get(caller.ast_node)
-        if parameters is None:
-            parameters = parameter_names(caller.ast_node)
-        for callee in callees:
+    for caller in ordered:
+        callee_names: set[str] = set()
+        for callee in visitor.uses_edges.get(caller, ()):
             if callee in index:
                 calls.add((index[caller], index[callee]))
-                continue
-            if "^^^argument^^^" in (callee.name or ""):
-                # pyan3 uses one placeholder for every parameter use, so it can
-                # only be a call reference when the function calls a parameter.
-                if called & parameters:
-                    unresolved += 1
-                continue
-            if callee.name in called:
-                unresolved += 1
+                callee_names.add(callee.name)
+        imported_names = imported_by_module.get(caller.filename, set())
+        unresolved += sum(
+            1
+            for call in own_scope_calls(caller.ast_node)
+            if not call_is_resolved(call.func, callee_names, imported_names)
+        )
 
     import networkx as nx
 

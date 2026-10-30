@@ -1273,8 +1273,8 @@ const definitions = [
     },
     check: ({ result }) => {
       // A nested def is its own function node. outer -> inner -> target gives
-      // outer depth 2, inner depth 1 and target depth 0; parameter placeholder
-      // edges are not miscounted as unresolved calls.
+      // outer depth 2, inner depth 1 and target depth 0; nested bodies are not
+      // walked into by the enclosing function's unresolved-call count.
       complete(result, 'structure');
       assert.equal(functionMeasurement(result, 'function.fan_out', 'src/nested.py', 'nested.outer').value, 1);
       assert.equal(functionMeasurement(result, 'function.call_depth', 'src/nested.py', 'nested.outer').value, 2);
@@ -1353,6 +1353,28 @@ const definitions = [
     },
   },
   {
+    id: 'function_graph.builtin_import_and_resolved_calls',
+    capability: 'structure.function_graph',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/boundaries.py': 'import os\n\n\ndef builtin_calls(value):\n    print(value)\n    return len(value)\n\n\ndef external_call():\n    return os.getcwd()\n\n\ndef resolved_call():\n    return target()\n\n\ndef target():\n    return 1\n',
+    },
+    check: ({ result }) => {
+      // Builtin names, a chain rooted at an imported module and an in-scope
+      // resolved callee are all resolved call sites, so none is counted as
+      // unresolved and the function graph stays complete with no finding.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/boundaries.py', 'boundaries.builtin_calls').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/boundaries.py', 'boundaries.external_call').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/boundaries.py', 'boundaries.resolved_call').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/boundaries.py', 'boundaries.target').value, 1);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
     id: 'criticality.self_recursion_counts_once',
     capability: 'structure.function_graph',
     kind: 'boundary',
@@ -1408,8 +1430,8 @@ const definitions = [
       'src/dynamic.py': 'def dynamic(obj):\n    return getattr(obj, \'run\')()\n\n\ndef caller():\n    return dynamic(None)\n',
     },
     check: ({ result }) => {
-      // getattr(...)() cannot be resolved to a defined function. It is counted
-      // as one unresolved call reference and creates no edge, but the
+      // getattr(...)() cannot be resolved to a defined function. Its outer
+      // call site is counted as unresolved and creates no edge, but the
       // assessment stays complete and no finding or exit change is produced.
       complete(result, 'structure');
       assert.equal(structureMeasurement(result, 'calls.unresolved'), 1);
@@ -1479,16 +1501,59 @@ const definitions = [
       'src/unresolved.py': 'def first(items):\n    return items[0]()\n\n\ndef plain(items):\n    return items[0]\n\n\ndef outer(callback):\n    def inner():\n        return callback()\n    return inner()\n',
     },
     check: ({ result }) => {
-      // items[0]() is a call through a parameter even though the callee is a
-      // Subscript, and inner() calls a parameter bound by its enclosing
-      // function. Both are unresolved call references; plain parameter reads
-      // are not. The assessment stays complete and no finding is produced.
+      // items[0]() has a Subscript target, and inner() calls a parameter bound
+      // by its enclosing function. Both are unresolved call sites; plain
+      // parameter reads have no call site. The assessment stays complete and
+      // no finding is produced.
       complete(result, 'structure');
       assert.equal(structureMeasurement(result, 'calls.unresolved'), 2);
       assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.first').value, 0);
       assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.plain').value, 0);
       assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.outer').value, 1);
       assert.equal(functionMeasurement(result, 'function.fan_out', 'src/unresolved.py', 'unresolved.outer.inner').value, 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.unresolved_alias_and_receiver_calls',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/aliases.py': 'def invoke(callback):\n    saved = callback\n    return saved()\n\n\ndef indexed(items):\n    callback = items[0]\n    return callback()\n\n\ndef receiver(obj):\n    saved = obj\n    return obj.run()\n',
+    },
+    check: ({ result }) => {
+      // No alias or dataflow tracking: saved(), the aliased subscript call and
+      // obj.run() are each one syntactic unresolved call site. A receiver is
+      // never counted as a second call site.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 3);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/aliases.py', 'aliases.invoke').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/aliases.py', 'aliases.indexed').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/aliases.py', 'aliases.receiver').value, 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'function_graph.unresolved_closure_alias',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/nested_alias.py': 'def outer(callback):\n    saved = callback\n    def inner():\n        return callback()\n    return inner()\n',
+    },
+    check: ({ result }) => {
+      // The nested body belongs to inner, which calls a parameter bound by its
+      // enclosing function. outer's own scope only has the resolved inner()
+      // call, so the whole fixture has exactly one unresolved call site.
+      complete(result, 'structure');
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/nested_alias.py', 'nested_alias.outer').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/nested_alias.py', 'nested_alias.outer.inner').value, 0);
       assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
       assert.equal(result.exit_code, 0);
       assert.equal(blockingOutcome(result), false);

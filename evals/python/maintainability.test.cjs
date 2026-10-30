@@ -47,6 +47,9 @@ const FUNCTION_GRAPH = {
   'function_graph.unresolved_dynamic_call': { functions: [['src/dynamic.py', 'dynamic.dynamic', 1, 1, 0, 0], ['src/dynamic.py', 'dynamic.caller', 5, 0, 1, 1]], recursive: 0, unresolved: 1 },
   'function_graph.encoded_source_preserves_import_root': { functions: [['src/pkg/a.py', 'pkg.a.run', 4, 0, 1, 1], ['src/pkg/b.py', 'pkg.b.target', 1, 1, 0, 0]], recursive: 0, unresolved: 0 },
   'function_graph.unresolved_indirect_and_closure_calls': { functions: [['src/unresolved.py', 'unresolved.first', 1, 0, 0, 0], ['src/unresolved.py', 'unresolved.plain', 5, 0, 0, 0], ['src/unresolved.py', 'unresolved.outer', 9, 0, 1, 1], ['src/unresolved.py', 'unresolved.outer.inner', 10, 0, 0, 0]], recursive: 0, unresolved: 2 },
+  'function_graph.builtin_import_and_resolved_calls': { functions: [['src/boundaries.py', 'boundaries.builtin_calls', 4, 0, 0, 0], ['src/boundaries.py', 'boundaries.external_call', 9, 0, 0, 0], ['src/boundaries.py', 'boundaries.resolved_call', 13, 0, 1, 1], ['src/boundaries.py', 'boundaries.target', 17, 1, 0, 0]], recursive: 0, unresolved: 0 },
+  'function_graph.unresolved_alias_and_receiver_calls': { functions: [['src/aliases.py', 'aliases.invoke', 1, 0, 0, 0], ['src/aliases.py', 'aliases.indexed', 6, 0, 0, 0], ['src/aliases.py', 'aliases.receiver', 11, 0, 0, 0]], recursive: 0, unresolved: 3 },
+  'function_graph.unresolved_closure_alias': { functions: [['src/nested_alias.py', 'nested_alias.outer', 1, 0, 1, 1], ['src/nested_alias.py', 'nested_alias.outer.inner', 3, 1, 0, 0]], recursive: 0, unresolved: 1 },
   'function_graph.unparsable_is_not_evaluated': { functions: [['src/good.py', 'good.target', 1, 0, 0, 0]], recursive: 0, unresolved: 0, partial: 'Unparsable source: src/broken.py', status: 'advisory', gate: 'advisory', normalization: 'partial', assessment: 'incomplete' },
 };
 
