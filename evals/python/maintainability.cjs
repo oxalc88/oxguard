@@ -1493,6 +1493,32 @@ const definitions = [
     },
   },
   {
+    id: 'function_graph.declared_non_utf8_bytes_are_not_utf8',
+    capability: 'structure.function_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/latin1.py': latin1Source('# coding: latin-1\n\n\ndef \u00c2\u00aa():\n    return 1\n\n\ndef a():\n    return 2\n\n\ndef caller():\n    return \u00c2\u00aa() + a()\n'),
+    },
+    check: ({ result }) => {
+      // These bytes also decode as UTF-8, but the declared Latin-1 encoding
+      // makes Python see Âª (normalized to Âa), distinct from a. pyan3's
+      // forced UTF-8 read would see ª, normalize it to a and collapse the
+      // first function into a, so the mirror must follow the declared encoding.
+      complete(result, 'structure');
+      const latinFunctions = result.measurements.filter(m => m.metric === 'function.fan_in' && m.location.file === 'src/latin1.py');
+      assert.equal(latinFunctions.length, 3, JSON.stringify(result.measurements));
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/latin1.py', 'latin1.\u00c2a').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/latin1.py', 'latin1.a').value, 1);
+      assert.equal(functionMeasurement(result, 'function.fan_in', 'src/latin1.py', 'latin1.caller').value, 0);
+      assert.equal(functionMeasurement(result, 'function.fan_out', 'src/latin1.py', 'latin1.caller').value, 2);
+      assert.equal(structureMeasurement(result, 'calls.unresolved'), 0);
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
     id: 'function_graph.unresolved_indirect_and_closure_calls',
     capability: 'structure.function_graph',
     kind: 'boundary',

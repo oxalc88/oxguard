@@ -719,6 +719,24 @@ def empty_function_graph() -> dict[str, object]:
     }
 
 
+def needs_utf8_mirror(data: bytes) -> bool:
+    """Decide from Python's own detection whether pyan3 would misread bytes.
+
+    A source the structure parser accepted has a valid PEP 263 encoding, and
+    that encoding is not necessarily UTF-8 just because the bytes also happen
+    to decode as UTF-8. pyan3 always opens files as UTF-8, so a Latin-1 file
+    that is coincidentally valid UTF-8 would expose different identifiers and
+    could collapse distinct functions after Python's NFKC normalization.
+    """
+    try:
+        encoding, _ = tokenize.detect_encoding(io.BytesIO(data).readline)
+    except (SyntaxError, UnicodeDecodeError):
+        # The structure parser already accepted the same bytes, so this is
+        # unexpected. Mirroring cannot lose information and is the safe answer.
+        return True
+    return encoding != "utf-8"
+
+
 def stage_pyan_sources(
     files: list[str],
 ) -> tuple[
@@ -727,27 +745,24 @@ def stage_pyan_sources(
     tempfile.TemporaryDirectory[str] | None,
     str | None,
 ]:
-    """Mirror sources as UTF-8 when pyan3 cannot read their valid encoding.
+    """Mirror sources as UTF-8 when pyan3 would not read their declared text.
 
     pyan3 opens every file as UTF-8, so a UTF-8 BOM or a valid PEP 263 source
-    declaration makes it drop the file (or fail). The structure parser already
-    accepted those files. A temporary mirror keeps line numbers and the module
-    layout relative to pyan3's original inferred import root, and the original
-    paths remain the reported locations. The mirror root is returned so the
-    visitor uses that same root even when ``__init__.py`` ancestors were not in
-    scope and therefore were not copied.
+    declaration makes it drop the file (or fail). Successful UTF-8 decoding is
+    not sufficient evidence: a Latin-1 source can also decode as UTF-8 while
+    pyan3 would see different characters and Python would then normalize two
+    distinct identifiers together. ``tokenize.detect_encoding`` mirrors every
+    source whose declared or BOM encoding is not plain UTF-8, decoding with
+    that detected encoding. The structure parser already accepted those files.
+    A temporary mirror keeps line numbers and the module layout relative to
+    pyan3's original inferred import root, and the original paths remain the
+    reported locations. The mirror root is returned so the visitor uses that
+    same root even when ``__init__.py`` ancestors were not in scope and
+    therefore were not copied.
     """
-    needs_copy = False
-    for path in files:
-        data = Path(path).read_bytes()
-        if data.startswith(b"\xef\xbb\xbf"):
-            needs_copy = True
-            break
-        try:
-            data.decode("utf-8")
-        except UnicodeDecodeError:
-            needs_copy = True
-            break
+    needs_copy = any(
+        needs_utf8_mirror(Path(path).read_bytes()) for path in files
+    )
     if not needs_copy:
         return files, {}, None, None
 
@@ -783,7 +798,7 @@ def stage_pyan_sources(
 def build_function_graph(
     files: list[str], root: Path
 ) -> tuple[dict[str, object], list[str]]:
-    """Build the function graph, normalizing only sources pyan3 cannot decode."""
+    """Build the function graph, normalizing only sources pyan3 would misread."""
     if not files:
         return empty_function_graph(), []
     staged, source_map, temporary, visitor_root = stage_pyan_sources(files)

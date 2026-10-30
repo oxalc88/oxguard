@@ -87,6 +87,37 @@ class StructureFunctionGraphContract(unittest.TestCase):
             self.assertEqual(graph["functions"][0]["depth"], 1)
             self.assertEqual(graph["function_counts"]["unresolved_calls"], 0)
 
+    def test_latin1_source_that_is_also_valid_utf8_keeps_both_functions(self):
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "latin1.py"
+            # These bytes decode as UTF-8, but the declared Latin-1 encoding
+            # makes Python see the identifier Âª (normalized to Âa), which is
+            # distinct from a. pyan3's forced UTF-8 read would see ª instead,
+            # normalize it to a and collapse the first function into a.
+            source.write_bytes(
+                b"# coding: latin-1\n\n\n"
+                b"def \xc2\xaa():\n"
+                b"    return 1\n\n\n"
+                b"def a():\n"
+                b"    return 2\n\n\n"
+                b"def caller():\n"
+                b"    return \xc2\xaa() + a()\n"
+            )
+            self.assertTrue(analyze_structure.needs_utf8_mirror(source.read_bytes()))
+            graph, skipped = analyze_structure.build_function_graph(
+                [str(source.resolve())], Path(root).resolve()
+            )
+            self.assertEqual(skipped, [])
+            self.assertEqual(
+                [function["symbol"] for function in graph["functions"]],
+                ["latin1.\u00c2a", "latin1.a", "latin1.caller"],
+            )
+            self.assertEqual(
+                graph["calls"],
+                [{"caller": 2, "callee": 0}, {"caller": 2, "callee": 1}],
+            )
+            self.assertEqual(graph["function_counts"]["unresolved_calls"], 0)
+
     def test_indirect_and_closure_parameter_calls_are_unresolved(self):
         with tempfile.TemporaryDirectory() as root:
             source = Path(root) / "unresolved.py"
