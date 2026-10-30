@@ -221,8 +221,22 @@ def failure_handlers(path: Path, tree: ast.Module) -> list[dict[str, object]]:
         with tokenize.open(path) as source_file:
             source = source_file.read()
     except (OSError, UnicodeError, SyntaxError) as error:
-        raise StructureError("adapter_failure", f"Unparsable source: {path}: {error}") from error
-    lines = source.splitlines(keepends=True)
+        raise StructureError(
+            "adapter_failure", f"Unparsable source: {path}: {error}"
+        ) from error
+    # StringIO.readline follows Python's physical newline rules (LF, CRLF and
+    # CR); unlike str.splitlines(), it does not treat Unicode separators as
+    # source line boundaries.
+    try:
+        source_tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    except tokenize.TokenError:
+        source_tokens = []
+    token_lines = {token.start[0]: token.line for token in source_tokens if token.line}
+
+    def character_column(row: int, byte_column: int) -> int:
+        line = token_lines.get(row, "")
+        return len(line.encode("utf-8")[:byte_column].decode("utf-8"))
+
     facts: list[dict[str, object]] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.Try, getattr(ast, "TryStar", ast.Try))):
@@ -252,25 +266,59 @@ def failure_handlers(path: Path, tree: ast.Module) -> list[dict[str, object]]:
                         (isinstance(item, ast.Tuple) and any(broad_type(child) for child in item.elts)))
             broad = handler.type is None or broad_type(handler.type)
             tokens: list[str] = []
-            if body:
-                start_line, end_line = body[0].lineno, body[-1].end_lineno or body[-1].lineno
-                start_text = lines[start_line - 1]
-                end_text = lines[end_line - 1]
-                start_col = len(start_text.encode("utf-8")[:body[0].col_offset].decode("utf-8"))
-                end_col_bytes = body[-1].end_col_offset or len(end_text.encode("utf-8"))
-                end_col = len(end_text.encode("utf-8")[:end_col_bytes].decode("utf-8"))
-                start_position = (start_line, start_col)
+            if body and source_tokens:
+                # Locate the terminating colon of this except header while
+                # respecting bracketed/multiline exception expressions.
+                depth = 0
+                colon_end: tuple[int, int] | None = None
+                for token in source_tokens:
+                    if token.start < (handler.lineno, 0):
+                        continue
+                    if token.type == tokenize.OP:
+                        if token.string in "([{":
+                            depth += 1
+                        elif token.string in ")]}":
+                            depth = max(0, depth - 1)
+                        elif token.string == ":" and depth == 0:
+                            colon_end = token.end
+                            break
+                end_line = handler.end_lineno or body[-1].end_lineno or body[-1].lineno
+                end_byte_col = handler.end_col_offset
+                end_col = (
+                    character_column(end_line, end_byte_col)
+                    if end_byte_col is not None
+                    else (body[-1].end_col_offset or 0)
+                )
                 end_position = (end_line, end_col)
-                try:
-                    tokens = [token.string for token in tokenize.generate_tokens(io.StringIO(source).readline)
-                              if token.start >= start_position and token.end <= end_position
-                              and token.type not in {tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT,
-                                                     tokenize.DEDENT, tokenize.ENCODING, tokenize.ENDMARKER}]
-                except tokenize.TokenError:
-                    tokens = []
-            facts.append({"file": path.as_posix(), "line": handler.lineno, "fallback": fallback and broad,
-                          "exit": exit_policy and broad, "token_count": len(tokens),
-                          "fingerprint": hashlib.sha256("\0".join(tokens).encode("utf-8")).hexdigest()})
+                dropped = {
+                    tokenize.COMMENT,
+                    tokenize.NL,
+                    tokenize.NEWLINE,
+                    tokenize.INDENT,
+                    tokenize.DEDENT,
+                    tokenize.ENCODING,
+                    tokenize.ENDMARKER,
+                }
+                if colon_end is not None:
+                    tokens = [
+                        token.string
+                        for token in source_tokens
+                        if token.start >= colon_end
+                        and token.end <= end_position
+                        and token.type not in dropped
+                    ]
+            facts.append(
+                {
+                    "file": path.as_posix(),
+                    "line": handler.lineno,
+                    "fallback": fallback and broad,
+                    "exit": exit_policy and broad,
+                    "token_count": len(tokens),
+                    "fingerprint": hashlib.sha256(
+                        "\0".join(tokens).encode("utf-8")
+                    ).hexdigest(),
+                }
+            )
     return facts
 
 

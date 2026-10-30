@@ -577,6 +577,59 @@ class StructureDelegationContract(unittest.TestCase):
         self.assertEqual(facts[0]["fingerprint"], facts[1]["fingerprint"])
         self.assertEqual(facts[0]["token_count"], 2)
 
+    def test_failure_handler_fingerprint_includes_nested_decorators(self):
+        source_text = """def run():
+    try:
+        work()
+    except Exception:
+        @alpha
+        def nested():
+            return 1
+    try:
+        work()
+    except Exception:
+        @beta
+        def nested():
+            return 1
+    try:
+        work()
+    except Exception:
+        @gamma
+        def nested():
+            return 1
+"""
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "handlers.py"
+            source.write_text(source_text)
+            facts = analyze_structure.failure_handlers(source, analyze_structure.read_tree(source))
+        self.assertEqual(len(facts), 3)
+        self.assertEqual(len({fact["fingerprint"] for fact in facts}), 3)
+
+    def test_failure_handler_fingerprint_uses_physical_lines(self):
+        body = """        record(error)
+        retry(error)
+        report(error)
+        recover(error)
+        annotate(error)
+        retain(error)
+        update(error)
+        notify(error)
+        measure(error)
+        finish(error)
+        return None
+"""
+        prefix = 'label = "before\u2028after"\n'
+        handler = "    try:\n        work()\n    except Exception as error:\n" + body
+        source_text = prefix + "def run():\n" + handler * 3
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=repr(newline)), tempfile.TemporaryDirectory() as root:
+                source = Path(root) / "handlers.py"
+                source.write_bytes(source_text.replace("\n", newline).encode("utf-8"))
+                facts = analyze_structure.failure_handlers(source, analyze_structure.read_tree(source))
+                self.assertEqual(len(facts), 3)
+                self.assertEqual([fact["token_count"] for fact in facts], [42, 42, 42])
+                self.assertEqual(len({fact["fingerprint"] for fact in facts}), 1)
+
     def test_failure_handler_broad_attribute_is_only_builtin_qualified(self):
         source_text = (
             "def run():\n"
