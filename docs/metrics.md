@@ -81,7 +81,7 @@ makes mistakes likely.
 
 **Test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and the `tests/`
 directory are excluded from the radon gates (cc, mi, hal), the Halstead script,
-complexipy and the runtime module graph by default. For complexipy, which has no directory `--ignore`, the exclusion
+complexipy, the runtime module graph and the function graph by default. For complexipy, which has no directory `--ignore`, the exclusion
 globs also cover root-level matches and whole `tests/` or `test/` directories at any
 depth. Test files are intentionally repetitive — many similar cases, parameterized
 fixtures — so complexity metrics don't apply meaningfully. Ruff and coverage still gate
@@ -151,6 +151,34 @@ Python-specific controls are explicit. Imports guarded by `TYPE_CHECKING` are ex
 Source scope follows `--dirs`, `[tool.pyguard] exclude` and the default test-file/directory exclusion. `--dirs`, exclusion globs and test filters choose graph nodes only; they do not remove files from local import resolution. grimp is pinned exactly at 3.18 in the dev-dependency manifest and hash-locked evaluation toolchain; `pyguard doctor` reports its version.
 
 The graph is static evidence, not proof of runtime reachability. Dynamic imports, import hooks and conditional package availability remain outside the graph; the missing-local/unparsable controls keep incomplete evidence visible rather than turning it into a pass.
+
+---
+
+## Function call graph (pyguard, advisory)
+
+**Tool:** pyan3 2.9.0 + NetworkX 3.7
+**Command:** `pyguard structure` (also `pyguard audit` and the `structure.module_graph` `pyguard diagnose` analysis; not `pyguard check`)
+
+The same command builds a graph of resolved calls between defined in-scope Python functions. Nodes are `FunctionDef`/`AsyncFunctionDef` definitions in the selected non-test files, including methods and nested functions; call edges come from pyan3's function-use edges restricted to those definitions. External, out-of-scope and module-level calls are not edges. Repeated calls from one function remain one edge and one caller/callee. Every function produces these measurements at location file, line and symbol:
+
+| Metric | Meaning | Unit |
+|---|---|---|
+| `function.fan_in` | Distinct in-scope defined functions that call it; a self-call is not counted | `callers` |
+| `function.fan_out` | Distinct in-scope defined functions it calls; a self-call is not counted | `callees` |
+| `function.call_depth` | Longest path in the call SCC condensation DAG, measured in edges; internal cycle edges add no depth | `edges` |
+
+Two project measurements use location `.`:
+
+| Metric | Meaning | Unit |
+|---|---|---|
+| `function.recursive_components` | Call SCCs with more than one function, plus self-recursive functions | `components` |
+| `calls.unresolved` | Distinct pyan3 call references from in-scope functions that do not resolve to an in-scope defined function | `calls` |
+
+`calls.unresolved` includes undefined names, unresolved attributes and imports, out-of-scope targets, and calls through parameters. pyan3 also creates a placeholder node for every parameter use; plain parameter reads are not call references and are not counted. pyan3 deduplicates repeated uses of the same unresolved target from one caller, so that caller/target pair counts once. The measurement is evidence only: unresolved calls never make the assessment incomplete and the result remains complete unless a source file or module resolution limitation is separately reported.
+
+A self-call is one call edge and one recursive component, but a function is neither its own caller nor its own callee. Therefore `function.fan_in` equals the unchanged `pyguard criticality` `criticality.in_degree` except for self-recursive functions, where criticality counts the self-call once and function fan-in counts zero. Both metrics are retained; `pyguard criticality` and its in-degree semantics are unchanged.
+
+The function graph emits no findings and never changes the exit code, status or blocking outcome. An SCC, recursion, high fan-in or unresolved call is not by itself a quality violation. A UTF-8 BOM or valid PEP 263 source is normalized into a temporary UTF-8 mirror for pyan3 while reported locations stay the original paths and line numbers; a file pyan3 cannot parse leaves the assessment incomplete with `pyguard.structure.not_evaluated`, as in the module graph. Missing/broken pyan3 or NetworkX is an execution error. Source scope follows `--dirs`, `[tool.pyguard] exclude` and the default test-file/directory exclusion exactly like the module graph.
 
 ---
 

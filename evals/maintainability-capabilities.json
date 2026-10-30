@@ -147,21 +147,28 @@
       "id": "structure.function_graph",
       "tsguard": "structure.function_graph",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
           "positive": [
-            "criticality.distinct_callers_cross_module"
+            "criticality.distinct_callers_cross_module",
+            "function_graph.tsguard_parity",
+            "function_graph.method_call",
+            "function_graph.nested_function"
           ],
           "negative": [
             "criticality.uncalled_function_zero",
-            "criticality.same_caller_not_inflated"
+            "criticality.same_caller_not_inflated",
+            "function_graph.test_file_exclusion"
           ],
           "boundary": [
-            "criticality.self_recursion_counts_once"
+            "criticality.self_recursion_counts_once",
+            "function_graph.mutual_recursion_depth",
+            "function_graph.unresolved_dynamic_call",
+            "function_graph.unparsable_is_not_evaluated"
           ]
         }
       },
-      "python_candidate": "Extend existing pyan3 caller graph with fan-out and SCC call depth"
+      "python_candidate": "pyan3 2.9.0 function-use graph with NetworkX SCC condensation and pyan unresolved call references"
     },
     {
       "id": "structure.coupling",

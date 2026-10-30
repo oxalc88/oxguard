@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import ast
 import fnmatch
+import io
 import json
 import os
 import sys
+import tempfile
+import tokenize
 from pathlib import Path
 
 # Python packages grimp cannot infer for top-level modules are represented as
@@ -621,6 +624,242 @@ def build_graph(
     return sorted(edges), ordered_components, module_depth, cycles, resolver_reason
 
 
+def called_identifier_names(node: ast.AST) -> set[str]:
+    """Return identifiers that participate in a call expression in *node*.
+
+    pyan3's use edges include ordinary name reads and a placeholder for every
+    function parameter. Only an unresolved callee whose name is actually used
+    in a call expression is a call reference for the unresolved-call count.
+    For ``helpers.run()`` both ``helpers`` and ``run`` participate in the call.
+    """
+    names: set[str] = set()
+    for child in ast.walk(node):
+        if not isinstance(child, ast.Call):
+            continue
+        pending = [child.func]
+        while pending:
+            current = pending.pop()
+            if isinstance(current, ast.Name):
+                names.add(current.id)
+            elif isinstance(current, ast.Attribute):
+                names.add(current.attr)
+                pending.append(current.value)
+            elif isinstance(current, ast.Call):
+                pending.append(current.func)
+    return names
+
+
+def parameter_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
+    """Return every bound parameter name, including positional-only and variadic."""
+    arguments = node.args
+    names = {
+        argument.arg
+        for argument in (
+            list(arguments.posonlyargs)
+            + list(arguments.args)
+            + list(arguments.kwonlyargs)
+        )
+    }
+    if arguments.vararg is not None:
+        names.add(arguments.vararg.arg)
+    if arguments.kwarg is not None:
+        names.add(arguments.kwarg.arg)
+    return names
+
+
+def empty_function_graph() -> dict[str, object]:
+    return {
+        "functions": [],
+        "calls": [],
+        "function_components": [],
+        "function_counts": {
+            "functions": 0,
+            "calls": 0,
+            "recursive_components": 0,
+            "unresolved_calls": 0,
+        },
+    }
+
+
+def stage_pyan_sources(
+    files: list[str], root: Path
+) -> tuple[list[str], dict[str, str], tempfile.TemporaryDirectory[str] | None]:
+    """Mirror sources as UTF-8 when pyan3 cannot read their valid encoding.
+
+    pyan3 opens every file as UTF-8, so a UTF-8 BOM or a valid PEP 263 source
+    declaration makes it drop the file (or fail). The structure parser already
+    accepted those files. A temporary mirror keeps line numbers and relative
+    module layout, and the original paths remain the reported locations.
+    """
+    needs_copy = False
+    for path in files:
+        data = Path(path).read_bytes()
+        if data.startswith(b"\xef\xbb\xbf"):
+            needs_copy = True
+            break
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            needs_copy = True
+            break
+    if not needs_copy:
+        return files, {}, None
+
+    temporary = tempfile.TemporaryDirectory(prefix="pyguard-structure-functions-")
+    staged_root = Path(temporary.name)
+    # A root marker pins pyan3's inferred import root to the mirrored tree even
+    # when the original project root marker is outside the copied common path.
+    (staged_root / "pyproject.toml").write_bytes(b"")
+    base = root
+    if any(not Path(path).is_relative_to(base) for path in files):
+        base = Path(os.path.commonpath(files))
+        if not base.is_dir():
+            base = base.parent
+    staged: list[str] = []
+    mapping: dict[str, str] = {}
+    for path in files:
+        source = Path(path).read_bytes()
+        encoding, _ = tokenize.detect_encoding(io.BytesIO(source).readline)
+        text = source.decode(encoding)
+        try:
+            relative = Path(path).relative_to(base)
+        except ValueError:
+            relative = Path(path).name
+        target = staged_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(text.encode("utf-8"))
+        staged.append(str(target))
+        mapping[str(target)] = path
+    return staged, mapping, temporary
+
+
+def build_function_graph(
+    files: list[str], root: Path
+) -> tuple[dict[str, object], list[str]]:
+    """Build the function graph, normalizing only sources pyan3 cannot decode."""
+    if not files:
+        return empty_function_graph(), []
+    staged, source_map, temporary = stage_pyan_sources(files, root)
+    try:
+        return _build_function_graph(staged, source_map, root)
+    finally:
+        if temporary is not None:
+            temporary.cleanup()
+
+
+def _build_function_graph(
+    files: list[str], source_map: dict[str, str], root: Path
+) -> tuple[dict[str, object], list[str]]:
+    """Build the in-scope function graph from pyan3's resolved use edges.
+
+    Node and edge selection matches the criticality analyzer: defined
+    ``FunctionDef``/``AsyncFunctionDef`` nodes in the requested files, and pyan3
+    ``uses_edges`` whose caller and callee are both selected functions. SCCs and
+    condensation depth come from NetworkX. A parameter placeholder is only
+    counted as unresolved when the function actually calls a parameter; plain
+    parameter reads are not call references.
+    """
+    from pyan.analyzer import CallGraphVisitor
+
+    visitor = CallGraphVisitor(files)
+    skipped = sorted(
+        source_map.get(path, path) for path in set(files) - set(visitor.filenames)
+    )
+    functions = {
+        node
+        for group in visitor.nodes.values()
+        for node in group
+        if node.defined
+        and node.filename in files
+        and isinstance(node.ast_node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    ordered = sorted(
+        functions,
+        key=lambda node: (
+            relative_path(Path(source_map.get(node.filename, node.filename)), root),
+            node.ast_node.lineno,
+            node.get_name(),
+        ),
+    )
+    index = {node: position for position, node in enumerate(ordered)}
+    calls: set[tuple[int, int]] = set()
+    unresolved = 0
+    for caller, callees in visitor.uses_edges.items():
+        if caller not in index:
+            continue
+        called = called_identifier_names(caller.ast_node)
+        parameters = parameter_names(caller.ast_node)
+        for callee in callees:
+            if callee in index:
+                calls.add((index[caller], index[callee]))
+                continue
+            if "^^^argument^^^" in (callee.name or ""):
+                # pyan3 uses one placeholder for every parameter use, so it can
+                # only be a call reference when the function calls a parameter.
+                if called & parameters:
+                    unresolved += 1
+                continue
+            if callee.name in called:
+                unresolved += 1
+
+    import networkx as nx
+
+    dag = nx.DiGraph()
+    dag.add_nodes_from(range(len(ordered)))
+    dag.add_edges_from(sorted(calls))
+    components = [set(component) for component in nx.strongly_connected_components(dag)]
+    condensation = nx.condensation(dag, scc=components)
+    depths = {node: 0 for node in condensation.nodes}
+    for component in reversed(list(nx.topological_sort(condensation))):
+        depths[component] = max(
+            (1 + depths[target] for target in condensation.successors(component)),
+            default=0,
+        )
+    mapping = condensation.graph["mapping"]
+    ordered_components = sorted(
+        (sorted(component) for component in components), key=lambda part: tuple(part)
+    )
+    recursive_components = sum(
+        1
+        for component in ordered_components
+        if len(component) > 1 or (component[0], component[0]) in calls
+    )
+    return (
+        {
+            "functions": [
+                {
+                    "file": relative_path(
+                        Path(source_map.get(node.filename, node.filename)), root
+                    ),
+                    "line": node.ast_node.lineno,
+                    "symbol": node.get_name(),
+                    "depth": depths[mapping[position]],
+                }
+                for position, node in enumerate(ordered)
+            ],
+            "calls": [
+                {"caller": caller, "callee": callee}
+                for caller, callee in sorted(calls)
+            ],
+            "function_components": [
+                {
+                    "functions": component,
+                    "cyclic": len(component) > 1
+                    or (component[0], component[0]) in calls,
+                }
+                for component in ordered_components
+            ],
+            "function_counts": {
+                "functions": len(ordered),
+                "calls": len(calls),
+                "recursive_components": recursive_components,
+                "unresolved_calls": unresolved,
+            },
+        },
+        skipped,
+    )
+
+
 def build_report(targets: list[str]) -> dict[str, object]:
     root = Path.cwd().resolve()
     target_paths = [Path(target) for target in targets or ["."]]
@@ -755,11 +994,32 @@ def build_report(targets: list[str]) -> dict[str, object]:
             valid_by_module,
         )
 
+    # Files that the structure parser could not read are already incomplete
+    # evidence. pyan3 only sees parseable sources, so its own skipped set adds
+    # evidence only for a source it drops after Python accepted it.
+    function_graph, function_skipped = build_function_graph(
+        sorted(str(path) for path in parsed), root
+    )
+
     reasons: list[str] = []
     if unparsable:
         reasons.append(
             "Unparsable source: "
             + ", ".join(relative_path(path, root) for path in sorted(set(unparsable)))
+        )
+    # pyan3 drops a file it cannot parse from its filename set instead of
+    # failing. Structure already treats those files as unparsable, so only a
+    # skip that the module parser did not see adds another limitation.
+    unparsable_paths = {str(path.resolve()) for path in unparsable}
+    extra_skipped = [
+        path for path in function_skipped if str(Path(path).resolve()) not in unparsable_paths
+    ]
+    if extra_skipped:
+        reasons.append(
+            "Unparsable source skipped by pyan3: "
+            + ", ".join(
+                relative_path(Path(path), root) for path in sorted(set(extra_skipped))
+            )
         )
     imported_targets = {
         target
@@ -830,6 +1090,7 @@ def build_report(targets: list[str]) -> dict[str, object]:
             "type_imports": type_imports,
             "deferred_imports": deferred_imports,
         },
+        **function_graph,
         "partial": bool(reasons),
         "limitation": " ".join(reasons),
     }
@@ -844,6 +1105,7 @@ def machine_failure(category: str, message: str) -> int:
                 "imports": [],
                 "components": [],
                 "counts": {},
+                **empty_function_graph(),
                 "partial": False,
                 "limitation": "",
                 "error": {"category": category, "message": message},
@@ -874,6 +1136,13 @@ def main() -> int:
                 "tool_missing",
                 f"networkx is not installed. Run: uv add --group dev networkx ({error})",
             ) from error
+        try:
+            from pyan.analyzer import CallGraphVisitor  # noqa: F401
+        except ImportError as error:
+            raise StructureError(
+                "tool_missing",
+                f"pyan3 is not installed. Run: uv add --group dev pyan3 ({error})",
+            ) from error
         report = build_report(targets)
     except StructureError as error:
         if machine:
@@ -884,6 +1153,7 @@ def main() -> int:
         AttributeError,
         IndexError,
         KeyError,
+        NotImplementedError,
         OSError,
         RecursionError,
         RuntimeError,
