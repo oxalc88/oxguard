@@ -8,6 +8,9 @@ import (
 // runCheck runs the full quality gate: ruff → mypy → radon → coverage → security.
 // Sequential, fail-fast: stops at first failure.
 func runCheck(r *Runner, dirs []string) int {
+	if r.baseline != "" {
+		defer runChangeAdvisory(r)
+	}
 	r.println("pyguard check")
 	r.println("─────────")
 

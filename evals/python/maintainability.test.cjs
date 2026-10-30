@@ -210,6 +210,28 @@ const failurePolicies = ${JSON.stringify(FAILURE_POLICIES)};
 const caseId = path.basename(path.dirname(process.cwd()));
 const variant = path.basename(process.cwd());
 const command = process.argv[2] || 'criticality';
+if (command === 'change') {
+  const incomplete = ['change.absent_baseline', 'change.unavailable_ref', 'change.unparsable_baseline_is_incomplete'].includes(caseId);
+  const rule = caseId === 'change.unparsable_baseline_is_incomplete' ? 'INCOMPLETE_INPUT' : ['change.absent_baseline', 'change.unavailable_ref'].includes(caseId) ? 'BASELINE_UNAVAILABLE' : caseId === 'change.artificial_split_and_inert_baseline' ? 'POSSIBLE_COMPLEXITY_DISPLACEMENT' : caseId === 'change.new_dependency_cycle' ? 'NEW_DEPENDENCY_CYCLES' : caseId === 'change.coupling_increase' ? 'INCREASED_COUPLING' : null;
+  const findings = rule ? [{ gate:'change',level:'change',rule:'pyguard.change.'+rule,status:'advisory',severity:incomplete?'info':'warning',category:'quality',evidence:'Baseline '+ 'a'.repeat(40),diagnostics:[] }] : [];
+  const measurements = [];
+  if (!incomplete) {
+    for (const side of ['baseline','candidate']) {
+      for (const metric of ['module_count','module_edges','total_branches','max_file_branches','total_cyclomatic','total_halstead_volume','min_maintainability_index','module_cycles','coupling_hotspots']) {
+        let value = 0;
+        if (metric === 'module_count') value=1;
+        if (metric === 'total_branches') value = side === 'candidate' && caseId === 'change.real_simplification_control' ? 4 : 8;
+        if (metric === 'max_file_branches') value = side === 'candidate' ? 4 : 8;
+        if (metric === 'module_cycles' && side === 'candidate' && caseId === 'change.new_dependency_cycle') value=1;
+        if (metric === 'coupling_hotspots' && side === 'candidate' && caseId === 'change.coupling_increase') value=1;
+        measurements.push({metric:'change.'+side+'.'+metric,level:'change',location:{file:'.'},value,unit:'count'});
+      }
+      for (const metric of ['cyclomatic','maintainability_index','halstead_volume']) measurements.push({metric:'change.'+side+'.file.'+metric,level:'change',location:{file:'src/pkg/core.py'},value:0,unit:'score'});
+    }
+    measurements.push({metric:'change.delta.file.cyclomatic',level:'change',location:{file:caseId === 'change.nested_project_prefix' ? 'src/clean.py' : 'src/pkg/core.py'},value:0,unit:'paths'});
+  }
+  process.stdout.write(JSON.stringify({schema_version:'1',status:findings.length?'advisory':'pass',assessment:incomplete?'incomplete':'complete',gates:[{name:'change',status:incomplete?'not_run':findings.length?'advisory':'passed',normalization:incomplete?'not_run':'complete'}],exit_code:incomplete?1:0,findings,measurements,artifacts:[],diagnostics:[]}));process.exit(incomplete?1:0);
+}
 if (failurePolicies[caseId] && command === 'structure') {
   const partial = caseId === 'failure_policy.unparsable_is_incomplete';
   const findings = failurePolicies[caseId].map(([rule, file, line, observed, related]) => ({ level:'structure', gate:'structure', rule: rule === 'not_evaluated' ? 'pyguard.structure.not_evaluated' : 'pyguard.structure.' + rule, severity:rule === 'not_evaluated' ? 'info' : 'warning', status:'advisory', category:'quality', location:{file,line}, ...(observed ? {observed} : {}), ...(related ? {related:Array.from({length:related},()=>({file:'src/repeat.py'}))} : {}), evidence:'advisory fixture', diagnostics:[] }));
@@ -313,7 +335,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'maintainability.failure_policies', 'structure.runtime_graph', 'structure.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'maintainability.failure_policies', 'structure.runtime_graph', 'structure.false_positive_controls', 'change.complexity_displacement', 'change.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 

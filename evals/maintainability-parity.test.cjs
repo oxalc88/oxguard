@@ -65,6 +65,11 @@ test('a passing Python report is accepted as not_implemented without claiming re
   const implemented=result.capabilities.find(c=>c.id==='structure.function_graph');
   assert.equal(implemented.pyguard,'pass');
   assert.deepEqual(implemented.pyguard_cases,Object.fromEntries(declared().filter(d=>d.capability==='structure.function_graph').map(d=>[d.id,'pass'])));
+  for (const id of ['change.complexity_displacement', 'change.false_positive_controls']) {
+    const row=result.capabilities.find(c=>c.id===id);
+    assert.equal(row.pyguard,'pass');
+    for (const kind of ['positive','negative','boundary']) assert.ok(declared().some(d=>d.capability===id && d.kind===kind));
+  }
   const planned=result.capabilities.find(c=>c.id==='change.function_complexity');
   assert.equal(planned.pyguard,'not_implemented');
   assert.deepEqual(planned.pyguard_cases,{});
