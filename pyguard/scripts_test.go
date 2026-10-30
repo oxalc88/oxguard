@@ -22,7 +22,7 @@ func TestMaterializeAnalysisHelperUsesOnlyEmbeddedFiles(t *testing.T) {
 		t.Fatalf("helper directory permissions: %v", info.Mode().Perm())
 	}
 	for _, name := range []string{
-		"_paths.py", "analyze_criticality.py", "check_halstead.py",
+		"_paths.py", "analyze_criticality.py", "analyze_structure.py", "check_halstead.py",
 		"check_secrets.py", "check_type_complexity.py", "vulture_report.py",
 	} {
 		want, err := analysisScripts.ReadFile("analysis/" + name)
@@ -82,7 +82,7 @@ func TestRunnerIgnoresProjectHelperChangesAndSymlinks(t *testing.T) {
 
 	for _, name := range []string{
 		"check_type_complexity.py", "check_halstead.py",
-		"check_secrets.py", "analyze_criticality.py", "vulture_report.py",
+		"check_secrets.py", "analyze_criticality.py", "analyze_structure.py", "vulture_report.py",
 	} {
 		for _, form := range []string{"modified", "symlink"} {
 			t.Run(name+"/"+form, func(t *testing.T) {

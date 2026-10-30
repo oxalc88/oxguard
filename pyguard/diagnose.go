@@ -31,6 +31,7 @@ func runDiagnose(r *Runner, dirs []string) int {
 		{"complexipy.cognitive", "radon", func(r *Runner) int {
 			return runComplexipy(r, dirs)
 		}},
+		{"structure.module_graph", "structure", func(r *Runner) int { return runStructure(r) }},
 		{"types", "types", func(r *Runner) int { return runTypes(r, dirs) }},
 		{"coverage", "coverage", runCoverage},
 		{"bandit", "bandit", func(r *Runner) int { return runBandit(r, dirs) }},

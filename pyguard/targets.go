@@ -50,11 +50,12 @@ func runFix(r *Runner, dirs []string) int {
 	return 0
 }
 
-// runAudit runs informational analysis: criticality + dead-code + deps.
+// runAudit runs informational analysis: criticality + structure + dead-code + deps.
 // Never fails (exit 0 always) — these are advisory.
 func runAudit(r *Runner, dirs []string) int {
 	r.println("pyguard audit (informational)")
 	runCriticality(r)
+	runStructure(r)
 	runDeadCode(r, dirs)
 	runDeps(r)
 	return 0

@@ -80,8 +80,8 @@ concepts crammed into one place — even if the control flow is linear, the cogn
 makes mistakes likely.
 
 **Test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and the `tests/`
-directory are excluded from the radon gates (cc, mi, hal), the Halstead script and
-complexipy by default. For complexipy, which has no directory `--ignore`, the exclusion
+directory are excluded from the radon gates (cc, mi, hal), the Halstead script,
+complexipy and the runtime module graph by default. For complexipy, which has no directory `--ignore`, the exclusion
 globs also cover root-level matches and whole `tests/` or `test/` directories at any
 depth. Test files are intentionally repetitive — many similar cases, parameterized
 fixtures — so complexity metrics don't apply meaningfully. Ruff and coverage still gate
@@ -123,6 +123,32 @@ The analyzer is pinned exactly at 8.3.0 and is managed like radon and pyan3: it 
 PyGuard dev-dependency manifest, the hash-locked Python evaluation toolchain, and
 `pyguard doctor` reports its version. `pyguard diagnose` exposes it as a separate
 `complexipy.cognitive` analysis.
+
+---
+
+## Runtime module graph (pyguard, advisory)
+
+**Tool:** grimp 3.18 + NetworkX 3.7
+**Command:** `pyguard structure` (also `pyguard audit` and the `structure.module_graph` `pyguard diagnose` analysis; not `pyguard check`)
+
+PyGuard builds a graph of in-scope runtime imports between Python modules. External and third-party imports are not edges, and imports outside the configured scope are not inferred. The graph emits the same project-level measurements as Tsguard:
+
+| Metric | Meaning | Unit |
+|---|---|---|
+| `module.count` | In-scope Python modules, including package `__init__.py` files | `modules` |
+| `module.edges` | Unique in-scope runtime import edges after type-only/deferred imports are removed | `edges` |
+| `module.cycles` | Runtime strongly connected components with more than one module, plus self-loops | `components` |
+| `module.type_imports` | Import statements under `if TYPE_CHECKING:` / `typing.TYPE_CHECKING` | `references` |
+| `module.deferred_imports` | Import statements inside a function or method body | `references` |
+| `module.dependency_depth` | Per module: longest path in the SCC condensation DAG, measured in edges; internal cycle edges add no depth | `edges` |
+
+A runtime cycle yields one advisory `pyguard.structure.CIRCULAR_DEPENDENCY` warning at level `structure`, with the first module as its location and the remaining modules as `related`. A self-import is a one-module cycle. The warning never changes the exit code, blocking outcome or strict expectations; `pyguard structure` exits 0 for advisory findings. As in Tsguard, a project whose only finding is a cycle reports overall status `advisory` instead of `pass` and an advisory gate instead of `passed`. This release does not add coupling, fan-in/out, layer or boundary rules.
+
+Python-specific controls are explicit. Imports guarded by `TYPE_CHECKING` are excluded from runtime edges and counted as type imports. Imports inside a function or method body are deferred: they execute only when that callable runs, so they are excluded from edges/cycles and counted separately. Class-body imports execute at import time and remain runtime imports. An import of an out-of-scope package is external, not unresolved. Import roots come from the project layout, independently of the requested graph scope: files under `<project>/src` use `src` as their root (including the default `.` scope and a narrowed `--dirs` path inside `src`), and every other file uses the project root. Module identities are the full dotted path beneath those fixed roots, including implicit namespace directories; files are never renamed or promoted to match an import name. Resolution inventories every `.py` file under the roots, so an existing out-of-scope target is a scope boundary: it creates no edge, is not missing and gets no parent-package fallback edge. `from X import name` validates `name` against the full inventory (a submodule, subpackage, or an AST-defined/exported name in X's `__init__.py`) before the boundary applies, so an out-of-scope parent never hides a missing child. Export validation is a deliberate over-approximation: a name counts as exported when any statement in the package `__init__` AST can bind it, at any nesting level, including ordinary `if`/`elif`/`else` branches, `try`, `while`, `match`, `with`, function bodies (including `global` declarations), `Store` names, `def`/`class` names, import aliases and except/match targets. Only bodies of `if TYPE_CHECKING:` blocks and annotation-only `AnnAssign` statements are excluded. It also accepts Python-provided module attributes such as `__path__`, `__name__`, `__spec__` and `__file__`, and any name when the package `__init__` defines module-level `__getattr__`, performs a runtime `from ... import *`, or assigns through `globals()`/`setattr()`. Because exports are over-approximated, only a clearly missing name makes the result incomplete. Only imports that resolve nowhere locally are unresolved. `from . import x` and `from pkg import x` validate `x` as a child of a namespace package. Unresolved modules, including invalid relative imports beyond the top-level package, are withheld from grimp; a grimp resolver panic becomes incomplete `not_evaluated` evidence rather than an execution failure. If two files map to one identity, the first deterministic file is kept and the assessment becomes incomplete with `pyguard.structure.not_evaluated`. A missing module inside a project package root or an unparsable source file also leaves the assessment incomplete; it is not a crash or a clean pass. Source parsing honors a UTF-8 BOM and PEP 263 encoding declarations by reading bytes, matching grimp's own decoding and line numbers. Missing/broken grimp or NetworkX is an execution error.
+
+Source scope follows `--dirs`, `[tool.pyguard] exclude` and the default test-file/directory exclusion. `--dirs`, exclusion globs and test filters choose graph nodes only; they do not remove files from local import resolution. grimp is pinned exactly at 3.18 in the dev-dependency manifest and hash-locked evaluation toolchain; `pyguard doctor` reports its version.
+
+The graph is static evidence, not proof of runtime reachability. Dynamic imports, import hooks and conditional package availability remain outside the graph; the missing-local/unparsable controls keep incomplete evidence visible rather than turning it into a pass.
 
 ---
 

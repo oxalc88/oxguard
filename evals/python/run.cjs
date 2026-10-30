@@ -46,7 +46,7 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
     const installed = JSON.parse(versions.stdout);
     installed.packages = Object.fromEntries(Object.entries(installed.packages).map(([name, version]) => [name.toLowerCase().replace(/[-_.]+/g, '-'), version]));
     const toolchain = { ...installed, uv: uv.stdout.trim(), requirements_sha256: digest([path.join(__dirname, 'requirements.txt')]) };
-    for (const name of ['ruff', 'mypy', 'radon', 'pyan3', 'networkx', 'pydot']) if (!toolchain.packages[name]) throw new Error(`Missing eval dependency: ${name}`);
+    for (const name of ['ruff', 'mypy', 'radon', 'pyan3', 'networkx', 'pydot', 'grimp']) if (!toolchain.packages[name]) throw new Error(`Missing eval dependency: ${name}`);
     for (const line of fs.readFileSync(path.join(__dirname, 'requirements.txt'), 'utf8').split('\n')) {
       const pin = line.match(/^([a-zA-Z0-9-]+)==([^\s]+)/);
       if (pin && toolchain.packages[pin[1].toLowerCase().replace(/[-_.]+/g, '-')]  !== pin[2]) throw new Error(`Eval dependency does not match lock: ${pin[1]}`);

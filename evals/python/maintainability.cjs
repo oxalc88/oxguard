@@ -77,6 +77,11 @@ const twoChains = (name) => {
   return lines.join('\n') + '\n';
 };
 const flatFunction = 'def flat(value):\n    return value + 1\n';
+// Python accepts a UTF-8 BOM and a PEP 263 non-UTF-8 source declaration.
+// Write raw bytes so the fixture is identical on Windows and POSIX and is
+// never silently re-encoded by the harness.
+const utf8BomSource = (text) => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(text, 'utf8')]);
+const latin1Source = (text) => Buffer.from(text, 'latin1');
 // complexipy folds nested functions into the enclosing function: an inner
 // chain of eight scores 36 and is reported once under the outer name.
 const nestedFunctionChain = (depth, outer, inner) => {
@@ -94,6 +99,19 @@ function cognitiveMeasurement(result, symbol) {
 }
 function cognitiveWarning(result, symbol) {
   return result.findings.find(f => f.rule === 'pyguard.complexipy.cognitive_exceeded' && f.location.symbol === symbol);
+}
+function structureMeasurement(result, metric) {
+  const found = result.measurements.find(m => m.metric === metric && m.location.file === '.');
+  assert.ok(found, `missing ${metric}; measurements: ${JSON.stringify(result.measurements)}`);
+  return found.value;
+}
+function structureDepth(result, file) {
+  const found = result.measurements.find(m => m.metric === 'module.dependency_depth' && m.location.file === file);
+  assert.ok(found, `missing module.dependency_depth for ${file}; measurements: ${JSON.stringify(result.measurements)}`);
+  return found.value;
+}
+function circularFindings(result) {
+  return result.findings.filter(f => f.rule === 'pyguard.structure.CIRCULAR_DEPENDENCY');
 }
 
 function ruffMeasurement(result) {
@@ -311,6 +329,826 @@ const definitions = [
       // complexity analyzers, not from Ruff. Ruff still gates test code, so the
       // zero-config baseline reports S110 inside tests/ and blocks.
       assertBlockingRuff(result, 'S110', 'src/tests/test_handlers.py', 4);
+    },
+  },
+  {
+    id: 'structure.runtime_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from .b import B\n\n\ndef load():\n    return B\n',
+      'src/pkg/b.py': 'from .a import load\n',
+    },
+    check: ({ result }) => {
+      // A runtime a<->b SCC is one advisory finding. pyguard stays at exit 0
+      // with no blocking gate outcome, exactly like a clean structure run.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].severity, 'warning');
+      assert.equal(findings[0].status, 'advisory');
+      assert.equal(findings[0].category, 'quality');
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/b.py']);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/b.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.self_import_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'import pkg.a\n\ndef load():\n    return pkg.a\n',
+    },
+    check: ({ result }) => {
+      // A self-loop is a strongly connected component of size one and counts
+      // exactly like a multi-module cycle; it remains advisory.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related || [], []);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.nested_package_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/sub/__init__.py': '',
+      'src/pkg/sub/a.py': 'from ..b import load\n',
+      'src/pkg/b.py': 'from .sub.a import load\n',
+    },
+    check: ({ result }) => {
+      // Intermediate package directories must survive in module identities:
+      // pkg/sub/a.py is pkg.sub.a, not a flattened pkg.a, and pkg.b <-> pkg.sub.a
+      // is one real SCC. Flattening previously dropped modules or panicked grimp.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/b.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/sub/a.py']);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.count'), 4);
+      assert.equal(structureDepth(result, 'src/pkg/sub/a.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/b.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.namespace_package_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/a.py': 'import pkg.b\n',
+      'src/pkg/b.py': 'import pkg.a\n',
+    },
+    check: ({ result }) => {
+      // Without __init__.py these files are still an importable namespace
+      // package. Their dotted identities participate in the same runtime cycle
+      // instead of becoming unrelated bare modules named a and b.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/b.py']);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/b.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.namespace_relative_import_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/a.py': 'from . import b\n',
+      'src/pkg/b.py': 'from . import a\n',
+    },
+    check: ({ result }) => {
+      // Namespace packages have no __init__.py, but `from . import b` still
+      // validates b as pkg.b (not an attribute of a missing package module).
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/b.py']);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.default_scope_src_layout_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    dirs: '.',
+    pyproject: PYPROJECT + '[tool.pyguard]\nexclude = ["tools/*"]\n',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'import pkg.b\n',
+      'src/pkg/b.py': 'import pkg.a\n',
+    },
+    check: ({ result }) => {
+      // The default '.' scope must still use src as the import root for files
+      // under src, so pkg.a <-> pkg.b is a real cycle instead of src.pkg.*
+      // identities whose imports all look external.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/b.py']);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/b.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.dunder_package_attribute_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      // Python supplies __path__, __name__ and the other module dunders, so
+      // `from pkg import __path__` is a real attribute import. It must close
+      // the pkg <-> pkg.worker cycle instead of being unresolved.
+      'src/pkg/__init__.py': 'import pkg.worker\n',
+      'src/pkg/worker.py': 'from pkg import __path__, __name__, __spec__\nfrom pkg import __file__, __loader__, __package__\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/__init__.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/worker.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.runtime_binding_exports_control',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      // Imports aliases, for/with/except targets, walrus assignments, class
+      // definitions and names declared global inside functions all bind
+      // runtime package attributes. Each must validate, closing the cycle.
+      'src/pkg/__init__.py': "import os.path as helper\nimport pkg.worker\n\n\ndef setup():\n    global plugin\n    plugin = 1\n\n\nclass Service:\n    pass\n\nfor item in ():\n    pass\n\nwith open('unused') as handle:\n    pass\n\ntry:\n    recovered = 1\nexcept Exception as error:\n    pass\n\nif (loaded := None) is None:\n    pass\n",
+      'src/pkg/worker.py': 'from pkg import plugin, Service, item, handle, recovered, error, loaded, helper\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/__init__.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/worker.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.conditional_export_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      // VALUE is bound in both runtime branches of a sys.version_info check.
+      // Treating only one branch as exported previously made `from pkg import
+      // VALUE` unresolved, withheld worker.py from grimp and hid the cycle.
+      'src/pkg/__init__.py': "import sys\nimport pkg.worker\n\nif sys.version_info >= (3, 12):\n    VALUE = 1\nelse:\n    VALUE = 2\n",
+      'src/pkg/worker.py': 'from pkg import VALUE\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/__init__.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/worker.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.type_imports'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.utf8_bom_source_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': utf8BomSource('from .b import B\n\n\ndef load():\n    return B\n'),
+      'src/pkg/b.py': utf8BomSource('from .a import load\n'),
+    },
+    check: ({ result }) => {
+      // Windows editors commonly add a UTF-8 BOM. Python accepts it, so both
+      // modules must remain in the graph and their runtime SCC must survive.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/b.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.deferred_imports'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.latin1_declared_source_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': latin1Source('# -*- coding: latin-1 -*-\n# caf\u00e9\nfrom .b import B\n\n\ndef load():\n    return B\n'),
+      'src/pkg/b.py': latin1Source('# -*- coding: latin-1 -*-\n# caf\u00e9\nfrom .a import load\n'),
+    },
+    check: ({ result }) => {
+      // A valid PEP 263 declaration makes these non-UTF-8 bytes importable by
+      // Python. The AST pass and grimp must agree on the same source lines.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/b.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.deferred_imports'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.acyclic_chain',
+    capability: 'structure.runtime_graph',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from .b import B\n',
+      'src/pkg/b.py': 'from .c import C\n',
+      'src/pkg/c.py': '',
+    },
+    check: ({ result }) => {
+      // a -> b -> c has no cycle. SCC-condensation depth is the longest path
+      // to a leaf: a=2, b=1, c=0, and a package __init__ with no imports is 0.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.count'), 4);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 2);
+      assert.equal(structureDepth(result, 'src/pkg/b.py'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/c.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+    },
+  },
+  {
+    id: 'structure.scope_and_test_exclusions',
+    capability: 'structure.runtime_graph',
+    kind: 'boundary',
+    command: 'structure',
+    pyproject: PYPROJECT + '[tool.pyguard]\nexclude = ["src/pkg/ignored/*"]\n',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/main.py': 'from . import helper\n',
+      'src/pkg/helper.py': '',
+      'src/pkg/ignored/source.py': 'from .missing import value\n',
+      'src/pkg/test_bad.py': 'from .missing import value\n',
+      'src/pkg/tests/test_nested.py': 'from .missing import value\n',
+    },
+    check: ({ result }) => {
+      // [tool.pyguard] exclude removes the ignored directory and the default
+      // test exclusion removes test_*.py plus whole tests/ directories. None
+      // of the excluded files' unresolved imports may make the graph partial.
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(circularFindings(result).length, 0);
+    },
+  },
+  {
+    id: 'structure.duplicate_identities_do_not_crash',
+    capability: 'structure.runtime_graph',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      // The first two files keep distinct namespace-module identities. The
+      // last two deliberately collide on pkg.a; the analyzer must keep one
+      // deterministically and report incomplete evidence instead of crashing.
+      'src/one/a.py': 'import a\n',
+      'src/two/a.py': 'import a\n',
+      'src/pkg/a.py': 'VALUE = 1\n',
+      'src/pkg/a/__init__.py': 'VALUE = 2\n',
+    },
+    check: ({ result }) => {
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.not_evaluated');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.match(findings[0].evidence, /Duplicate module identity/);
+      assert.equal(result.assessment, 'incomplete');
+      assert.equal(result.gates.find(g => g.name === 'structure').normalization, 'partial');
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 0);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.out_of_scope_collision_is_ignored',
+    capability: 'structure.runtime_graph',
+    kind: 'boundary',
+    command: 'structure',
+    dirs: 'src/other.py',
+    files: {
+      // pkg.a collides between a module and a package, but neither identity is
+      // in the requested graph and other.py imports nothing. The collision is
+      // irrelevant to this scope and must not make its evidence incomplete.
+      'src/other.py': '',
+      'src/pkg/a.py': '',
+      'src/pkg/a/__init__.py': '',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 0);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/other.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.runtime_cycle_with_type_only_imports',
+    capability: 'structure.false_positive_controls',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from typing import TYPE_CHECKING\nfrom .b import B\n\nif TYPE_CHECKING:\n    from .c import C\n',
+      'src/pkg/b.py': 'from .a import load\n',
+      'src/pkg/c.py': '',
+    },
+    check: ({ result }) => {
+      // Ignoring TYPE_CHECKING imports must not hide a runtime cycle: the
+      // type-only edge is counted separately while the a<->b SCC is reported.
+      complete(result, 'structure');
+      assert.equal(circularFindings(result).length, 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.type_imports'), 1);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.type_only_cycle_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    from .b import B\n',
+      'src/pkg/b.py': 'from typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    from .a import A\n',
+    },
+    check: ({ result }) => {
+      // The same import cycle under TYPE_CHECKING is not a runtime edge:
+      // zero edges, exactly two type-only references, and no finding.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.edges'), 0);
+      assert.equal(structureMeasurement(result, 'module.type_imports'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+    },
+  },
+  {
+    id: 'structure.external_imports_no_edges',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'import json\nimport os\n\ndef load():\n    return json.dumps({"path": os.sep})\n',
+      'src/pkg/b.py': 'import os\n',
+    },
+    check: ({ result }) => {
+      // External/third-party imports are boundary references, never in-scope
+      // module edges, so they cannot create a cycle.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.edges'), 0);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+    },
+  },
+  {
+    id: 'structure.external_name_collision_no_cycle',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      // src is the fixed import root, so `import json` is external even though
+      // src/vendor/json.py exists. vendor.json stays vendor.json and cannot be
+      // promoted into a false pkg.a <-> json cycle.
+      'src/pkg/a.py': 'import json\n',
+      'src/vendor/json.py': 'import pkg.a\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(circularFindings(result).length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.relative_import_package_export_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': 'VALUE = 1\n',
+      'src/pkg/a.py': 'from . import VALUE\n',
+    },
+    check: ({ result }) => {
+      // A name exported by the package __init__ is a legitimate attribute
+      // import, not a missing pkg.VALUE submodule. It stays complete and keeps
+      // the edge to the package.
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 1);
+    },
+  },
+  {
+    id: 'structure.module_getattr_export_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      // A module-level __getattr__ can supply any attribute, so an arbitrary
+      // name imported from the package is valid rather than unresolved.
+      'src/pkg/__init__.py': 'def __getattr__(name):\n    return name\n',
+      'src/pkg/worker.py': 'from pkg import plugin\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 1);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.star_reexport_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      // A runtime star re-export makes the package's attribute set dynamic;
+      // a name imported from it is valid and the impl edge stays intact.
+      'src/pkg/__init__.py': 'from .impl import *\n',
+      'src/pkg/impl.py': 'VALUE = 1\n',
+      'src/pkg/worker.py': 'from pkg import VALUE\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/impl.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 2);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.dynamic_module_exports_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      // globals() and setattr() can create package attributes at runtime, so
+      // imported names that no static statement binds remain valid.
+      'src/pkg/__init__.py': "import sys\n\nglobals()['plugin'] = 1\nsetattr(sys.modules[__name__], 'extension', 2)\n",
+      'src/pkg/worker.py': 'from pkg import plugin, extension, arbitrary\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 1);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.deferred_import_cycle_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from .b import B\n',
+      'src/pkg/b.py': 'def load():\n    from .a import load as imported\n    return imported\n',
+    },
+    check: ({ result }) => {
+      // A function-local import closes a<->b only when it executes, not at
+      // import time. It is removed from runtime edges/cycles and counted.
+      complete(result, 'structure');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.deferred_imports'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/b.py'), 0);
+    },
+  },
+  {
+    id: 'structure.unresolved_local_import_is_partial',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from .missing import value\n',
+    },
+    check: ({ result }) => {
+      // A missing module inside the package root is incomplete evidence, not a
+      // crash or a clean pass. The not_evaluated advisory leaves exit 0.
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.not_evaluated');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].status, 'advisory');
+      assert.equal(findings[0].severity, 'info');
+      assert.match(findings[0].evidence, /pkg\.missing/);
+      assert.equal(result.assessment, 'incomplete');
+      assert.equal(result.gates.find(g => g.name === 'structure').normalization, 'partial');
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.excluded_import_is_scope_boundary',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    pyproject: PYPROJECT + '[tool.pyguard]\nexclude = ["src/pkg/b.py"]\n',
+    files: {
+      'src/pkg/__init__.py': 'from .a import load\n',
+      'src/pkg/a.py': 'import pkg.b\n',
+      'src/pkg/b.py': 'VALUE = 1\n',
+    },
+    check: ({ result }) => {
+      // b.py exists but is excluded. Grimp knows the target so it must not
+      // fall back to pkg (which would invent a pkg <-> pkg.a cycle), and the
+      // excluded target is a scope boundary rather than a missing module.
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 0);
+    },
+  },
+  {
+    id: 'structure.relative_import_missing_name_is_partial',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from . import missing\n',
+    },
+    check: ({ result }) => {
+      // from . import missing refers to pkg.missing, not to an exported pkg
+      // attribute. With an empty __init__ this is missing evidence, not an
+      // edge to pkg with a complete assessment.
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.not_evaluated');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].status, 'advisory');
+      assert.match(findings[0].evidence, /pkg\.missing/);
+      assert.equal(circularFindings(result).length, 0);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 0);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(result.assessment, 'incomplete');
+      assert.equal(result.gates.find(g => g.name === 'structure').normalization, 'partial');
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.narrow_scope_import_is_boundary',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    dirs: 'src/pkg/a.py',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from .b import B\n',
+      'src/pkg/b.py': 'B = 1\n',
+    },
+    check: ({ result }) => {
+      // b.py is outside the requested graph scope but exists under the fixed
+      // import root. It is a boundary, not an unresolved module; no edge is
+      // invented for the out-of-scope sibling.
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 0);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 0);
+    },
+  },
+  {
+    id: 'structure.narrow_scope_missing_child_is_partial',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    dirs: 'src/pkg/a.py',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from . import missing\n',
+    },
+    check: ({ result }) => {
+      // An existing parent package does not prove that the requested child
+      // exists. The child is validated against the full inventory before the
+      // narrow graph scope makes the parent a boundary.
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.not_evaluated');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].status, 'advisory');
+      assert.match(findings[0].evidence, /pkg\.missing/);
+      assert.equal(circularFindings(result).length, 0);
+      assert.equal(result.assessment, 'incomplete');
+      assert.equal(result.gates.find(g => g.name === 'structure').normalization, 'partial');
+      assert.equal(structureMeasurement(result, 'module.count'), 1);
+      assert.equal(structureMeasurement(result, 'module.edges'), 0);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/a.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.invalid_relative_import_is_partial',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': 'from ...missing import X\n',
+    },
+    check: ({ result }) => {
+      // This relative level is beyond the top-level package. It must be
+      // classified as unresolved before grimp sees it: passing it through
+      // would let grimp 3.18 panic and turn incomplete source evidence into an
+      // execution failure.
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.not_evaluated');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].status, 'advisory');
+      assert.match(findings[0].evidence, /<relative>/);
+      assert.equal(circularFindings(result).length, 0);
+      assert.equal(result.assessment, 'incomplete');
+      assert.equal(result.gates.find(g => g.name === 'structure').normalization, 'partial');
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 0);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.type_only_package_export_is_partial',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      // Foo exists only under TYPE_CHECKING in the package __init__, so it is
+      // not a runtime package attribute. `from pkg import Foo` in b.py is
+      // therefore unresolved and the evidence is incomplete, not a cycle.
+      'src/pkg/__init__.py': 'from typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    from .a import Foo\n\nimport pkg.b\n',
+      'src/pkg/a.py': 'class Foo:\n    pass\n',
+      'src/pkg/b.py': 'from pkg import Foo\n',
+    },
+    check: ({ result }) => {
+      assert.equal(result.assessment, 'incomplete');
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.not_evaluated');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].status, 'advisory');
+      assert.equal(findings[0].severity, 'info');
+      assert.match(findings[0].evidence, /pkg\.Foo/);
+      assert.equal(circularFindings(result).length, 0);
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureMeasurement(result, 'module.type_imports'), 1);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.annotation_only_export_is_partial',
+    capability: 'structure.false_positive_controls',
+    kind: 'boundary',
+    command: 'structure',
+    files: {
+      // client is annotated but never assigned in __init__, so it is not a
+      // runtime package attribute. `from pkg import client` in worker.py is
+      // therefore unresolved; it must not close a false pkg <-> pkg.worker
+      // cycle just because the annotation mentions the name.
+      'src/pkg/__init__.py': 'client: Client\n\nimport pkg.worker\n',
+      'src/pkg/worker.py': 'from pkg import client\n',
+    },
+    check: ({ result }) => {
+      assert.equal(result.assessment, 'incomplete');
+      const findings = result.findings.filter(f => f.rule === 'pyguard.structure.not_evaluated');
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].status, 'advisory');
+      assert.equal(findings[0].severity, 'info');
+      assert.match(findings[0].evidence, /pkg\.client/);
+      assert.equal(circularFindings(result).length, 0);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
     },
   },
   {
@@ -594,7 +1432,8 @@ function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
       const start = performance.now();
       let outcome = 'pass';
       let error;
-      const args = [definition.command || 'criticality', '--dirs', 'src', '--output', 'json', '--allow-pipe', '--timeout', '30'];
+      const dirs = Array.isArray(definition.dirs) ? definition.dirs.join(',') : definition.dirs || 'src';
+      const args = [definition.command || 'criticality', '--dirs', dirs, '--output', 'json', '--allow-pipe', '--timeout', '30'];
       try {
         const response = execute({ project: project(definition, base), args });
         assert.ok(!response.error, `pyguard could not be started: ${response.error}`);
