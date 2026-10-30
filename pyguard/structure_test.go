@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -371,5 +372,88 @@ func TestStructureAdapterSelfImportIsNotItsOwnCoupling(t *testing.T) {
 	}
 	if r.result.ExitCode != 0 || r.result.Status != StatusAdvisory || r.result.Assessment != Complete {
 		t.Fatalf("self-import changed policy: %+v", r.result)
+	}
+}
+
+// structureHumanReport combines a coupling hub with a runtime cycle so the
+// human renderer must show both advisory finding kinds.
+func structureHumanReport(t *testing.T) string {
+	t.Helper()
+	var report structureReport
+	if err := json.Unmarshal([]byte(structureCouplingReport(t, 3, 8, false)), &report); err != nil {
+		t.Fatal(err)
+	}
+	report.Modules = append(report.Modules,
+		structureModule{Name: "pkg.a", File: "src/pkg/a.py"},
+		structureModule{Name: "pkg.b", File: "src/pkg/b.py"},
+	)
+	report.Imports = append(report.Imports,
+		structureImport{Importer: "pkg.a", Imported: "pkg.b"},
+		structureImport{Importer: "pkg.b", Imported: "pkg.a"},
+	)
+	report.Components = append(report.Components, structureComponent{Modules: []string{"pkg.a", "pkg.b"}, Cyclic: true})
+	report.Counts.Modules = len(report.Modules)
+	report.Counts.Edges = len(report.Imports)
+	report.Counts.Cycles = 1
+	data, err := json.Marshal(report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// TestStructureHumanProcess is the fake analyzer used by the human-mode
+// regression test. It emits the same structured payload the owned adapter
+// consumes, so the test exercises the production subprocess runner.
+func TestStructureHumanProcess(t *testing.T) {
+	if os.Getenv("PYGUARD_STRUCTURE_HUMAN_HELPER") == "" {
+		return
+	}
+	fmt.Fprint(os.Stdout, structureHumanReport(t))
+	os.Exit(0)
+}
+
+func captureStdoutText(t *testing.T, fn func() int) (int, string) {
+	t.Helper()
+	file, err := os.CreateTemp(t.TempDir(), "stdout")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	old := os.Stdout
+	os.Stdout = file
+	defer func() { os.Stdout = old }()
+	code := fn()
+	if _, err := file.Seek(0, 0); err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return code, string(data)
+}
+
+func TestStructureHumanRendersCouplingAndCycles(t *testing.T) {
+	r := &Runner{root: t.TempDir(), timeout: 2, outputMode: "human", result: newRunResult("structure")}
+	t.Setenv("PYGUARD_STRUCTURE_HUMAN_HELPER", "1")
+	code, output := captureStdoutText(t, func() int {
+		return runStructureHumanReport(r, os.Args[0], "-test.run=^TestStructureHumanProcess$")
+	})
+	if code != 0 {
+		t.Fatalf("human structure exit = %d, want 0; output: %s", code, output)
+	}
+	for _, want := range []string{
+		"[OK]   structure",
+		"[ADVISORY] pyguard.structure.HIGH_MODULE_COUPLING hub.py",
+		"[ADVISORY] pyguard.structure.CIRCULAR_DEPENDENCY src/pkg/a.py",
+		"src/pkg/a.py, src/pkg/b.py",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("human structure output missing %q: %s", want, output)
+		}
+	}
+	if count := strings.Count(output, "HIGH_MODULE_COUPLING"); count != 1 {
+		t.Fatalf("human structure coupling count = %d, want 1: %s", count, output)
 	}
 }

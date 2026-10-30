@@ -1290,6 +1290,29 @@ const definitions = [
     },
   },
   {
+    id: 'structure.coupling_human_warning',
+    capability: 'structure.coupling',
+    kind: 'positive',
+    command: 'structure',
+    human: true,
+    files: (() => {
+      // One coupling hub plus a separate runtime cycle makes both advisory
+      // finding kinds observable in the human CLI output.
+      const files = couplingFixture();
+      files['src/pkg/a.py'] = 'from . import b\n';
+      files['src/pkg/b.py'] = 'from . import a\n';
+      return files;
+    })(),
+    check: ({ stdout }) => {
+      // Human mode must render the same normalized findings as JSON: the
+      // coupling warning and the runtime cycle remain visible at exit 0.
+      assert.match(stdout, /\[OK\]\s+structure/);
+      assert.match(stdout, /\[ADVISORY\] pyguard\.structure\.HIGH_MODULE_COUPLING src\/pkg\/hub\.py/);
+      assert.match(stdout, /\[ADVISORY\] pyguard\.structure\.CIRCULAR_DEPENDENCY src\/pkg\/a\.py/);
+      assert.match(stdout, /src\/pkg\/a\.py, src\/pkg\/b\.py/);
+    },
+  },
+  {
     id: 'structure.coupling_below_importer_threshold',
     capability: 'structure.coupling',
     kind: 'negative',
@@ -1656,21 +1679,25 @@ function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
       let outcome = 'pass';
       let error;
       const dirs = Array.isArray(definition.dirs) ? definition.dirs.join(',') : definition.dirs || 'src';
-      const args = [definition.command || 'criticality', '--dirs', dirs, '--output', 'json', '--allow-pipe', '--timeout', '30'];
+      const args = [definition.command || 'criticality', '--dirs', dirs, ...(definition.human ? [] : ['--output', 'json']), '--allow-pipe', '--timeout', '30'];
       try {
         const response = execute({ project: project(definition, base), args });
         assert.ok(!response.error, `pyguard could not be started: ${response.error}`);
         const expectedExit = definition.exitCode ?? 0;
         assert.equal(response.status, expectedExit, `pyguard ${args[0]} exited with ${response.status}, expected ${expectedExit}: ${String(response.stderr || '').slice(0, 1024)}`);
-        const result = JSON.parse(response.stdout);
-        let baseline;
-        if (definition.baselineFiles) {
-          const clean = execute({ project: project({ id: definition.id, files: definition.baselineFiles }, base, 'baseline'), args });
-          assert.ok(!clean.error, `pyguard baseline could not be started: ${clean.error}`);
-          assert.equal(clean.status, 0, `clean baseline exited with ${clean.status}: ${String(clean.stderr || '').slice(0, 1024)}`);
-          baseline = JSON.parse(clean.stdout);
+        if (definition.human) {
+          definition.check({ stdout: response.stdout, stderr: response.stderr });
+        } else {
+          const result = JSON.parse(response.stdout);
+          let baseline;
+          if (definition.baselineFiles) {
+            const clean = execute({ project: project({ id: definition.id, files: definition.baselineFiles }, base, 'baseline'), args });
+            assert.ok(!clean.error, `pyguard baseline could not be started: ${clean.error}`);
+            assert.equal(clean.status, 0, `clean baseline exited with ${clean.status}: ${String(clean.stderr || '').slice(0, 1024)}`);
+            baseline = JSON.parse(clean.stdout);
+          }
+          definition.check({ result, baseline });
         }
-        definition.check({ result, baseline });
       } catch (failure) {
         outcome = 'fail';
         error = String((failure && failure.message) || failure);

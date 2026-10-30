@@ -170,7 +170,8 @@
         "status": "implemented",
         "cases": {
           "positive": [
-            "structure.coupling_hub_threshold"
+            "structure.coupling_hub_threshold",
+            "structure.coupling_human_warning"
           ],
           "negative": [
             "structure.coupling_below_importer_threshold",
