@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- PyGuard `structure` reports advisory `SILENT_EXCEPTION_FALLBACK`, `SILENT_EXCEPTION_EXIT` and `REPEATED_ERROR_HANDLER` findings for in-scope non-test Python handlers. Findings use fixed thresholds, preserve the exit code, and are available through `structure`, `audit` and `diagnose`; Python fallback/exit rules apply only to broad handlers and exclude `pass` (covered by Ruff S110). Repeated-handler fingerprints tokenize handler bodies only and preserve identifiers and literals. (#23)
+
 **Upgrade note:** PyGuard cognitive complexity is advisory in this release: a function scoring above 20 reports the warning `pyguard.complexipy.cognitive_exceeded` but never changes the exit code or the gate/overall pass–fail outcome. The next release will make it blocking, so functions above 20 will then fail the radon gate. Review and refactor them before upgrading.
 
 **Upgrade note:** For projects with no Ruff configuration, PyGuard now enables blocking Ruff rules S110 (try-except-pass) and B012 (jump in finally). A `pass`-only handler on a bare `except:` or on `except Exception:`/`except BaseException:`, or a control-flow statement in `finally`, therefore fails the ruff gate and `pyguard check`. Ruff's default `check-typed-exception = false` leaves typed handlers such as `except ValueError: pass` unflagged. Projects with a `[tool.ruff]`/`[tool.ruff.*]` table, `ruff.toml`, or `.ruff.toml` are unaffected: their Ruff configuration remains authoritative, including any `ignore` entries.

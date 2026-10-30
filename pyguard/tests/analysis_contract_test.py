@@ -532,6 +532,145 @@ class StructureDelegationContract(unittest.TestCase):
             self.assertEqual(functions[symbol]["forwarding_mode"], "sync")
             self.assertNotEqual(functions[symbol]["forward_target"], "")
 
+    def test_failure_handler_policy_and_fingerprint_facts(self):
+        source_text = (
+            "def run():\n"
+            "    try:\n        work()\n    except Exception:\n        return ()\n"
+            "    try:\n        work()\n    except KeyError:\n        return None\n"
+            "    try:\n        work()\n    except Exception as error:\n        return error\n"
+            "    try:\n        work()\n    except Exception as error:\n        return other\n"
+            "    try:\n        work()\n    except:\n        pass\n"
+            "    try:\n        work()\n    except Exception:\n        return set()\n"
+        )
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "handlers.py"
+            source.write_text(source_text)
+            facts = analyze_structure.failure_handlers(source, analyze_structure.read_tree(source))
+        self.assertEqual([fact["line"] for fact in facts], [4, 8, 12, 16, 20, 24])
+        self.assertEqual([fact["fallback"] for fact in facts], [True, False, False, True, False, False])
+        self.assertTrue(all(fact["exit"] is False for fact in facts))
+        self.assertEqual(facts[0]["token_count"], 3)
+        self.assertEqual(len(facts[0]["fingerprint"]), 64)
+
+    def test_failure_handler_fingerprint_ignores_comments_and_newlines(self):
+        bodies = ["    record(error)\n    return None\n", "    record( error )  # same body\n    return None\n"]
+        fingerprints = []
+        for body in bodies:
+            with tempfile.TemporaryDirectory() as root:
+                source = Path(root) / "handlers.py"
+                source.write_text("def run():\n    try:\n        work()\n    except Exception as error:\n" + "".join("    " + line for line in body.splitlines(keepends=True)))
+                facts = analyze_structure.failure_handlers(source, analyze_structure.read_tree(source))
+                fingerprints.append((facts[0]["fingerprint"], facts[0]["token_count"]))
+        self.assertEqual(fingerprints[0], fingerprints[1])
+
+    def test_failure_handler_body_fingerprint_excludes_inline_except_header(self):
+        sources = [
+            "def run():\n    try:\n        work()\n    except Exception as error: return fallback\n",
+            "def run():\n    try:\n        work()\n    except KeyError as error: return fallback\n",
+        ]
+        facts = []
+        for source_text in sources:
+            with tempfile.TemporaryDirectory() as root:
+                source = Path(root) / "handlers.py"
+                source.write_text(source_text)
+                facts.append(analyze_structure.failure_handlers(source, analyze_structure.read_tree(source))[0])
+        self.assertEqual(facts[0]["fingerprint"], facts[1]["fingerprint"])
+        self.assertEqual(facts[0]["token_count"], 2)
+
+    def test_failure_handler_fingerprint_skips_lambda_colon_in_header(self):
+        body = """        record(error)
+        retry(error)
+        report(error)
+        recover(error)
+        annotate(error)
+        retain(error)
+        update(error)
+        notify(error)
+        measure(error)
+        finish(error)
+        return None
+"""
+        headers = (
+            "except ValueError if enabled else lambda: Exception:",
+            "except ValueError:",
+            "except Exception:",
+        )
+        facts = []
+        for header in headers:
+            source_text = "def run():\n    try:\n        work()\n    " + header + "\n" + body
+            with tempfile.TemporaryDirectory() as root:
+                source = Path(root) / "handlers.py"
+                source.write_text(source_text)
+                facts.extend(analyze_structure.failure_handlers(source, analyze_structure.read_tree(source)))
+        self.assertEqual([fact["token_count"] for fact in facts], [42, 42, 42])
+        self.assertEqual(len({fact["fingerprint"] for fact in facts}), 1)
+
+    def test_failure_handler_fingerprint_includes_nested_decorators(self):
+        source_text = """def run():
+    try:
+        work()
+    except Exception:
+        @alpha
+        def nested():
+            return 1
+    try:
+        work()
+    except Exception:
+        @beta
+        def nested():
+            return 1
+    try:
+        work()
+    except Exception:
+        @gamma
+        def nested():
+            return 1
+"""
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "handlers.py"
+            source.write_text(source_text)
+            facts = analyze_structure.failure_handlers(source, analyze_structure.read_tree(source))
+        self.assertEqual(len(facts), 3)
+        self.assertEqual(len({fact["fingerprint"] for fact in facts}), 3)
+
+    def test_failure_handler_fingerprint_uses_physical_lines(self):
+        body = """        record(error)
+        retry(error)
+        report(error)
+        recover(error)
+        annotate(error)
+        retain(error)
+        update(error)
+        notify(error)
+        measure(error)
+        finish(error)
+        return None
+"""
+        prefix = 'label = "before\u2028after"\n'
+        handler = "    try:\n        work()\n    except Exception as error:\n" + body
+        source_text = prefix + "def run():\n" + handler * 3
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=repr(newline)), tempfile.TemporaryDirectory() as root:
+                source = Path(root) / "handlers.py"
+                source.write_bytes(source_text.replace("\n", newline).encode("utf-8"))
+                facts = analyze_structure.failure_handlers(source, analyze_structure.read_tree(source))
+                self.assertEqual(len(facts), 3)
+                self.assertEqual([fact["token_count"] for fact in facts], [42, 42, 42])
+                self.assertEqual(len({fact["fingerprint"] for fact in facts}), 1)
+
+    def test_failure_handler_broad_attribute_is_only_builtin_qualified(self):
+        source_text = (
+            "def run():\n"
+            "    try:\n        work()\n    except custom.Exception:\n        return None\n"
+            "    try:\n        work()\n    except builtins.Exception:\n        return None\n"
+            "    try:\n        work()\n    except (KeyError, Exception):\n        return None\n"
+        )
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "handlers.py"
+            source.write_text(source_text)
+            facts = analyze_structure.failure_handlers(source, analyze_structure.read_tree(source))
+        self.assertEqual([fact["fallback"] for fact in facts], [False, True, True])
+
 
 if __name__ == "__main__":
     unittest.main()

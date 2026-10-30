@@ -47,6 +47,8 @@ For Codex sessions, read the last `token_count` event in `~/.codex/sessions/`. F
 | 2026-10-30 | P6 delegation smells (#23) | pi | write | nan/deepseek-v4-flash | default | 1 | 15,571,221 | 439,189 | 79,083 | pi session dir (p6) |
 | 2026-10-30 | P6 delegation smells (#23) | Codex CLI | review fixes | gpt-6-luna | default | 3 | 1,196,047 | 69,647 | 8,408 | ~/.codex/sessions (p6) |
 | 2026-10-30 | P6 delegation smells (#23) | Codex CLI | review | gpt-6.1-sol | medium | 4 | 2,576,490 | 215,914 | 12,844 | ~/.codex/sessions (p6) |
+| 2026-10-30 | failure_policies implementation (#23) | Codex CLI | implementer | gpt-6-luna | default | 4 | 9,753,276 | 227,388 | 47,873 | ~/.codex/sessions (p6b) |
+| 2026-10-30 | failure_policies review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 3 | 796,324 | 99,108 | 8,534 | ~/.codex/sessions (p6b) |
 
 #32: 2 implementation rounds, 2 review rounds (round 1 requested 3 fixes, round 2 approved). Per session: mimo 681,389 (44,670 not cached, 29,103 output) and 1,161,033 (52,078 / 17,755); Sol 155,916 (31,342 / 1,950) and 288,963 (35,629 / 2,326). Codex's own "tokens used" lines for the two reviews were 33,292 and 37,955. During review 2, Sol started a `gpt-6-luna` session (142,660 total) that was not requested; it is not counted as a review.
 
@@ -71,6 +73,8 @@ P4b (#23 module coupling, HIGH_MODULE_COUPLING at fan_in >= 3 and fan_out >= 8):
 P5 (#23 function graph in `pyguard structure`, pyan3 + NetworkX): nan/deepseek-v4-flash did all implementation (total / not cached / output). Session 1, 16,317,294 / 419,822 / 87,602, implemented function fan-in/fan-out, call depth, recursive components, calls.unresolved, the harness cases and the docs. Session 2, 3,244,707 / 199,331 / 32,563, fixed Sol round 1 (mirrored-source import root, indirect and closure unresolved calls). Session 3, 2,431,970 / 219,746 / 26,667, redesigned calls.unresolved as a syntactic AST call-site count after Sol round 2 (nested-scope, alias and receiver edge cases). Session 4, 1,454,736 / 123,152 / 16,029, fixed Sol round 3 (PEP 263 declared encoding via tokenize.detect_encoding). gpt-6.1-sol reviewed in 4 separate sessions: 587,186 / 63,410 / 4,100; 675,598 / 56,974 / 5,177; 785,983 / 63,167 / 4,501; 646,333 / 65,213 / 3,529. Rounds 1–3 requested changes; round 4 approved. Self-calls are excluded from function.fan_in/fan_out, so these differ from criticality.in_degree only for self-recursive functions. glm and Codex were not used for implementation.
 
 P6 (delegation smells): deepseek-v4-flash wrote the first implementation. The second pi run failed immediately: the nan key was blocked (401) for both deepseek-v4-flash and glm5.3-flash, and that run used no tokens. As the fallback rule says, gpt-6-luna made the three review-fix rounds. Sol reviewed in four separate sessions and approved in round 4.
+
+#23 failure_policies: Luna implemented in 4 sessions (initial, completion, two review-fix rounds); Sol reviewed in 3 separate read-only sessions (round 1 and 2 CHANGES_REQUESTED, round 3 APPROVE). Totals are the last `total_token_usage` per session.
 
 #31 (model roles doc): no token data was recorded for its sessions, so it has no row. After merging main, its docs-only CI run (40200327340) took 41 s.
 

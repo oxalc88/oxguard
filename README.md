@@ -74,7 +74,7 @@ copies to the project's `tools/analysis/`; these are not executed during checks.
 
 ### `tsguard` — TypeScript quality gate
 
-The current implementation provides three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python runtime module-graph, function-graph, delegation and async-delegation parity is implemented as an advisory subset; remaining Python failure-policy and change parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
+The current implementation provides three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python runtime module-graph, function-graph, delegation, async-delegation and failure-policy parity is implemented as an advisory subset; remaining Python change parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
 
 `tsguard/` is the CLI for TypeScript projects. Runs:
 
@@ -166,6 +166,8 @@ Standalone `tsguard setup` installs project dependencies and a verified SAST eng
   The binary bundles its own runtime (Nuitka-compiled). A missing or untrusted engine
   blocks security checks; run `tsguard setup` to install or repair it. npm installations
   use their package-owned engine; reinstall with optional dependencies if it is missing.
+
+**Failure-policy smells — advisory:** `pyguard structure` reports broad exception handlers that silently return a fallback or exit a loop, plus repeated handler bodies. These findings also run through `audit` and `diagnose`, remain outside `check`, and never change exit code or blocking outcome. Python reports fallback/exit only for bare/`Exception`/`BaseException` handlers (including tuples), ignores `pass` because Ruff S110 covers it, and considers every handler for repetition. Empty `()` and `{}` returns count as fallback; `set()` does not. Repeated-body fingerprints use Python tokens from the handler body only, preserve identifiers and literals, and require at least 12 tokens across three handlers. Parse failures are reported as incomplete structure evidence. See [maintainability rules](docs/maintainability.md) and [metrics](docs/metrics.md).
 
 ## Install
 

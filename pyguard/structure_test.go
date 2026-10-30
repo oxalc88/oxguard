@@ -117,6 +117,45 @@ func TestStructureAdapterReportsAdvisoryCycleAndDepth(t *testing.T) {
 	}
 }
 
+func TestStructureFailurePolicyFindingsAreAdvisory(t *testing.T) {
+	r := contractRunner(t)
+	handlers := []structureFailureHandler{
+		{File: "src/b.py", Line: 20, Fallback: true, Exit: true},
+		{File: "src/a.py", Line: 4, TokenCount: 12, Fingerprint: "same"},
+		{File: "src/a.py", Line: 8, TokenCount: 12, Fingerprint: "same"},
+		{File: "src/b.py", Line: 2, TokenCount: 12, Fingerprint: "same"},
+	}
+	r.structureFailurePolicyFindings("structure", handlers, StatusAdvisory, nil)
+	if err := r.result.Finish(0); err != nil {
+		t.Fatal(err)
+	}
+	if r.result.ExitCode != 0 || r.result.Status != StatusAdvisory {
+		t.Fatalf("policy changed blocking outcome: %+v", r.result)
+	}
+	if len(r.result.Findings) != 3 {
+		t.Fatalf("findings: %+v", r.result.Findings)
+	}
+	byRule := map[string]Finding{}
+	for _, f := range r.result.Findings {
+		byRule[f.Rule] = f
+		if f.Status != StatusAdvisory || f.Severity != "warning" || f.Category != "quality" || f.Level != "structure" {
+			t.Fatalf("finding contract: %+v", f)
+		}
+	}
+	for _, rule := range []string{"pyguard.structure.REPEATED_ERROR_HANDLER", "pyguard.structure.SILENT_EXCEPTION_FALLBACK", "pyguard.structure.SILENT_EXCEPTION_EXIT"} {
+		if _, ok := byRule[rule]; !ok {
+			t.Fatalf("missing %s: %+v", rule, r.result.Findings)
+		}
+	}
+	repeated := byRule["pyguard.structure.REPEATED_ERROR_HANDLER"]
+	if repeated.Location == nil || repeated.Location.File != "src/a.py" || repeated.Location.Line != 4 || len(repeated.Related) != 2 || repeated.Observed == nil || *repeated.Observed != 3 {
+		t.Fatalf("repeated handler shape: %+v", repeated)
+	}
+	if repeated.Related[0].File != "src/a.py" || repeated.Related[0].Line != 8 || repeated.Related[1].File != "src/b.py" || repeated.Related[1].Line != 2 {
+		t.Fatalf("related handler ordering: %+v", repeated.Related)
+	}
+}
+
 func TestStructureAdapterSelfLoopIsCycle(t *testing.T) {
 	r := contractRunner(t)
 	r.normalize(structureSpec(), Result{ok: true}, strings.NewReader(structureSelfLoopReport), nil)
