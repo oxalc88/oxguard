@@ -41,14 +41,36 @@ const COMPLEXIPI = {
   'complexipy.cognitive.threshold_boundary': [['src/boundary.py', 'boundary', 20], ['src/boundary.py', 'above', 21]],
 };
 
+// Canned zero-config Ruff baseline results. Real-binary cases verify these
+// independently when PYGUARD_EVAL_BINARY is set.
+const RUFF = {
+  'ruff.baseline.empty_handler_is_blocking': { exit: 1, status: 'fail', gate: 'failed', measurement: true, findings: [['S110', 'src/handlers.py', 4]] },
+  'ruff.baseline.finally_jump_is_blocking': { exit: 1, status: 'fail', gate: 'failed', measurement: true, findings: [['B012', 'src/finally.py', 5]] },
+  'ruff.baseline.logging_contrast_pass_is_blocking': { exit: 1, status: 'fail', gate: 'failed', measurement: true, findings: [['S110', 'src/handlers.py', 9]] },
+  'ruff.baseline.logging_or_reraise_is_clean': { exit: 0, status: 'pass', gate: 'passed', measurement: true, findings: [] },
+  'ruff.baseline.project_ignore_preserved': { exit: 0, status: 'pass', gate: 'passed', measurement: false, findings: [] },
+  'ruff.baseline.noqa_suppression_respected': { exit: 0, status: 'pass', gate: 'passed', measurement: true, findings: [] },
+  'ruff.baseline.ellipsis_body_not_flagged': { exit: 0, status: 'pass', gate: 'passed', measurement: true, findings: [] },
+  'ruff.baseline.typed_exception_handler_not_flagged': { exit: 0, status: 'pass', gate: 'passed', measurement: true, findings: [] },
+  'ruff.baseline.test_files_still_linted': { exit: 1, status: 'fail', gate: 'failed', measurement: true, findings: [['S110', 'src/tests/test_handlers.py', 4]] },
+};
+
 function standInBinary(t) {
   const file = path.join(temporary(t), 'pyguard-stand-in.cjs');
   fs.writeFileSync(file, `'use strict';
 const path = require('node:path');
 const answers = ${JSON.stringify(ANSWERS)};
 const cognitive = ${JSON.stringify(COMPLEXIPI)};
+const ruff = ${JSON.stringify(RUFF)};
 const caseId = path.basename(path.dirname(process.cwd()));
 const variant = path.basename(process.cwd());
+if (ruff[caseId]) {
+  const spec = ruff[caseId];
+  const findings = spec.findings.map(([rule, file, line]) => ({ rule, level: 'code', gate: 'ruff', severity: 'error', status: 'blocking', category: 'quality', location: { file, line, column: 5 }, evidence: rule + ' violation', diagnostics: [] }));
+  const measurements = spec.measurement ? [{ metric: 'ruff.baseline_version', level: 'code', location: { file: '.' }, value: 1, unit: 'version' }] : [];
+  process.stdout.write(JSON.stringify({ schema_version: '1', status: spec.status, assessment: 'complete', gates: [{ name: 'ruff', status: spec.gate, normalization: 'complete' }], exit_code: spec.exit, findings, measurements, artifacts: [], diagnostics: [] }));
+  process.exit(spec.exit);
+}
 if (variant === 'baseline' || cognitive[caseId]) {
   const rows = variant === 'baseline' ? [] : cognitive[caseId];
   const measurements = rows.map(([file, symbol, value]) => ({ metric: 'complexipy.cognitive', level: 'code', location: { file, symbol }, value, unit: 'score', threshold: 20 }));
@@ -89,7 +111,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['structure.function_graph', 'quality.cognitive_complexity']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'structure.function_graph', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 

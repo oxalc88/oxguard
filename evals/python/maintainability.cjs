@@ -1,7 +1,8 @@
 'use strict';
 // Seeded Python maintainability evals for issue #23. The harness builds small
 // fixture projects in a temp directory and runs the built pyguard binary's
-// informational `criticality` command and the `radon` gate (radon + complexipy)
+// informational `criticality` command, the `ruff` gate (including the
+// zero-config S110/B012 baseline) and the `radon` gate (radon + complexipy)
 // against them; no production project and no LLM is involved. Case IDs,
 // capabilities and kinds mirror evals/maintainability-capabilities.json
 // (enforced by this suite's tests and by evals/maintainability-parity.cjs when
@@ -95,7 +96,223 @@ function cognitiveWarning(result, symbol) {
   return result.findings.find(f => f.rule === 'pyguard.complexipy.cognitive_exceeded' && f.location.symbol === symbol);
 }
 
+function ruffMeasurement(result) {
+  return result.measurements.find(m => m.metric === 'ruff.baseline_version');
+}
+function ruffFinding(result, code) {
+  return result.findings.find(f => f.rule === code);
+}
+function assertBlockingRuff(result, code, file, line) {
+  assert.equal(result.exit_code, 1);
+  assert.equal(result.status, 'fail');
+  const finding = ruffFinding(result, code);
+  assert.ok(finding, `missing ${code}; findings: ${JSON.stringify(result.findings)}`);
+  assert.equal(finding.gate, 'ruff');
+  assert.equal(finding.category, 'quality');
+  assert.equal(finding.status, 'blocking');
+  assert.equal(finding.severity, 'error');
+  assert.equal(finding.location.file, file);
+  assert.equal(finding.location.line, line);
+  assert.equal(result.gates.find(g => g.name === 'ruff').status, 'failed');
+  const measurement = ruffMeasurement(result);
+  assert.ok(measurement, 'missing ruff.baseline_version measurement');
+  assert.equal(measurement.level, 'code');
+  assert.equal(measurement.location.file, '.');
+  assert.equal(measurement.value, 1);
+  assert.equal(measurement.unit, 'version');
+}
+
 const definitions = [
+  {
+    id: 'ruff.baseline.empty_handler_is_blocking',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'positive',
+    command: 'ruff',
+    exitCode: 1,
+    files: {
+      'src/handlers.py': 'def swallow() -> None:\n    try:\n        int("x")\n    except Exception:  # noqa: BLE001\n        pass\n',
+    },
+    check: ({ result }) => {
+      // No Ruff configuration at the project root, so pyguard adds
+      // --extend-select S110,B012 and records the baseline version. S110 is a
+      // blocking quality finding: exit 1 and a failed ruff gate. The fixture's
+      // BLE001 suppression only hides the unrelated blind-except rule.
+      assertBlockingRuff(result, 'S110', 'src/handlers.py', 4);
+    },
+  },
+  {
+    id: 'ruff.baseline.finally_jump_is_blocking',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'positive',
+    command: 'ruff',
+    exitCode: 1,
+    files: {
+      'src/finally.py': 'def value() -> int:\n    try:\n        return 1\n    finally:\n        return 2  # noqa: SIM107\n',
+    },
+    check: ({ result }) => {
+      // B012 is selected by the same zero-config baseline and blocks: a return
+      // inside finally discards a pending exception.
+      assertBlockingRuff(result, 'B012', 'src/finally.py', 5);
+    },
+  },
+  {
+    id: 'ruff.baseline.logging_contrast_pass_is_blocking',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'positive',
+    command: 'ruff',
+    exitCode: 1,
+    files: {
+      'src/handlers.py': [
+        'import logging',
+        '',
+        'logger = logging.getLogger(__name__)',
+        '',
+        '',
+        'def logs() -> None:',
+        '    try:',
+        '        int("x")',
+        '    except Exception:  # noqa: BLE001',
+        '        pass',
+        '',
+      ].join('\n'),
+    },
+    check: ({ result }) => {
+      // Contrast for the logging negative case: the same handler and exception
+      // type, but with `pass` instead of logging, is exactly what S110 flags.
+      // BLE001 is suppressed only because the blind `Exception` handler is
+      // otherwise unrelated to proving S110.
+      assertBlockingRuff(result, 'S110', 'src/handlers.py', 9);
+    },
+  },
+  {
+    id: 'ruff.baseline.logging_or_reraise_is_clean',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'negative',
+    command: 'ruff',
+    files: {
+      'src/handlers.py': [
+        'import logging',
+        '',
+        'logger = logging.getLogger(__name__)',
+        '',
+        '',
+        'def logs() -> None:',
+        '    try:',
+        '        int("x")',
+        '    except Exception:',
+        '        logger.exception("failed")',
+        '',
+        '',
+        'def reraises() -> None:',
+        '    try:',
+        '        int("x")',
+        '    except Exception:  # noqa: TRY203',
+        '        raise',
+        '',
+      ].join('\n'),
+    },
+    check: ({ result }) => {
+      // Both handlers catch Exception, so each would trigger S110 if its body
+      // were only `pass` (proved by logging_contrast_pass_is_blocking).
+      // Logging and re-raising bodies are not empty handlers, so S110 stays
+      // silent. TRY203 is the only unrelated finding and is suppressed; the
+      // fixture is otherwise clean.
+      assert.equal(result.exit_code, 0);
+      assert.equal(result.status, 'pass');
+      assert.equal(ruffFinding(result, 'S110'), undefined, JSON.stringify(result.findings));
+      assert.ok(ruffMeasurement(result), 'zero-config run must record the baseline version');
+    },
+  },
+  {
+    id: 'ruff.baseline.project_ignore_preserved',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'negative',
+    command: 'ruff',
+    pyproject: PYPROJECT + '[tool.ruff.lint]\nselect = ["S110"]\nignore = ["S110"]\n',
+    files: {
+      'src/handlers.py': 'def swallow() -> None:\n    try:\n        int("x")\n    except Exception:\n        pass\n',
+    },
+    check: ({ result }) => {
+      // A project Ruff config, even one that only ignores S110, disables the
+      // baseline. No --extend-select is added (Ruff's CLI select would override
+      // the ignore), and no baseline measurement is recorded.
+      assert.equal(result.exit_code, 0);
+      assert.equal(result.status, 'pass');
+      assert.equal(ruffFinding(result, 'S110'), undefined, JSON.stringify(result.findings));
+      assert.equal(ruffMeasurement(result), undefined, JSON.stringify(result.measurements));
+    },
+  },
+  {
+    id: 'ruff.baseline.noqa_suppression_respected',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'negative',
+    command: 'ruff',
+    files: {
+      'src/handlers.py': 'def swallow() -> None:\n    try:\n        int("x")\n    except Exception:  # noqa: S110,BLE001\n        pass\n',
+    },
+    check: ({ result }) => {
+      // Ruff's native inline suppression is respected; the baseline is still
+      // active and recorded.
+      assert.equal(result.exit_code, 0);
+      assert.equal(result.status, 'pass');
+      assert.equal(ruffFinding(result, 'S110'), undefined, JSON.stringify(result.findings));
+      assert.ok(ruffMeasurement(result), 'zero-config run must record the baseline version');
+    },
+  },
+  {
+    id: 'ruff.baseline.ellipsis_body_not_flagged',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'boundary',
+    command: 'ruff',
+    files: {
+      'src/handlers.py': 'def swallow() -> None:\n    try:\n        int("x")\n    except Exception:  # noqa: BLE001\n        ...\n',
+    },
+    check: ({ result }) => {
+      // Documented boundary: Ruff 0.17.2 S110 flags an empty `pass` body, not an
+      // ellipsis body. PyGuard keeps that analyzer semantics rather than
+      // inventing a broader empty-handler rule.
+      assert.equal(result.exit_code, 0);
+      assert.equal(result.status, 'pass');
+      assert.equal(ruffFinding(result, 'S110'), undefined, JSON.stringify(result.findings));
+      assert.ok(ruffMeasurement(result), 'zero-config run must record the baseline version');
+    },
+  },
+  {
+    id: 'ruff.baseline.typed_exception_handler_not_flagged',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'boundary',
+    command: 'ruff',
+    files: {
+      'src/handlers.py': 'def swallow_typed() -> None:\n    try:\n        int("x")\n    except ValueError:\n        pass\n',
+    },
+    check: ({ result }) => {
+      // Documented limitation: Ruff's default `check-typed-exception = false`
+      // means S110 only checks bare/Exception/BaseException handlers. A
+      // `pass`-only typed handler such as `except ValueError: pass` is not
+      // flagged, and pyguard keeps that upstream semantics rather than adding
+      // S112 or enabling check-typed-exception.
+      assert.equal(result.exit_code, 0);
+      assert.equal(result.status, 'pass');
+      assert.equal(ruffFinding(result, 'S110'), undefined, JSON.stringify(result.findings));
+      assert.ok(ruffMeasurement(result), 'zero-config run must record the baseline version');
+    },
+  },
+  {
+    id: 'ruff.baseline.test_files_still_linted',
+    capability: 'quality.zero_config_exception_handling',
+    kind: 'boundary',
+    command: 'ruff',
+    exitCode: 1,
+    files: {
+      'src/tests/test_handlers.py': 'def test_swallow() -> None:\n    try:\n        int("x")\n    except Exception:  # noqa: BLE001\n        pass\n',
+    },
+    check: ({ result }) => {
+      // Existing pyguard policy excludes conventional test files from the
+      // complexity analyzers, not from Ruff. Ruff still gates test code, so the
+      // zero-config baseline reports S110 inside tests/ and blocks.
+      assertBlockingRuff(result, 'S110', 'src/tests/test_handlers.py', 4);
+    },
+  },
   {
     id: 'criticality.distinct_callers_cross_module',
     capability: 'structure.function_graph',
@@ -359,7 +576,7 @@ function project(definition, base, variant = 'project') {
   const dir = path.join(base, definition.id, variant);
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'tools'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'pyproject.toml'), PYPROJECT);
+  fs.writeFileSync(path.join(dir, 'pyproject.toml'), definition.pyproject || PYPROJECT);
   fs.cpSync(ANALYSIS, path.join(dir, 'tools', 'analysis'), { recursive: true });
   for (const [file, text] of Object.entries(definition.files)) {
     fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
@@ -381,7 +598,8 @@ function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
       try {
         const response = execute({ project: project(definition, base), args });
         assert.ok(!response.error, `pyguard could not be started: ${response.error}`);
-        assert.equal(response.status, 0, `pyguard ${args[0]} exited with ${response.status}: ${String(response.stderr || '').slice(0, 1024)}`);
+        const expectedExit = definition.exitCode ?? 0;
+        assert.equal(response.status, expectedExit, `pyguard ${args[0]} exited with ${response.status}, expected ${expectedExit}: ${String(response.stderr || '').slice(0, 1024)}`);
         const result = JSON.parse(response.stdout);
         let baseline;
         if (definition.baselineFiles) {

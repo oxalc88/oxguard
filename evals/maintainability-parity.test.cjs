@@ -73,7 +73,7 @@ test('a passing Python report is accepted as not_implemented without claiming re
   assert.equal(cli([evidence(),pythonEvidence()]).status,0);
 });
 test('a failing Python seed case is not ready and fails the process', () => {
-  const pyguard=pythonEvidence(r=>{ r.cases.find(c=>c.kind==='boundary').outcome='fail'; });
+  const pyguard=pythonEvidence(r=>{ r.cases.find(c=>c.capability==='structure.function_graph'&&c.kind==='boundary').outcome='fail'; });
   const result=assess(evidence(),pyguard);
   assert.equal(result.pyguard_cases_passed,false);
   assert.equal(result.pyguard_maintainability_ready,false);

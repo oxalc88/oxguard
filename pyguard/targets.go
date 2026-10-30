@@ -38,8 +38,8 @@ func runCheck(r *Runner, dirs []string) int {
 // runFix runs auto-formatters: ruff check --fix then ruff format.
 func runFix(r *Runner, dirs []string) int {
 	r.println("pyguard fix")
-	args1 := append([]string{"uv", "run", "ruff", "check", "--fix"}, dirs...)
-	res1 := r.Run("ruff check --fix", args1...)
+	args1 := append([]string{"uv", "run", "ruff", "check", "--fix"}, r.ruffBaselineArgs()...)
+	res1 := r.Run("ruff check --fix", append(args1, dirs...)...)
 
 	args2 := append([]string{"uv", "run", "ruff", "format"}, dirs...)
 	res2 := r.Run("ruff format", args2...)
@@ -74,7 +74,7 @@ func runSecurity(r *Runner, dirs []string) int {
 
 // runRuff runs lint + format check.
 func runRuff(r *Runner, dirs []string) int {
-	args := []string{"uv", "run", "ruff", "check"}
+	args := append([]string{"uv", "run", "ruff", "check"}, r.ruffBaselineArgs()...)
 	if r.machine() {
 		args = append(args, "--output-format", "json")
 	}

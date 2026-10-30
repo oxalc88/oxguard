@@ -8,7 +8,9 @@ func runDiagnose(r *Runner, dirs []string) int {
 		run        func(*Runner) int
 	}{
 		{"ruff.lint", "ruff", func(r *Runner) int {
-			args := append([]string{"uv", "run", "ruff", "check", "--output-format", "json"}, dirs...)
+			args := append([]string{"uv", "run", "ruff", "check"}, r.ruffBaselineArgs()...)
+			args = append(args, "--output-format", "json")
+			args = append(args, dirs...)
 			return diagnosticTool(r, toolSpec{gate: "ruff", adapter: "ruff"}, "ruff check", args)
 		}},
 		{"ruff.format", "ruff", func(r *Runner) int {
