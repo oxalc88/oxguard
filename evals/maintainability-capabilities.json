@@ -65,7 +65,12 @@
             "structure.nested_package_cycle",
             "structure.namespace_package_cycle",
             "structure.namespace_relative_import_cycle",
-            "structure.default_scope_src_layout_cycle"
+            "structure.default_scope_src_layout_cycle",
+            "structure.dunder_package_attribute_cycle",
+            "structure.runtime_binding_exports_control",
+            "structure.conditional_export_cycle",
+            "structure.utf8_bom_source_cycle",
+            "structure.latin1_declared_source_cycle"
           ],
           "negative": [
             "structure.acyclic_chain"
@@ -92,7 +97,10 @@
             "structure.type_only_cycle_control",
             "structure.external_imports_no_edges",
             "structure.external_name_collision_no_cycle",
-            "structure.relative_import_package_export_control"
+            "structure.relative_import_package_export_control",
+            "structure.module_getattr_export_control",
+            "structure.star_reexport_control",
+            "structure.dynamic_module_exports_control"
           ],
           "boundary": [
             "structure.deferred_import_cycle_control",

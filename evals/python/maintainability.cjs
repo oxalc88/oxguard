@@ -77,6 +77,11 @@ const twoChains = (name) => {
   return lines.join('\n') + '\n';
 };
 const flatFunction = 'def flat(value):\n    return value + 1\n';
+// Python accepts a UTF-8 BOM and a PEP 263 non-UTF-8 source declaration.
+// Write raw bytes so the fixture is identical on Windows and POSIX and is
+// never silently re-encoded by the harness.
+const utf8BomSource = (text) => Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(text, 'utf8')]);
+const latin1Source = (text) => Buffer.from(text, 'latin1');
 // complexipy folds nested functions into the enclosing function: an inner
 // chain of eight scores 36 and is reported once under the outer name.
 const nestedFunctionChain = (depth, outer, inner) => {
@@ -491,6 +496,141 @@ const definitions = [
     },
   },
   {
+    id: 'structure.dunder_package_attribute_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      // Python supplies __path__, __name__ and the other module dunders, so
+      // `from pkg import __path__` is a real attribute import. It must close
+      // the pkg <-> pkg.worker cycle instead of being unresolved.
+      'src/pkg/__init__.py': 'import pkg.worker\n',
+      'src/pkg/worker.py': 'from pkg import __path__, __name__, __spec__\nfrom pkg import __file__, __loader__, __package__\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/__init__.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/worker.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.runtime_binding_exports_control',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      // Imports aliases, for/with/except targets, walrus assignments, class
+      // definitions and names declared global inside functions all bind
+      // runtime package attributes. Each must validate, closing the cycle.
+      'src/pkg/__init__.py': "import os.path as helper\nimport pkg.worker\n\n\ndef setup():\n    global plugin\n    plugin = 1\n\n\nclass Service:\n    pass\n\nfor item in ():\n    pass\n\nwith open('unused') as handle:\n    pass\n\ntry:\n    recovered = 1\nexcept Exception as error:\n    pass\n\nif (loaded := None) is None:\n    pass\n",
+      'src/pkg/worker.py': 'from pkg import plugin, Service, item, handle, recovered, error, loaded, helper\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/__init__.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/worker.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.conditional_export_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      // VALUE is bound in both runtime branches of a sys.version_info check.
+      // Treating only one branch as exported previously made `from pkg import
+      // VALUE` unresolved, withheld worker.py from grimp and hid the cycle.
+      'src/pkg/__init__.py': "import sys\nimport pkg.worker\n\nif sys.version_info >= (3, 12):\n    VALUE = 1\nelse:\n    VALUE = 2\n",
+      'src/pkg/worker.py': 'from pkg import VALUE\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/__init__.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/worker.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.type_imports'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.utf8_bom_source_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': utf8BomSource('from .b import B\n\n\ndef load():\n    return B\n'),
+      'src/pkg/b.py': utf8BomSource('from .a import load\n'),
+    },
+    check: ({ result }) => {
+      // Windows editors commonly add a UTF-8 BOM. Python accepts it, so both
+      // modules must remain in the graph and their runtime SCC must survive.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/b.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.deferred_imports'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.latin1_declared_source_cycle',
+    capability: 'structure.runtime_graph',
+    kind: 'positive',
+    command: 'structure',
+    files: {
+      'src/pkg/__init__.py': '',
+      'src/pkg/a.py': latin1Source('# -*- coding: latin-1 -*-\n# caf\u00e9\nfrom .b import B\n\n\ndef load():\n    return B\n'),
+      'src/pkg/b.py': latin1Source('# -*- coding: latin-1 -*-\n# caf\u00e9\nfrom .a import load\n'),
+    },
+    check: ({ result }) => {
+      // A valid PEP 263 declaration makes these non-UTF-8 bytes importable by
+      // Python. The AST pass and grimp must agree on the same source lines.
+      complete(result, 'structure');
+      const findings = circularFindings(result);
+      assert.equal(findings.length, 1, JSON.stringify(result.findings));
+      assert.equal(findings[0].location.file, 'src/pkg/a.py');
+      assert.deepEqual(findings[0].related.map(location => location.file), ['src/pkg/b.py']);
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 1);
+      assert.equal(structureMeasurement(result, 'module.deferred_imports'), 0);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
     id: 'structure.acyclic_chain',
     capability: 'structure.runtime_graph',
     kind: 'negative',
@@ -698,6 +838,80 @@ const definitions = [
       assert.equal(structureMeasurement(result, 'module.edges'), 1);
       assert.equal(structureMeasurement(result, 'module.cycles'), 0);
       assert.equal(structureDepth(result, 'src/pkg/a.py'), 1);
+    },
+  },
+  {
+    id: 'structure.module_getattr_export_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      // A module-level __getattr__ can supply any attribute, so an arbitrary
+      // name imported from the package is valid rather than unresolved.
+      'src/pkg/__init__.py': 'def __getattr__(name):\n    return name\n',
+      'src/pkg/worker.py': 'from pkg import plugin\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 1);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.star_reexport_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      // A runtime star re-export makes the package's attribute set dynamic;
+      // a name imported from it is valid and the impl edge stays intact.
+      'src/pkg/__init__.py': 'from .impl import *\n',
+      'src/pkg/impl.py': 'VALUE = 1\n',
+      'src/pkg/worker.py': 'from pkg import VALUE\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 3);
+      assert.equal(structureMeasurement(result, 'module.edges'), 2);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 1);
+      assert.equal(structureDepth(result, 'src/pkg/impl.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 2);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'structure.dynamic_module_exports_control',
+    capability: 'structure.false_positive_controls',
+    kind: 'negative',
+    command: 'structure',
+    files: {
+      // globals() and setattr() can create package attributes at runtime, so
+      // imported names that no static statement binds remain valid.
+      'src/pkg/__init__.py': "import sys\n\nglobals()['plugin'] = 1\nsetattr(sys.modules[__name__], 'extension', 2)\n",
+      'src/pkg/worker.py': 'from pkg import plugin, extension, arbitrary\n',
+    },
+    check: ({ result }) => {
+      complete(result, 'structure');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.findings.length, 0, JSON.stringify(result.findings));
+      assert.equal(structureMeasurement(result, 'module.count'), 2);
+      assert.equal(structureMeasurement(result, 'module.edges'), 1);
+      assert.equal(structureMeasurement(result, 'module.cycles'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/__init__.py'), 0);
+      assert.equal(structureDepth(result, 'src/pkg/worker.py'), 1);
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
     },
   },
   {

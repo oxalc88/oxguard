@@ -197,8 +197,11 @@ def build_inventory(
 
 
 def read_tree(path: Path) -> ast.Module:
+    # Parse the on-disk bytes so Python's own detection honors a UTF-8 BOM and
+    # PEP 263 encoding declarations. Decoding as UTF-8 first rejects valid
+    # sources and hides their imports from the graph.
     try:
-        source = path.read_text(encoding="utf-8")
+        source = path.read_bytes()
         return ast.parse(source, filename=str(path))
     except (OSError, UnicodeError, SyntaxError) as error:
         raise StructureError(
@@ -221,72 +224,108 @@ def absolute_import_base(
     return base
 
 
-def bind_target_names(node: ast.AST) -> set[str]:
-    """Collect simple names bound by an assignment target."""
-    if isinstance(node, ast.Name):
-        return {node.id}
-    if isinstance(node, (ast.Tuple, ast.List)):
-        names: set[str] = set()
-        for element in node.elts:
-            names.update(bind_target_names(element))
-        return names
-    if isinstance(node, ast.Starred):
-        return bind_target_names(node.value)
-    return set()
+# Attributes Python supplies for imported modules and packages. They are valid
+# ``from package import name`` targets even though no source statement binds
+# them.
+IMPLICIT_MODULE_ATTRIBUTES = frozenset(
+    {
+        "__all__",
+        "__builtins__",
+        "__cached__",
+        "__dict__",
+        "__doc__",
+        "__file__",
+        "__loader__",
+        "__name__",
+        "__package__",
+        "__path__",
+        "__spec__",
+    }
+)
+
+
+def match_pattern_names(pattern: ast.AST) -> set[str]:
+    """Return names bound by a structural pattern match."""
+    names: set[str] = set()
+    for node in ast.walk(pattern):
+        if isinstance(node, ast.MatchAs) and node.name:
+            names.add(node.name)
+        elif isinstance(node, ast.MatchStar) and node.name:
+            names.add(node.name)
+        elif isinstance(node, ast.MatchMapping) and node.rest:
+            names.add(node.rest)
+    return names
+
+
+def contains_dynamic_export(node: ast.AST) -> bool:
+    """Detect globals()/setattr() calls that can create arbitrary names."""
+    for child in ast.walk(node):
+        if not isinstance(child, ast.Call):
+            continue
+        func = child.func
+        if isinstance(func, ast.Name) and func.id in {"globals", "setattr"}:
+            return True
+        if isinstance(func, ast.Attribute) and func.attr == "setattr":
+            return True
+    return False
 
 
 def module_exports(tree: ast.Module) -> tuple[set[str], bool]:
-    """Return module-level names and whether the module can export dynamically."""
-    exports: set[str] = set()
+    """Return a deliberate over-approximation of a package's exports.
+
+    A name counts as exported when any statement in the module could bind it at
+    runtime, including ordinary conditional branches and any nesting level.
+    This keeps a valid conditional import from becoming incomplete evidence;
+    only a name that is clearly absent makes the result incomplete. TYPE_CHECKING
+    bodies and annotation-only assignments are excluded because neither creates
+    a runtime module attribute.
+    """
+    exports: set[str] = set(IMPLICIT_MODULE_ATTRIBUTES)
     dynamic = False
 
-    def visit_body(body: list[ast.stmt]) -> None:
+    def visit(node: ast.AST) -> None:
         nonlocal dynamic
-        for statement in body:
-            if isinstance(statement, ast.If) and is_type_checking(statement.test):
-                # TYPE_CHECKING is false at runtime, so its body cannot bind
-                # package attributes. Only a runtime else branch can export.
-                visit_body(statement.orelse)
-                continue
-            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                exports.add(statement.name)
-                if statement.name == "__getattr__":
-                    dynamic = True
-                continue
-            if isinstance(statement, ast.ClassDef):
-                exports.add(statement.name)
-                continue
-            if isinstance(statement, ast.Import):
-                for alias in statement.names:
-                    exports.add(alias.asname or alias.name.split(".", 1)[0])
-                continue
-            if isinstance(statement, ast.ImportFrom):
-                for alias in statement.names:
-                    if alias.name == "*":
-                        dynamic = True
-                    else:
-                        exports.add(alias.asname or alias.name)
-                continue
-            if isinstance(statement, ast.Assign):
-                for target in statement.targets:
-                    exports.update(bind_target_names(target))
-            elif isinstance(statement, ast.AugAssign):
-                exports.update(bind_target_names(statement.target))
-            elif isinstance(statement, ast.AnnAssign) and statement.value is not None:
-                # An annotation without a value does not bind the name at
-                # runtime; it may be assigned later by setup code.
-                exports.update(bind_target_names(statement.target))
-            # Control-flow bodies execute at import time and can bind exports.
-            for field in ("body", "orelse", "finalbody"):
-                child = getattr(statement, field, None)
-                if isinstance(child, list) and child and isinstance(child[0], ast.stmt):
-                    visit_body(child)
-            for handler in getattr(statement, "handlers", []):
-                visit_body(handler.body)
-            for case in getattr(statement, "cases", []):
-                visit_body(case.body)
+        if isinstance(node, ast.If) and is_type_checking(node.test):
+            # The test still runs; only the guarded body is unreachable at
+            # runtime. The else branch, including an elif chain, remains.
+            visit(node.test)
+            for statement in node.orelse:
+                visit(statement)
+            return
+        if isinstance(node, ast.AnnAssign) and node.value is None:
+            # `name: Type` does not bind name at runtime. Keep looking at the
+            # annotation for walrus/dynamic expressions, but do not export the
+            # target.
+            visit(node.annotation)
+            return
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            exports.add(node.id)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            exports.add(node.name)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                exports.add(alias.asname or alias.name.split(".", 1)[0])
+        elif isinstance(node, ast.ImportFrom):
+            if any(alias.name == "*" for alias in node.names):
+                dynamic = True
+            for alias in node.names:
+                if alias.name != "*":
+                    exports.add(alias.asname or alias.name)
+        elif isinstance(node, ast.ExceptHandler) and node.name:
+            exports.add(node.name)
+        elif isinstance(node, ast.Match):
+            for case in node.cases:
+                exports.update(match_pattern_names(case.pattern))
+        elif isinstance(node, ast.Call) and contains_dynamic_export(node):
+            dynamic = True
+        for child in ast.iter_child_nodes(node):
+            visit(child)
 
-    visit_body(tree.body)
+    visit(tree)
+    # A module-level __getattr__ supplies arbitrary attributes even when it is
+    # imported or assigned rather than defined by a function statement.
+    if "__getattr__" in exports:
+        dynamic = True
     return exports, dynamic
 
 
@@ -352,6 +391,12 @@ def scan_ast(
 
         for alias in node.names:
             if alias.name == "*":
+                valid_by_line.setdefault(line, set()).add(base)
+                continue
+            if alias.name in IMPLICIT_MODULE_ATTRIBUTES:
+                # Python supplies these attributes on every imported module or
+                # package. They are valid ``from package import name`` targets
+                # even though no source statement binds them.
                 valid_by_line.setdefault(line, set()).add(base)
                 continue
             target = f"{base}.{alias.name}"
