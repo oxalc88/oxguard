@@ -55,6 +55,35 @@ const RUFF = {
   'ruff.baseline.test_files_still_linted': { exit: 1, status: 'fail', gate: 'failed', measurement: true, findings: [['S110', 'src/tests/test_handlers.py', 4]] },
 };
 
+// Canned structure reports for the Python module-graph controls. The real-binary
+// test independently verifies the same measurements and findings with grimp.
+const STRUCTURE = {
+  'structure.runtime_cycle': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, counts: { modules: 3, edges: 2, cycles: 1, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0, 'src/pkg/b.py': 0 }, cycles: [['src/pkg/a.py', 'src/pkg/b.py']] },
+  'structure.self_import_cycle': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, counts: { modules: 2, edges: 1, cycles: 1, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0 }, cycles: [['src/pkg/a.py']] },
+  'structure.nested_package_cycle': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, counts: { modules: 4, edges: 2, cycles: 1, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/sub/__init__.py': 0, 'src/pkg/sub/a.py': 0, 'src/pkg/b.py': 0 }, cycles: [['src/pkg/b.py', 'src/pkg/sub/a.py']] },
+  'structure.namespace_package_cycle': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, counts: { modules: 2, edges: 2, cycles: 1, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/a.py': 0, 'src/pkg/b.py': 0 }, cycles: [['src/pkg/a.py', 'src/pkg/b.py']] },
+  'structure.namespace_relative_import_cycle': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, counts: { modules: 2, edges: 2, cycles: 1, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/a.py': 0, 'src/pkg/b.py': 0 }, cycles: [['src/pkg/a.py', 'src/pkg/b.py']] },
+  'structure.default_scope_src_layout_cycle': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, counts: { modules: 3, edges: 2, cycles: 1, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0, 'src/pkg/b.py': 0 }, cycles: [['src/pkg/a.py', 'src/pkg/b.py']] },
+  'structure.acyclic_chain': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 4, edges: 2, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 2, 'src/pkg/b.py': 1, 'src/pkg/c.py': 0 } },
+  'structure.scope_and_test_exclusions': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 3, edges: 1, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/main.py': 1, 'src/pkg/helper.py': 0 } },
+  'structure.duplicate_identities_do_not_crash': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 3, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/one/a.py': 0, 'src/two/a.py': 0, 'src/pkg/a.py': 0 }, partial: 'Duplicate module identity: pkg.a (src/pkg/a/__init__.py, src/pkg/a.py)' },
+  'structure.out_of_scope_collision_is_ignored': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 1, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/other.py': 0 } },
+  'structure.runtime_cycle_with_type_only_imports': { status: 'advisory', assessment: 'complete', gate: 'advisory', normalization: 'complete', exit: 0, counts: { modules: 4, edges: 2, cycles: 1, type_imports: 1, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0, 'src/pkg/b.py': 0, 'src/pkg/c.py': 0 }, cycles: [['src/pkg/a.py', 'src/pkg/b.py']] },
+  'structure.type_only_cycle_control': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 3, edges: 0, cycles: 0, type_imports: 2, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0, 'src/pkg/b.py': 0 } },
+  'structure.external_imports_no_edges': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 3, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0, 'src/pkg/b.py': 0 } },
+  'structure.external_name_collision_no_cycle': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 2, edges: 1, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/a.py': 0, 'src/vendor/json.py': 0 } },
+  'structure.relative_import_package_export_control': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 2, edges: 1, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 1 } },
+  'structure.deferred_import_cycle_control': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 3, edges: 1, cycles: 0, type_imports: 0, deferred_imports: 1 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 1, 'src/pkg/b.py': 0 } },
+  'structure.unresolved_local_import_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 2, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0 }, partial: 'Unresolved local import: pkg.missing (src/pkg/a.py:1)' },
+  'structure.excluded_import_is_scope_boundary': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 2, edges: 1, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 1, 'src/pkg/a.py': 0 } },
+  'structure.relative_import_missing_name_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 2, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0 }, partial: 'Unresolved local import: pkg.missing (src/pkg/a.py:1)' },
+  'structure.narrow_scope_import_is_boundary': { status: 'pass', assessment: 'complete', gate: 'passed', normalization: 'complete', exit: 0, counts: { modules: 1, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/a.py': 0 } },
+  'structure.narrow_scope_missing_child_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 1, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/a.py': 0 }, partial: 'Unresolved local import: pkg.missing (src/pkg/a.py:1)' },
+  'structure.invalid_relative_import_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 2, edges: 0, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 0, 'src/pkg/a.py': 0 }, partial: 'Unresolved local import: <relative> (src/pkg/a.py:1)' },
+  'structure.type_only_package_export_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 3, edges: 1, cycles: 0, type_imports: 1, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 1, 'src/pkg/a.py': 0, 'src/pkg/b.py': 0 }, partial: 'Unresolved local import: pkg.Foo (src/pkg/b.py:1)' },
+  'structure.annotation_only_export_is_partial': { status: 'advisory', assessment: 'incomplete', gate: 'advisory', normalization: 'partial', exit: 0, counts: { modules: 2, edges: 1, cycles: 0, type_imports: 0, deferred_imports: 0 }, depths: { 'src/pkg/__init__.py': 1, 'src/pkg/worker.py': 0 }, partial: 'Unresolved local import: pkg.client (src/pkg/worker.py:1)' },
+};
+
 function standInBinary(t) {
   const file = path.join(temporary(t), 'pyguard-stand-in.cjs');
   fs.writeFileSync(file, `'use strict';
@@ -62,6 +91,7 @@ const path = require('node:path');
 const answers = ${JSON.stringify(ANSWERS)};
 const cognitive = ${JSON.stringify(COMPLEXIPI)};
 const ruff = ${JSON.stringify(RUFF)};
+const structure = ${JSON.stringify(STRUCTURE)};
 const caseId = path.basename(path.dirname(process.cwd()));
 const variant = path.basename(process.cwd());
 if (ruff[caseId]) {
@@ -69,6 +99,16 @@ if (ruff[caseId]) {
   const findings = spec.findings.map(([rule, file, line]) => ({ rule, level: 'code', gate: 'ruff', severity: 'error', status: 'blocking', category: 'quality', location: { file, line, column: 5 }, evidence: rule + ' violation', diagnostics: [] }));
   const measurements = spec.measurement ? [{ metric: 'ruff.baseline_version', level: 'code', location: { file: '.' }, value: 1, unit: 'version' }] : [];
   process.stdout.write(JSON.stringify({ schema_version: '1', status: spec.status, assessment: 'complete', gates: [{ name: 'ruff', status: spec.gate, normalization: 'complete' }], exit_code: spec.exit, findings, measurements, artifacts: [], diagnostics: [] }));
+  process.exit(spec.exit);
+}
+if (structure[caseId]) {
+  const spec = structure[caseId];
+  const measurements = Object.entries(spec.depths || {}).map(([file, value]) => ({ metric: 'module.dependency_depth', level: 'structure', location: { file }, value, unit: 'edges' }));
+  const units = { modules: 'modules', edges: 'edges', cycles: 'components', type_imports: 'references', deferred_imports: 'references' };
+  for (const [name, value] of Object.entries(spec.counts)) measurements.push({ metric: name === 'modules' ? 'module.count' : 'module.' + name, level: 'structure', location: { file: '.' }, value, unit: units[name] });
+  const findings = (spec.cycles || []).map(files => ({ level: 'structure', gate: 'structure', rule: 'pyguard.structure.CIRCULAR_DEPENDENCY', severity: 'warning', status: 'advisory', category: 'quality', location: { file: files[0] }, related: files.slice(1).map(file => ({ file })), evidence: 'Runtime imports form a strongly connected component: ' + files.join(', '), diagnostics: [] }));
+  if (spec.partial) findings.push({ level: 'structure', gate: 'structure', rule: 'pyguard.structure.not_evaluated', severity: 'info', status: 'advisory', category: 'quality', evidence: spec.partial, diagnostics: [] });
+  process.stdout.write(JSON.stringify({ schema_version: '1', status: spec.status, assessment: spec.assessment, gates: [{ name: 'structure', status: spec.gate, normalization: spec.normalization }], exit_code: spec.exit, findings, measurements, artifacts: [], diagnostics: [] }));
   process.exit(spec.exit);
 }
 if (variant === 'baseline' || cognitive[caseId]) {
@@ -111,7 +151,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'structure.function_graph', 'quality.cognitive_complexity']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'structure.runtime_graph', 'structure.false_positive_controls', 'structure.function_graph', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 

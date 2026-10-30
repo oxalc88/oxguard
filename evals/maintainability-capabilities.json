@@ -57,27 +57,57 @@
       "id": "structure.runtime_graph",
       "tsguard": "structure.runtime_cycle",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "structure.runtime_cycle",
+            "structure.self_import_cycle",
+            "structure.nested_package_cycle",
+            "structure.namespace_package_cycle",
+            "structure.namespace_relative_import_cycle",
+            "structure.default_scope_src_layout_cycle"
+          ],
+          "negative": [
+            "structure.acyclic_chain"
+          ],
+          "boundary": [
+            "structure.scope_and_test_exclusions",
+            "structure.duplicate_identities_do_not_crash",
+            "structure.out_of_scope_collision_is_ignored"
+          ]
         }
       },
-      "python_candidate": "Extend existing pyan3/NetworkX infrastructure with module imports and SCCs"
+      "python_candidate": "grimp 3.18 runtime module graph with NetworkX SCCs and condensation depth"
     },
     {
       "id": "structure.false_positive_controls",
       "tsguard": "structure.type_only_cycle_control",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "structure.runtime_cycle_with_type_only_imports"
+          ],
+          "negative": [
+            "structure.type_only_cycle_control",
+            "structure.external_imports_no_edges",
+            "structure.external_name_collision_no_cycle",
+            "structure.relative_import_package_export_control"
+          ],
+          "boundary": [
+            "structure.deferred_import_cycle_control",
+            "structure.unresolved_local_import_is_partial",
+            "structure.excluded_import_is_scope_boundary",
+            "structure.relative_import_missing_name_is_partial",
+            "structure.narrow_scope_import_is_boundary",
+            "structure.narrow_scope_missing_child_is_partial",
+            "structure.invalid_relative_import_is_partial",
+            "structure.type_only_package_export_is_partial",
+            "structure.annotation_only_export_is_partial"
+          ]
         }
       },
-      "python_candidate": "Python-specific TYPE_CHECKING and deferred-import controls"
+      "python_candidate": "Python TYPE_CHECKING, deferred function-local imports, external references and unresolved-local partial assessment"
     },
     {
       "id": "change.complexity_displacement",

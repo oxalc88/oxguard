@@ -35,11 +35,13 @@ Informational (advisory, never fails gate):
 | Dead code | vulture | Unreachable functions, unused variables |
 | Dependency hygiene | deptry | Unused or missing package dependencies |
 | Criticality analysis | pyan3 + networkx → CRITICALITY.md | Load-bearing functions (high fan-in, bottlenecks) — tells AI where to apply stricter standards |
+| Structure analysis | grimp 3.18 + networkx | Runtime import cycles, TYPE_CHECKING/deferred-import controls and SCC dependency depth — advisory |
 
 ```bash
 pyguard check        # full gate (ruff → mypy → radon → types → coverage → security)
 pyguard fix          # auto-format (ruff format + lint --fix)
-pyguard audit        # informational: criticality + dead code + deps
+pyguard audit        # informational: criticality + structure + dead code + deps
+pyguard structure    # advisory runtime module graph: cycles and dependency depth
 pyguard security     # security gates only
 pyguard types        # type-annotation complexity only
 pyguard diagnose --output json  # collect all independent analyses before repair, no installs
@@ -48,6 +50,8 @@ pyguard diagnose --output json  # collect all independent analyses before repair
 **Cognitive complexity — advisory:** `pyguard radon` also runs complexipy 8.3.0 and emits one `complexipy.cognitive` measurement per function with a threshold of 20. A function scoring above 20 produces the warning `pyguard.complexipy.cognitive_exceeded`; exactly 20 is clean. In this release the warning never changes the exit code or the gate/overall pass–fail status, but the next release makes it blocking, so review such functions now. `pyguard doctor` reports the pinned version. See [docs/metrics.md](docs/metrics.md).
 
 **Zero-config exception handling:** when the project root has no Ruff configuration, PyGuard adds Ruff's blocking S110 and B012 rules to lint (`--extend-select S110,B012`) and records `ruff.baseline_version`. A `pass`-only handler on a bare `except:`, `except Exception:` or `except BaseException:`, or a `return`/`break`/`continue` in `finally`, therefore fails the ruff gate. Ruff's default `check-typed-exception = false` means a typed handler such as `except ValueError: pass` is not flagged. Add `[tool.ruff]` (or `ruff.toml`/`.ruff.toml`) to own lint policy, including ignores; configured projects run exactly as before. `# noqa: S110` remains effective. See [docs/metrics.md](docs/metrics.md).
+
+**Runtime module graph — advisory:** `pyguard structure` builds the in-scope runtime import graph with grimp 3.18 and NetworkX, emits `module.count`, `module.edges`, `module.cycles`, `module.type_imports`, `module.deferred_imports` and per-module `module.dependency_depth`, and reports one advisory `pyguard.structure.CIRCULAR_DEPENDENCY` per runtime SCC (including self-loops). Imports under `if TYPE_CHECKING:` are type-only and never create runtime edges; imports inside function or method bodies are deferred and also excluded from edges/cycles, while remaining counted. External imports are not edges. Import roots come from the project layout, not the requested graph scope: files under `<project>/src` use `src` as their root (including the default `.` scope and a narrowed `--dirs` path inside `src`), and every other file uses the project root. Identities are full dotted paths below those fixed roots (namespace directories included) and are never renamed from import names. Resolution sees every Python file under those roots, so an existing out-of-scope target is a boundary with no edge rather than a missing module; scope filters only choose graph nodes. `from X import name` validates `name` against the full inventory before that boundary applies, and unresolved local imports (including relative imports beyond the top-level package) are withheld from grimp and stay incomplete evidence rather than becoming execution failures. A missing local module, duplicate module identity or unparsable source leaves the assessment incomplete with `pyguard.structure.not_evaluated`; missing grimp/NetworkX is an execution error. Cycles never change the exit code or blocking outcome; like Tsguard, they can change an otherwise passing overall/gate status to `advisory`. The command also runs in `pyguard audit` and `pyguard diagnose`; it is not part of `pyguard check`. `pyguard doctor` reports the pinned grimp version. See [docs/metrics.md](docs/metrics.md).
 
 **Complexity gates — test file exclusion:** `test_*.py`, `*_test.py`, `conftest.py`, and
 the `tests/` directory are excluded from radon cc/mi/hal, complexipy cognitive, Halstead,
@@ -70,7 +74,7 @@ copies to the project's `tools/analysis/`; these are not executed during checks.
 
 ### `tsguard` — TypeScript quality gate
 
-The current implementation provides three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
+The current implementation provides three Tsguard levels: **code** (Ultracite/Biome, native typed lint and existing quality gates), **structure** (function/module graphs, cycles, coupling and delegation), and **change** (native FTA, cognitive complexity, duplication and graph comparisons against an inert Git baseline). Structure/change findings are advisory. Python runtime module-graph parity is implemented as an advisory subset; remaining Python structural/change parity is deferred independently. See [implemented levels and limits](docs/maintainability.md) and [validation evidence](docs/maintainability-validation.md). Project lint policies remain authoritative; missing capabilities are reported explicitly.
 
 `tsguard/` is the CLI for TypeScript projects. Runs:
 

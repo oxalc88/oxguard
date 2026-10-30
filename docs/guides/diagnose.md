@@ -11,7 +11,7 @@ The commands use the existing project root, exclusions, thresholds, locking, and
 
 ## Read the result
 
-The JSON envelope retains the existing fields and adds `analyses` for `diagnose`. Each entry contains `name`, parent `gate`, `status`, `normalization`, diagnostic references, and a reason when coverage is incomplete. Python includes distinct `radon.cc`, `radon.mi`, `radon.halstead` and `complexipy.cognitive` entries; cognitive warnings stay advisory and never make the assessment fail. TypeScript reports the FTA measurement collection ceiling separately as `fta.collection_score_cap`; findings and `fta.score` measurements retain the effective project policy threshold.
+The JSON envelope retains the existing fields and adds `analyses` for `diagnose`. Each entry contains `name`, parent `gate`, `status`, `normalization`, diagnostic references, and a reason when coverage is incomplete. Python includes distinct `radon.cc`, `radon.mi`, `radon.halstead`, `complexipy.cognitive` and `structure.module_graph` entries; cognitive and runtime-cycle warnings stay advisory and never make a complete assessment fail. A structure result with an unresolved local import or unparsable source is `partial` and adds `pyguard.structure.not_evaluated`, so it makes the assessment incomplete rather than passing silently. TypeScript reports the FTA measurement collection ceiling separately as `fta.collection_score_cap`; findings and `fta.score` measurements retain the effective project policy threshold.
 
 | Result | Meaning |
 | --- | --- |
@@ -24,7 +24,7 @@ The JSON envelope retains the existing fields and adds `analyses` for `diagnose`
 
 `diagnose` returns exit 1 when blocking findings, execution failures, or incomplete assessment prevent success. Advisory findings retain their existing policy. Invocation errors, lock failures, and human-mode pipe refusal retain their existing exit codes. JSON contains all findings; agent output remains bounded and discloses both omitted findings and the number of incomplete analyses. Human output lists every analysis and finding after collection.
 
-The scope matches each language's full check, including TypeScript's existing maintainability, duplicate, and change advisories. It does not add Python analyses that the current full check does not request. Project tests can execute and normal analyzer reports or caches can be written. `diagnose` is an assessment command, not a guarantee of side-effect-free test execution.
+The scope matches each language's full check, including TypeScript's existing maintainability, duplicate, and change advisories. Python additionally exposes the advisory `structure.module_graph` analysis even though `pyguard check` does not run the `structure` command; the module graph is informational evidence, not a new blocking gate. Project tests can execute and normal analyzer reports or caches can be written. `diagnose` is an assessment command, not a guarantee of side-effect-free test execution.
 
 ## Verify against frozen P0 fixtures
 

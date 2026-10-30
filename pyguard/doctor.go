@@ -46,16 +46,21 @@ func runDoctor(root string) int {
 		}
 	}
 
-	// Individual tools via uv run
-	for _, tool := range []struct{ name, cmd string }{
-		{"ruff", "ruff"},
-		{"mypy", "mypy"},
-		{"pytest", "pytest"},
-		{"bandit", "bandit"},
-		{"radon", "radon"},
-		{"complexipy", "complexipy"},
+	// Individual tools via uv run. grimp is a library without a --version
+	// executable, so its installed distribution metadata is the version source.
+	for _, tool := range []struct {
+		name string
+		args []string
+	}{
+		{"ruff", []string{"ruff", "--version"}},
+		{"mypy", []string{"mypy", "--version"}},
+		{"pytest", []string{"pytest", "--version"}},
+		{"bandit", []string{"bandit", "--version"}},
+		{"radon", []string{"radon", "--version"}},
+		{"complexipy", []string{"complexipy", "--version"}},
+		{"grimp", []string{"python", "-c", "import importlib.metadata; print(importlib.metadata.version(\"grimp\"))"}},
 	} {
-		out, _, err := RunSilent(root, "uv", "run", tool.cmd, "--version")
+		out, _, err := RunSilent(root, append([]string{"uv", "run"}, tool.args...)...)
 		if err != nil {
 			fmt.Printf("  [FAIL] %s — not found. Run: uv sync\n", tool.name)
 			failures++

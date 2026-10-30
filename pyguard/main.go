@@ -19,7 +19,7 @@ Quality gates (replaces make):
   pyguard check          full gate: ruff + mypy + radon + types + coverage + security
   pyguard diagnose       collect independent analyses and report incomplete coverage
   pyguard fix            auto-format: ruff --fix + ruff format
-  pyguard audit          informational: criticality + dead-code + deps
+  pyguard audit          informational: criticality + structure + dead-code + deps
   pyguard security       security only: bandit + pip-audit + secrets
   pyguard ruff           lint + format check
   pyguard mypy           type checking
@@ -30,6 +30,7 @@ Quality gates (replaces make):
   pyguard pip-audit      dependency vulnerability scan
   pyguard secrets        credential scan
   pyguard criticality    call-graph criticality analysis
+  pyguard structure      runtime module graph, cycles and dependency depth
   pyguard dead-code      detect dead code
   pyguard deps           dependency hygiene
 
@@ -81,7 +82,7 @@ func main() {
 }
 
 var analysisCommands = map[string]bool{
-	"check": true, "diagnose": true, "fix": true, "audit": true, "security": true, "ruff": true, "mypy": true, "radon": true, "types": true, "coverage": true, "bandit": true, "pip-audit": true, "secrets": true, "criticality": true, "dead-code": true, "deps": true,
+	"check": true, "diagnose": true, "fix": true, "audit": true, "security": true, "ruff": true, "mypy": true, "radon": true, "types": true, "coverage": true, "bandit": true, "pip-audit": true, "secrets": true, "criticality": true, "structure": true, "dead-code": true, "deps": true,
 }
 
 func runCLI(cmd string, args []string) int {
@@ -206,7 +207,7 @@ func dispatch(cmd string, args []string, cfg config, root string, result *RunRes
 		case "security":
 			result.Plan("bandit", "pip-audit", "secrets")
 		case "audit":
-			result.Plan("criticality", "dead-code", "deps")
+			result.Plan("criticality", "structure", "dead-code", "deps")
 		case "fix":
 			result.Plan("ruff")
 		default:
@@ -245,6 +246,8 @@ func dispatch(cmd string, args []string, cfg config, root string, result *RunRes
 		return runSecrets(r, cfg)
 	case "criticality":
 		return runCriticality(r)
+	case "structure":
+		return runStructure(r)
 	case "dead-code":
 		return runDeadCode(r, cfg.dirs)
 	case "deps":
