@@ -792,10 +792,17 @@ def forwarding_fact(
         for argument, parameter in zip(call.args, parameters)
     ):
         return None
+    # pyan's use edges also include names used in annotations and defaults.
+    # Keep only the edge matching this returned call's identifier; pyan has
+    # already resolved that identifier in the wrapper's scope.
     candidates = [
-        callee for callee in resolved if callee is not node and callee in in_scope
+        callee
+        for callee in resolved
+        if callee in in_scope
+        and getattr(getattr(callee, "ast_node", None), "name", None)
+        == call.func.id
     ]
-    if len(candidates) != 1:
+    if len(candidates) != 1 or candidates[0] is node:
         return None
     target = candidates[0]
     if is_async and not isinstance(target.ast_node, ast.AsyncFunctionDef):

@@ -429,6 +429,26 @@ class StructureDelegationContract(unittest.TestCase):
         self.assertEqual(functions["pkg.chain.boundary"]["forward_target"], "")
         self.assertEqual(functions["pkg.chain.boundary"]["forwarding_mode"], "")
 
+    def test_annotation_factory_edges_do_not_change_returned_call_resolution(self):
+        files = {
+            "cases.py": (
+                "def schema():\n"
+                "    return int\n\n\n"
+                "def recursive(x: schema()):\n"
+                "    return recursive(x)\n\n\n"
+                "def real(x):\n"
+                "    return x\n\n\n"
+                "def wrapper(x: schema()):\n"
+                "    return real(x)\n"
+            )
+        }
+        with tempfile.TemporaryDirectory() as root:
+            functions = self.graph(root, files)
+        self.assertEqual(functions["pkg.cases.recursive"]["forward_target"], "")
+        self.assertEqual(functions["pkg.cases.recursive"]["forwarding_mode"], "")
+        self.assertEqual(functions["pkg.cases.wrapper"]["forward_target"], "pkg.cases.real")
+        self.assertEqual(functions["pkg.cases.wrapper"]["forwarding_mode"], "sync")
+
     def test_non_forwarding_shapes_are_excluded(self):
         files = {
             "controls.py": (
