@@ -117,6 +117,10 @@ changes, not behavioral reachability changes. Reviewed findings remain visible a
 advisories with the reason and the original advisory ID. No exceptions are shipped
 with OxGuard.
 
+## Complexity context (P9 PR 1)
+
+Structured `radon` results retain `function.max_branch_nesting` measurements (`code`, `levels`) and a `maintainability_graph` artifact even when the existing complexity gate returns early with blocking findings. The owned analyzer uses the schema-1 findings/measurements/artifacts envelope; the graph is `.pyguard-cache/reports/complexity-context/maintainability-graph.json` with schema version `1`, function IDs/locations, max nesting, branch locations, resolved calls and explicit partial/skipped/graph-error fields. Nested definitions/closures/lambdas are separate boundaries. Context collection uses an isolated result and appends only evidence/diagnostics, preserving the original exit code, findings, gate status and assessment. An unavailable collector adds no invented measurements or execution finding to the original decision; partial graph coverage is recorded in the artifact. See [branch semantics](../metrics.md#pyguard-function-context-p9-pr-1).
+
 ## Explicit change comparison (P7a/P7b)
 
 `pyguard change --baseline <ref>` supports human, agent and JSON output through one trusted normalization path. Every comparison finding uses gate/level `change`, category `quality`, status `advisory` and rule prefix `pyguard.change.`. `FUNCTION_COMPLEXITY_INCREASE`, `POSSIBLE_COMPLEXITY_DISPLACEMENT`, `NEW_DEPENDENCY_CYCLES` and `INCREASED_COUPLING` are warning review cues; `BASELINE_UNAVAILABLE`, `INCOMPLETE_INPUT` and `INCOMPLETE_METRICS` are informational incomplete evidence. Evidence includes the resolved baseline SHA when available. A complete focused comparison exits 0 even with warnings; a not-run/error/partial comparison exits 1. Missing Git is an execution error. `check --baseline` includes the advisory comparison even after a blocking gate fails, but comparison execution failures remain advisory and preserve check's blocking outcome and exit code. Without `--baseline`, check does not plan or run change.

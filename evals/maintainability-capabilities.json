@@ -302,40 +302,46 @@
       "id": "quality.compiler_unsafe_operations",
       "tsguard": "typed.unsafe_assertion_condition_and_promises",
       "pyguard": {
-        "status": "planned",
+        "status": "deferred",
         "cases": {
           "positive": [],
           "negative": [],
           "boundary": []
         }
       },
-      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+      "python_candidate": "Follow-up after P9 PR 1: Python-specific unsafe-operation analysis with positive, negative and boundary controls."
     },
     {
       "id": "quality.discarded_failures",
       "tsguard": "smells.discarded_settled_rejection",
       "pyguard": {
-        "status": "planned",
+        "status": "deferred",
         "cases": {
           "positive": [],
           "negative": [],
           "boundary": []
         }
       },
-      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+      "python_candidate": "Follow-up after P9 PR 1: Python-specific discarded-failure analysis with positive, negative and boundary controls."
     },
     {
       "id": "quality.complexity_context",
       "tsguard": "complexity.fta_failure_has_context",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "complexity_context.radon_failure_has_context"
+          ],
+          "negative": [
+            "complexity_context.flat_control"
+          ],
+          "boundary": [
+            "complexity_context.function_boundaries"
+          ]
         }
       },
-      "python_candidate": "Deferred Python-specific compiler/AST/native analysis and controls"
+      "python_candidate": "AST per-function branch nesting and locations, attached as evidence to the unchanged radon gate."
     },
     {
       "id": "maintainability.async_delegation",

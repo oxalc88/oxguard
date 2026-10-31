@@ -314,6 +314,25 @@ if (functionGraph[caseId] && command === 'structure') {
   process.stdout.write(JSON.stringify({ schema_version: '1', status, assessment: spec.assessment || 'complete', gates: [{ name: 'structure', status: gate, normalization: spec.normalization || 'complete' }], exit_code: 0, findings, measurements, artifacts: [], diagnostics: [] }));
   process.exit(0);
 }
+if (caseId.startsWith('complexity_context.')) {
+  const fs = require('node:fs');
+  const positive = caseId.endsWith('radon_failure_has_context');
+  const boundary = caseId.endsWith('function_boundaries');
+  const file = positive ? 'src/deep.py' : boundary ? 'src/boundary.py' : 'src/flat.py';
+  const rows = positive ? [['deep.deep', 11, Array.from({length:11}, (_, i) => i === 0 ? 2 : i * 2 + 1)]]
+    : boundary ? [['boundary.outer', 2, [2, 3]], ['boundary.outer.inner', 3, [5, 6, 7]], ['boundary.outer.<lambda>@10:24', 1, [10]]]
+    : [['flat.flat', 0, []]];
+  const functions = rows.map(([symbol, depth, lines]) => ({ id: symbol, location: {file, symbol, line:1}, max_branch_nesting: depth, branch_locations: lines.map(line => ({ file, line })) }));
+  const artifact = '.pyguard-cache/reports/complexity-context/maintainability-graph.json';
+  fs.mkdirSync(path.dirname(artifact), {recursive:true});
+  fs.writeFileSync(artifact, JSON.stringify({schema_version:'1', functions, calls:boundary?[{caller:'boundary.outer',callee:'boundary.outer.inner'}]:[], partial:false}));
+  const findings = positive ? [{rule:'pyguard.radon.cc_exceeded', status:'blocking'}] : [];
+  process.stdout.write(JSON.stringify({schema_version:'1', status:positive?'fail':'pass', assessment:'complete', exit_code:positive?1:0,
+    gates:[{name:'radon', status:positive?'failed':'passed'}], findings,
+    measurements:functions.map(f => ({metric:'function.max_branch_nesting', location:f.location, value:f.max_branch_nesting})),
+    artifacts:[{kind:'maintainability_graph', path:artifact}]}));
+  process.exit(positive?1:0);
+}
 if (variant === 'baseline' || cognitive[caseId]) {
   const rows = variant === 'baseline' ? [] : cognitive[caseId];
   const measurements = rows.map(([file, symbol, value]) => ({ metric: 'complexipy.cognitive', level: 'code', location: { file, symbol }, value, unit: 'score', threshold: 20 }));
@@ -354,7 +373,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'maintainability.failure_policies', 'structure.runtime_graph', 'structure.false_positive_controls', 'change.complexity_displacement', 'change.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'change.function_complexity', 'change.truthful_completeness', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'maintainability.failure_policies', 'structure.runtime_graph', 'structure.false_positive_controls', 'change.complexity_displacement', 'change.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'change.function_complexity', 'change.truthful_completeness', 'quality.complexity_context', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 

@@ -1,5 +1,9 @@
 # Tsguard maintainability validation
 
+## Python P9 PR 1 validation scope
+
+The Python complexity-context subset adds three known-answer fixtures for blocking radon context, a flat/test-exclusion control and separate nested-function/lambda boundaries. Go tests cover context retention on early blocking failure, diagnostic identity and collector-failure isolation; Python tests cover AST locations, branch constructs, function headers, encoded sources and partial/excluded input. The real-binary evaluator exercises the pinned Python toolchain. Python unsafe-operation and discarded-failure analysis remain explicit deferred follow-ups, never passing rows; this subset does not certify those capabilities or replace release/platform validation.
+
 ## Review-gap extension
 
 The current extension adds semantic-only native typed lint, bounded discarded-failure findings, async forwarding and function nesting/context. The focused current-source corpus passes all 39 maintainability cases, and the evaluator/observer/agent/scope-readiness tests pass all 33 cases. Go race tests and vet pass. Fresh packed npm and pnpm distributions on Linux x64 each pass both integration tests, all 30 retained Level 1 cases and all 39 maintainability cases. Their fresh installed manifests/trees have no owned ESLint engine. Current-head platform CI is linked from the PR rather than inferred from older runs. Biome owns syntax/formatting; native semantic analysis adds a separate program and compiler compatibility preflight. No ESLint engine or second formatter is shipped.

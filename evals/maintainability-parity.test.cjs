@@ -40,7 +40,7 @@ test('deferred Python capabilities do not block the selected Tsguard scope', () 
   assert.equal(Object.hasOwn(result,'release_ready'),false);
   assert.deepEqual(result.deferred_tsguard_capabilities,[]);
   // Back-compat without a Python report: only the spec slot is visible.
-  assert.ok(result.capabilities.every(c=>c.pyguard===(c.id==='change.native_duplication'?'deferred':'not_evaluated')));
+  assert.ok(result.capabilities.every(c=>c.pyguard===(spec.capabilities.find(s=>s.id===c.id).pyguard.status==='deferred'?'deferred':'not_evaluated')));
   assert.ok(result.capabilities.every(c=>Object.keys(c.pyguard_cases).length===0));
   assert.equal(result.pyguard_cases_passed,false);
 });
@@ -60,7 +60,7 @@ test('the CLI keeps its single-report contract and exits on native failures', ()
   const failing=evidence();failing.cases.find(c=>c.id==='baseline.single_linter').outcome='fail';
   assert.equal(cli([failing]).status,1);
 });
-test('a passing Python report is accepted as not_implemented without claiming readiness', () => {
+test('passing implemented cases establish scoped readiness while deferred capabilities never pass', () => {
   const result=assess(evidence(),pythonEvidence());
   const implemented=result.capabilities.find(c=>c.id==='structure.function_graph');
   assert.equal(implemented.pyguard,'pass');
@@ -71,13 +71,17 @@ test('a passing Python report is accepted as not_implemented without claiming re
     for (const kind of ['positive','negative','boundary']) assert.ok(declared().some(d=>d.capability===id && d.kind===kind));
   }
   const planned=result.capabilities.find(c=>c.id==='quality.compiler_unsafe_operations');
-  assert.equal(planned.pyguard,'not_implemented');
+  assert.equal(planned.pyguard,'deferred');
+  assert.equal(result.capabilities.find(c=>c.id==='quality.discarded_failures').pyguard,'deferred');
+  for (const id of ['quality.compiler_unsafe_operations', 'quality.discarded_failures']) {
+    assert.match(spec.capabilities.find(c=>c.id===id).python_candidate, /Follow-up/);
+  }
   assert.deepEqual(planned.pyguard_cases,{});
   assert.equal(result.capabilities.find(c=>c.id==='change.native_duplication').pyguard,'deferred');
   for (const row of result.capabilities) assert.equal(Object.keys(row.pyguard_cases).length,declared().filter(d=>d.capability===row.id).length);
   assert.equal(result.pyguard_cases_passed,true);
-  assert.equal(result.pyguard_maintainability_ready,false);
-  assert.equal(result.maintainability_parity_ready,false);
+  assert.equal(result.pyguard_maintainability_ready,true);
+  assert.equal(result.maintainability_parity_ready,true);
   assert.equal(cli([evidence(),pythonEvidence()]).status,0);
 });
 test('a failing Python seed case is not ready and fails the process', () => {
