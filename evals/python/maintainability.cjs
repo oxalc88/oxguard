@@ -178,6 +178,42 @@ function assertBlockingRuff(result, code, file, line) {
   assert.equal(measurement.unit, 'version');
 }
 
+
+const changeFinding = (result, rule) => result.findings.find(f => f.rule === 'pyguard.change.' + rule);
+const branchFunction = name => `def ${name}(x):\n    if x > 0:\n        x += 1\n    if x > 1:\n        x += 1\n    if x > 2:\n        x += 1\n    if x > 3:\n        x += 1\n    return x\n`;
+const changeBaseline = {
+  'src/pkg/__init__.py': 'from pathlib import Path\nPath("__SIDE_EFFECT__").write_text("executed")\n',
+  'src/pkg/core.py': branchFunction('first') + '\n' + branchFunction('second') + '\ndef run(x):\n    return first(x) + second(x)\n',
+  'tools/analysis/analyze_structure.py': 'raise RuntimeError("baseline helper executed")\n',
+};
+const changeSplit = {
+  'src/pkg/__init__.py': '',
+  'src/pkg/core.py': 'from .helper import second\n\n' + branchFunction('first') + '\ndef run(x):\n    return first(x) + second(x)\n',
+  'src/pkg/helper.py': branchFunction('second'),
+};
+function assertChangeComplete(result) {
+  complete(result, 'change');
+  assert.equal(result.exit_code, 0);
+  for (const finding of result.findings) {
+    assert.equal(finding.status, 'advisory');
+    assert.equal(finding.level, 'change');
+    assert.equal(finding.gate, 'change');
+    assert.equal(finding.category, 'quality');
+    assert.match(finding.evidence, /[a-f0-9]{40,64}/);
+  }
+  assert.equal(blockingOutcome(result), false);
+}
+function assertChangeIncomplete(result, rule) {
+  assert.equal(result.exit_code, 1);
+  assert.equal(result.assessment, 'incomplete');
+  const finding = changeFinding(result, rule);
+  assert.ok(finding, JSON.stringify(result.findings));
+  assert.equal(finding.status, 'advisory');
+  assert.equal(finding.level, 'change');
+  assert.equal(finding.category, 'quality');
+  assert.equal(result.measurements.length, 0);
+}
+
 const definitions = [
   {
     id: 'ruff.baseline.empty_handler_is_blocking',
@@ -1514,6 +1550,79 @@ const definitions = [
     },
   },
   {
+    id: 'change.artificial_split_and_inert_baseline', capability: 'change.complexity_displacement', kind: 'positive', command: 'change',
+    gitBaseline: changeBaseline, files: changeSplit,
+    check: ({ result, project }) => {
+      assertChangeComplete(result);
+      assert.ok(changeFinding(result, 'POSSIBLE_COMPLEXITY_DISPLACEMENT'), JSON.stringify(result.findings));
+      assert.equal(fs.existsSync(path.join(project, 'BASELINE_EXECUTED')), false, 'baseline Python executed');
+      for (const side of ['baseline', 'candidate']) {
+        for (const metric of ['module_count', 'module_edges', 'total_branches', 'total_cyclomatic', 'total_halstead_volume', 'min_maintainability_index']) assert.ok(result.measurements.some(m => m.metric === `change.${side}.${metric}` && m.location.file === '.'));
+        for (const metric of ['cyclomatic', 'maintainability_index', 'halstead_volume']) assert.ok(result.measurements.some(m => m.metric === `change.${side}.file.${metric}` && m.location.file === 'src/pkg/core.py'));
+      }
+      assert.equal(structureMeasurement(result, 'change.baseline.total_branches'), 8);
+      assert.equal(structureMeasurement(result, 'change.candidate.total_branches'), 8);
+      assert.equal(structureMeasurement(result, 'change.baseline.max_file_branches'), 8);
+      assert.equal(structureMeasurement(result, 'change.candidate.max_file_branches'), 4);
+      for (const m of result.measurements.filter(m => m.metric.startsWith('change.delta.'))) assert.ok(['src/pkg/__init__.py', 'src/pkg/core.py'].includes(m.location.file));
+      assert.equal(result.artifacts.some(a => a.kind === 'maintainability_change'), false);
+    },
+  },
+  {
+    id: 'change.new_dependency_cycle', capability: 'change.complexity_displacement', kind: 'positive', command: 'change',
+    gitBaseline: { 'src/pkg/__init__.py': '', 'src/pkg/a.py': 'VALUE = 1\n', 'src/pkg/b.py': 'VALUE = 2\n' },
+    files: { 'src/pkg/__init__.py': '', 'src/pkg/a.py': 'from . import b\nVALUE = 1\n', 'src/pkg/b.py': 'from . import a\nVALUE = 2\n' },
+    check: ({ result }) => { assertChangeComplete(result); assert.ok(changeFinding(result, 'NEW_DEPENDENCY_CYCLES')); assert.equal(structureMeasurement(result, 'change.candidate.module_cycles'), 1); },
+  },
+  {
+    id: 'change.coupling_increase', capability: 'change.complexity_displacement', kind: 'positive', command: 'change',
+    gitBaseline: couplingFixture({ importers: 2 }), files: couplingFixture(),
+    check: ({ result }) => { assertChangeComplete(result); assert.ok(changeFinding(result, 'INCREASED_COUPLING')); assert.equal(structureMeasurement(result, 'change.candidate.coupling_hotspots'), 1); },
+  },
+  {
+    id: 'change.no_structural_growth_control', capability: 'change.complexity_displacement', kind: 'negative', command: 'change',
+    gitBaseline: changeBaseline,
+    files: { 'src/pkg/__init__.py': '', 'src/pkg/core.py': branchFunction('first'), 'src/pkg/helper.py': branchFunction('second') },
+    check: ({ result }) => { assertChangeComplete(result); assert.equal(changeFinding(result, 'POSSIBLE_COMPLEXITY_DISPLACEMENT'), undefined); assert.equal(structureMeasurement(result, 'change.candidate.module_edges'), 0); },
+  },
+  {
+    id: 'change.absent_baseline', capability: 'change.complexity_displacement', kind: 'boundary', command: 'change', exitCode: 1,
+    files: { 'src/clean.py': flatFunction },
+    check: ({ result }) => assertChangeIncomplete(result, 'BASELINE_UNAVAILABLE'),
+  },
+  {
+    id: 'change.unavailable_ref', capability: 'change.complexity_displacement', kind: 'boundary', command: 'change', exitCode: 1,
+    baselineRef: 'refs/heads/unavailable-p7a', gitBaseline: { 'src/clean.py': flatFunction }, files: { 'src/clean.py': flatFunction },
+    check: ({ result }) => assertChangeIncomplete(result, 'BASELINE_UNAVAILABLE'),
+  },
+  {
+    id: 'change.nested_project_prefix', capability: 'change.complexity_displacement', kind: 'boundary', command: 'change',
+    gitBaseline: { 'src/clean.py': flatFunction }, files: { 'src/clean.py': flatFunction },
+    check: ({ result }) => { assertChangeComplete(result); assert.equal(structureMeasurement(result, 'change.baseline.module_count'), 1); assert.equal(structureMeasurement(result, 'change.candidate.module_count'), 1); assert.equal(result.findings.length, 0); assert.ok(result.measurements.some(m => m.metric === 'change.delta.file.cyclomatic' && m.location.file === 'src/clean.py' && m.value === 0)); },
+  },
+  {
+    id: 'change.unparsable_baseline_is_incomplete', capability: 'change.complexity_displacement', kind: 'boundary', command: 'change', exitCode: 1,
+    gitBaseline: { 'src/broken.py': 'def broken(:\n    pass\n', 'src/clean.py': flatFunction }, files: { 'src/clean.py': flatFunction },
+    check: ({ result }) => { assertChangeIncomplete(result, 'INCOMPLETE_INPUT'); assert.match(changeFinding(result, 'INCOMPLETE_INPUT').evidence, /[a-f0-9]{40,64}/); },
+  },
+  {
+    id: 'change.unchanged_candidate_control', capability: 'change.false_positive_controls', kind: 'positive', command: 'change',
+    gitBaseline: { 'src/clean.py': flatFunction }, files: { 'src/clean.py': flatFunction },
+    check: ({ result }) => { assertChangeComplete(result); assert.equal(result.findings.length, 0); for (const metric of result.measurements.filter(m => m.metric.startsWith('change.delta.'))) assert.equal(metric.value, 0); },
+  },
+  {
+    id: 'change.real_simplification_control', capability: 'change.false_positive_controls', kind: 'negative', command: 'change',
+    gitBaseline: changeBaseline, files: { ...changeSplit, 'src/pkg/helper.py': 'def second(x):\n    return x\n' },
+    check: ({ result }) => { assertChangeComplete(result); assert.equal(changeFinding(result, 'POSSIBLE_COMPLEXITY_DISPLACEMENT'), undefined); assert.equal(structureMeasurement(result, 'change.candidate.total_branches'), 4); },
+  },
+  {
+    id: 'change.candidate_scope_and_test_exclusions', capability: 'change.false_positive_controls', kind: 'boundary', command: 'change',
+    pyproject: PYPROJECT + '[tool.pyguard]\nexclude = ["src/ignored.py"]\n',
+    gitBaseline: { 'src/clean.py': flatFunction, 'src/ignored.py': 'def broken(:\n', 'src/test_broken.py': 'def broken(:\n', 'elsewhere/broken.py': 'def broken(:\n' },
+    files: { 'src/clean.py': flatFunction, 'src/ignored.py': 'def broken(:\n', 'src/test_broken.py': 'def broken(:\n', 'elsewhere/broken.py': 'def broken(:\n' },
+    check: ({ result }) => { assertChangeComplete(result); assert.equal(result.findings.length, 0); for (const side of ['baseline', 'candidate']) assert.equal(structureMeasurement(result, `change.${side}.module_count`), 1); },
+  },
+  {
     id: 'criticality.distinct_callers_cross_module',
     capability: 'structure.function_graph',
     kind: 'positive',
@@ -2437,7 +2546,27 @@ function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
       const dirs = Array.isArray(definition.dirs) ? definition.dirs.join(',') : definition.dirs || 'src';
       const args = [definition.command || 'criticality', '--dirs', dirs, ...(definition.human ? [] : ['--output', 'json']), '--allow-pipe', '--timeout', '30'];
       try {
-        const projectDir = project(definition, base);
+        let projectDir = project(definition, base);
+        if (definition.gitBaseline) {
+          const repository = path.dirname(projectDir);
+          const git = (...gitArgs) => {
+            const response = spawnSync('git', gitArgs, { cwd: repository, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1' } });
+            assert.ok(!response.error, `git fixture could not be started: ${response.error?.message}`);
+            assert.equal(response.status, 0, response.stderr);
+            return response.stdout.trim();
+          };
+          // Baseline policy must never override the candidate's target scope.
+          fs.rmSync(path.join(projectDir, 'src'), { recursive: true, force: true });
+          const baselineFiles = Object.fromEntries(Object.entries(definition.gitBaseline).map(([file, source]) => [file, String(source).replaceAll('__SIDE_EFFECT__', path.join(projectDir, 'BASELINE_EXECUTED').replaceAll('\\', '/'))]));
+          project({ id: definition.id, files: baselineFiles, pyproject: PYPROJECT + '[tool.pyguard]\nexclude = ["src"]\n' }, base);
+          fs.writeFileSync(path.join(repository, 'outside.py'), 'raise RuntimeError("outside project")\n');
+          git('init'); git('add', '.');
+          git('-c', 'user.name=Eval Fixture', '-c', 'user.email=eval@example.invalid', '-c', 'core.hooksPath=/dev/null', 'commit', '-m', 'baseline');
+          const sha = git('rev-parse', 'HEAD');
+          fs.rmSync(path.join(projectDir, 'src'), { recursive: true, force: true });
+          project(definition, base);
+          args.push('--baseline', definition.baselineRef || sha);
+        }
         const response = execute({ project: projectDir, args });
         assert.ok(!response.error, `pyguard could not be started: ${response.error}`);
         const expectedExit = definition.exitCode ?? 0;
@@ -2464,7 +2593,7 @@ function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
             assert.equal(criticalityResponse.status, 0, `pyguard criticality exited with ${criticalityResponse.status}: ${String(criticalityResponse.stderr || '').slice(0, 1024)}`);
             criticality = JSON.parse(criticalityResponse.stdout);
           }
-          definition.check({ result, baseline, criticality });
+          definition.check({ result, baseline, criticality, project: projectDir });
         }
       } catch (failure) {
         outcome = 'fail';

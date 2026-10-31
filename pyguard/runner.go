@@ -19,6 +19,8 @@ import (
 
 // Runner executes subprocesses from the project root.
 type Runner struct {
+	baseline     string
+	baselineSHA  string
 	dirs         []string
 	dirsExplicit bool
 	outputMode   string

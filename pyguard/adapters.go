@@ -96,6 +96,9 @@ func (r *Runner) normalize(spec toolSpec, res Result, stdout io.Reader, refs []s
 	before := len(r.result.Findings)
 	decodeFailed := false
 	switch spec.adapter {
+	case "change":
+		complete = r.normalizeChange(stdout, refs)
+		return
 	case "bandit", "pip-audit", "deptry", "pytest":
 		if r.machine() {
 			if err := r.normalizeNative(spec, stdout, refs); err != nil {

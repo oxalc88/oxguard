@@ -30,6 +30,7 @@ Quality gates (replaces make):
   pyguard pip-audit      dependency vulnerability scan
   pyguard secrets        credential scan
   pyguard criticality    call-graph criticality analysis
+  pyguard change         advisory comparison against an explicit Git baseline
   pyguard structure      advisory module graph (cycles, coupling, depth) and function call graph
   pyguard dead-code      detect dead code
   pyguard deps           dependency hygiene
@@ -45,6 +46,7 @@ Testing (replaces jq):
 Flags:
   --output <mode>  human (default), agent (bounded), json (complete)
   --root <path>    explicit project root containing pyproject.toml
+  --baseline <ref> explicit Git commit for change (optional advisory in check)
   --dirs <d1,d2>    override target directories (default: . — project root)
   --timeout <s>     per-tool timeout in seconds (default: 300)
   --tail <n>        print only the last N lines of each tool's output to stdout
@@ -82,7 +84,7 @@ func main() {
 }
 
 var analysisCommands = map[string]bool{
-	"check": true, "diagnose": true, "fix": true, "audit": true, "security": true, "ruff": true, "mypy": true, "radon": true, "types": true, "coverage": true, "bandit": true, "pip-audit": true, "secrets": true, "criticality": true, "structure": true, "dead-code": true, "deps": true,
+	"check": true, "diagnose": true, "fix": true, "audit": true, "security": true, "ruff": true, "mypy": true, "radon": true, "types": true, "coverage": true, "bandit": true, "pip-audit": true, "secrets": true, "criticality": true, "structure": true, "change": true, "dead-code": true, "deps": true,
 }
 
 func runCLI(cmd string, args []string) int {
@@ -214,7 +216,7 @@ func dispatch(cmd string, args []string, cfg config, root string, result *RunRes
 			result.Plan(cmd)
 		}
 	}
-	r := &Runner{outputMode: cfg.output, result: result, dirs: cfg.dirs, dirsExplicit: cfg.dirsExplicit, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, excludeTests: cfg.excludeTests, exclude: cfg.exclude}
+	r := &Runner{baseline: cfg.baseline, outputMode: cfg.output, result: result, dirs: cfg.dirs, dirsExplicit: cfg.dirsExplicit, root: root, timeout: cfg.timeout, logFile: cfg.logFile, tailLines: cfg.tailLines, excludeTests: cfg.excludeTests, exclude: cfg.exclude}
 
 	switch cmd {
 	// Quality gates
@@ -248,6 +250,8 @@ func dispatch(cmd string, args []string, cfg config, root string, result *RunRes
 		return runCriticality(r)
 	case "structure":
 		return runStructure(r)
+	case "change":
+		return changeExitCode(r, runChange(r))
 	case "dead-code":
 		return runDeadCode(r, cfg.dirs)
 	case "deps":
@@ -285,6 +289,7 @@ var heavyGates = map[string]bool{
 
 // config holds parsed flags.
 type config struct {
+	baseline     string
 	dirs         []string
 	dirsExplicit bool
 	timeout      int
@@ -311,7 +316,7 @@ func parseFlags(args []string) (config, error) {
 	for i := 0; i < len(args); i++ {
 		flag := args[i]
 		switch flag {
-		case "--dirs", "--timeout", "--tail", "--log-file", "--output", "--root":
+		case "--dirs", "--timeout", "--tail", "--log-file", "--output", "--root", "--baseline":
 			if i+1 == len(args) || strings.HasPrefix(args[i+1], "--") || args[i+1] == "" {
 				return cfg, fmt.Errorf("missing value for %s", flag)
 			}
@@ -326,6 +331,8 @@ func parseFlags(args []string) (config, error) {
 						return cfg, fmt.Errorf("empty directory in --dirs")
 					}
 				}
+			case "--baseline":
+				cfg.baseline = value
 			case "--root":
 				cfg.root = value
 			case "--log-file":
