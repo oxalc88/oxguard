@@ -56,6 +56,8 @@ For Codex sessions, read the last `token_count` event in `~/.codex/sessions/`. F
 | 2026-10-31 | P9 decisions analysis (#23) | Codex CLI | analyst | gpt-6.1-sol | medium | 1 | 841,592 | 97,656 | 6,028 | ~/.codex/sessions (p9-read) |
 | 2026-10-31 | P9 PR 1 complexity context implement (#23) | Codex CLI | implementer | gpt-6.1-sol | medium | 2 | 5,198,288 | 138,192 | 31,163 | ~/.codex/sessions (p9-1) |
 | 2026-10-31 | P9 PR 1 complexity context review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 2 | 1,081,519 | 112,047 | 7,749 | ~/.codex/sessions (p9-1) |
+| 2026-10-31 | P9 PR 2 strict readiness implement (#23) | Codex CLI | implementer | gpt-6-luna | default | 3 | 2,032,319 | 102,591 | 18,636 | ~/.codex/sessions (p9-2) |
+| 2026-10-31 | P9 PR 2 strict readiness review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 3 | 811,511 | 90,999 | 8,524 | ~/.codex/sessions (p9-2) |
 
 #32: 2 implementation rounds, 2 review rounds (round 1 requested 3 fixes, round 2 approved). Per session: mimo 681,389 (44,670 not cached, 29,103 output) and 1,161,033 (52,078 / 17,755); Sol 155,916 (31,342 / 1,950) and 288,963 (35,629 / 2,326). Codex's own "tokens used" lines for the two reviews were 33,292 and 37,955. During review 2, Sol started a `gpt-6-luna` session (142,660 total) that was not requested; it is not counted as a review.
 
@@ -88,6 +90,8 @@ P6 (delegation smells): deepseek-v4-flash wrote the first implementation. The se
 P7b: every prompt forbade auxiliary/multi-agent/subagent sessions; session_meta.source showed only `exec` for all 5 sessions (no subagent sessions). Review: round 1 CHANGES_REQUESTED (multiline decorators), round 2 approved.
 
 P9 analysis and PR 1: every prompt forbade auxiliary/multi-agent/subagent sessions; session_meta.source showed only `exec` for all 5 sessions (no subagent sessions). PR 1 review: round 1 CHANGES_REQUESTED (3 P2), round 2 approved.
+
+P9 PR 2 (strict readiness): implemented by gpt-6-luna and reviewed by gpt-6.1-sol in 3 rounds. Round 1 and round 2 were CHANGES_REQUESTED, and round 3 was APPROVED. Luna did every fix, with no escalation to Sol, and no auxiliary or subagent sessions were used.
 
 #31 (model roles doc): no token data was recorded for its sessions, so it has no row. After merging main, its docs-only CI run (40200327340) took 41 s.
 
