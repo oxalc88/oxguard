@@ -47,7 +47,7 @@ function capabilityPyguard(slot, capability, outcomes) {
 // The optional second argument keeps single-report callers working: without a
 // Python report nothing is evaluated, and pyguard values come from the spec
 // slot ('deferred' only; everything else stays 'not_evaluated').
-function assess(tsguardReport, pyguardReport) {
+function assess(tsguardReport, pyguardReport, { strict = false } = {}) {
   const report = tsguardReport;
   if (report.schema_version !== '1' || report.suite !== 'maintainability.installed' || !report.evaluator_sha256 || !Array.isArray(report.cases) || new Set(report.cases.map(c => c.id)).size !== report.cases.length) throw new Error('Invalid installed maintainability evidence');
   const expected = [...spec.required_tsguard_cases].sort();
@@ -71,21 +71,29 @@ function assess(tsguardReport, pyguardReport) {
   const levels = Object.fromEntries(Object.entries(spec.levels).map(([level, ids])=>[level,{
     implemented:true, evaluated_cases:ids.length, native_evals_passed:ids.every(id=>report.cases.find(c=>c.id===id)?.outcome==='pass'),
   }]));
-  return { schema_version: '1', scope: spec.scope, tsguard_capabilities_passed: tsguardPassed,
+  const deferredPyguardCapabilities = rows.filter(r => r.pyguard === 'deferred').map(r => r.id);
+  const result = { schema_version: '1', scope: spec.scope,
+    readiness_scope: 'Ready means every supported Python capability is implemented and all declared evidence passes; deferred capabilities are excluded. This is not full Tsguard parity.',
+    tsguard_capabilities_passed: tsguardPassed,
     tsguard_scope_ready: tsguardPassed, pyguard_maintainability_ready: pyguardReady, pyguard_cases_passed: pyguardCasesPassed,
     maintainability_parity_ready: tsguardPassed && pyguardReady,
-    levels, deferred_tsguard_capabilities: spec.deferred_tsguard_capabilities, capabilities: rows,
-    limitation: 'The planned Tsguard code, structure and change capabilities have native evaluations. New Python maintainability capabilities are deferred and do not block that scope. Provider limits and static-analysis boundaries remain explicit. This report does not replace retained Level 1 checks, platform verification or release authorization.' };
+    levels, deferred_tsguard_capabilities: spec.deferred_tsguard_capabilities,
+    deferred_pyguard_capabilities: deferredPyguardCapabilities, capabilities: rows,
+    limitation: 'The planned Tsguard code, structure and change capabilities have native evaluations. Python readiness covers the complete supported scope with deferred capabilities excluded; it is not full Tsguard parity. Provider limits and static-analysis boundaries remain explicit. This report does not replace retained Level 1 checks, platform verification or release authorization.' };
+  if (strict && pyguardReport && !result.pyguard_maintainability_ready) throw new Error('Strict Python maintainability readiness failed: supported capabilities must be implemented and all declared cases must pass');
+  return result;
 }
 if (require.main === module) {
-  const [tsguardFile, pyguardFile] = process.argv.slice(2);
+  const strict = process.argv.includes('--strict');
+  const files = process.argv.slice(2).filter(arg => arg !== '--strict');
+  const [tsguardFile, pyguardFile] = files;
   if (!tsguardFile) throw new Error('Usage: node evals/maintainability-parity.cjs <tsguard.json> [<pyguard.json>]');
   const tsguard = JSON.parse(fs.readFileSync(tsguardFile, 'utf8'));
   const pyguard = pyguardFile ? JSON.parse(fs.readFileSync(pyguardFile, 'utf8')) : undefined;
-  const result = assess(tsguard, pyguard);
+  const result = assess(tsguard, pyguard, { strict });
   console.log(JSON.stringify(result, null, 2));
-  // not_implemented is accepted; a failing Tsguard case or a failing Python
-  // seed case exits non-zero.
+  // Default mode remains report-only for planned Python capabilities. Strict
+  // mode is used by CI when a Python report is supplied.
   process.exitCode = result.tsguard_capabilities_passed && (!pyguard || result.pyguard_cases_passed) ? 0 : 1;
 }
 module.exports = { assess };

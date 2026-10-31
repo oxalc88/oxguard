@@ -2,6 +2,8 @@
 
 ## Python P9 PR 1 validation scope
 
+CI now runs the maintainability parity report in strict mode whenever Python evidence is supplied: every supported Python capability must be implemented and every declared positive, negative and boundary case must be present and pass. `pyguard_maintainability_ready` means the complete supported Python scope is ready with deferred capabilities excluded; it is not full Tsguard parity. The deferred capabilities are `quality.compiler_unsafe_operations`, `quality.discarded_failures` and P8 `change.native_duplication`, listed in the report and excluded from both pass and failure counts. Default CLI mode continues to report planned capabilities without treating them as ready.
+
 The Python complexity-context subset adds three known-answer fixtures for blocking radon context, a flat/test-exclusion control and separate nested-function/lambda boundaries. Go tests cover context retention on early blocking failure, diagnostic identity and collector-failure isolation; Python tests cover AST locations, branch constructs, function headers, encoded sources and partial/excluded input. The real-binary evaluator exercises the pinned Python toolchain. Python unsafe-operation and discarded-failure analysis remain explicit deferred follow-ups, never passing rows; this subset does not certify those capabilities or replace release/platform validation.
 
 ## Review-gap extension

@@ -18,7 +18,7 @@ const pythonEvidence = mutate => {
   if (mutate) mutate(report);
   return report;
 };
-function cli(reports) {
+function cli(reports, strict = false) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pyguard-mparity-test-'));
   try {
     const args = reports.map((report, i) => {
@@ -26,7 +26,7 @@ function cli(reports) {
       fs.writeFileSync(file, JSON.stringify(report));
       return file;
     });
-    return spawnSync(process.execPath, [require.resolve('./maintainability-parity.cjs'), ...args], { encoding:'utf8', timeout:60000 });
+    return spawnSync(process.execPath, [require.resolve('./maintainability-parity.cjs'), ...(strict ? ['--strict'] : []), ...args], { encoding:'utf8', timeout:60000 });
   } finally { fs.rmSync(dir, { recursive:true, force:true }); }
 }
 test('deferred Python capabilities do not block the selected Tsguard scope', () => {
@@ -56,7 +56,7 @@ test('missing, unsupported and duplicate native cases are rejected', () => {
 test('the CLI keeps its single-report contract and exits on native failures', () => {
   const passing=cli([evidence()]);
   assert.equal(passing.status,0,passing.stderr||passing.stdout);
-  assert.equal(JSON.parse(passing.stdout).pyguard_maintainability_ready,false);
+  assert.equal(assess(evidence()).pyguard_maintainability_ready,false);
   const failing=evidence();failing.cases.find(c=>c.id==='baseline.single_linter').outcome='fail';
   assert.equal(cli([failing]).status,1);
 });
@@ -82,7 +82,24 @@ test('passing implemented cases establish scoped readiness while deferred capabi
   assert.equal(result.pyguard_cases_passed,true);
   assert.equal(result.pyguard_maintainability_ready,true);
   assert.equal(result.maintainability_parity_ready,true);
+  assert.deepEqual(result.deferred_pyguard_capabilities,['change.native_duplication','quality.compiler_unsafe_operations','quality.discarded_failures']);
+  assert.match(result.readiness_scope,/not full Tsguard parity/i);
   assert.equal(cli([evidence(),pythonEvidence()]).status,0);
+  assert.equal(cli([evidence(),pythonEvidence()],true).status,0);
+});
+test('strict readiness rejects planned capabilities and missing declared Python evidence', () => {
+  const capability=spec.capabilities.find(c=>c.id==='structure.function_graph');
+  const original=JSON.parse(JSON.stringify(capability.pyguard));
+  try {
+    capability.pyguard={status:'planned',cases:{}};
+    assert.throws(()=>assess(evidence(),pythonEvidence(),{strict:true}),/Strict Python maintainability readiness/);
+  } finally { capability.pyguard=original; }
+  assert.throws(()=>assess(evidence(),pythonEvidence(r=>r.cases.pop()),{strict:true}),/Incomplete or unexpected Python/);
+});
+test('strict readiness rejects failing declared Python cases', () => {
+  const pyguard=pythonEvidence(r=>{r.cases[0].outcome='fail';});
+  assert.throws(()=>assess(evidence(),pyguard,{strict:true}),/Strict Python maintainability readiness/);
+  assert.equal(cli([evidence(),pyguard],true).status,1);
 });
 test('a failing Python seed case is not ready and fails the process', () => {
   const pyguard=pythonEvidence(r=>{ r.cases.find(c=>c.capability==='structure.function_graph'&&c.kind==='boundary').outcome='fail'; });
