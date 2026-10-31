@@ -7,7 +7,39 @@ import os
 import sys
 from pathlib import Path
 
-from analyze_structure import build_report
+from analyze_structure import (
+    TEST_FILE_PATTERNS,
+    build_report,
+    excluded,
+    exclusion_patterns,
+    read_tree,
+    skipped_directory,
+)
+
+
+def validate_stubs(targets: list[str]) -> None:
+    """Parse scoped stubs as input evidence, without adding graph/metric files."""
+    root = Path.cwd()
+    exclude_tests = os.environ.get("PYGUARD_EXCLUDE_TESTS") == "1"
+    patterns = exclusion_patterns()
+    if exclude_tests:
+        patterns.extend(pattern + "i" for pattern in TEST_FILE_PATTERNS)
+    candidates: set[Path] = set()
+    for target in targets or ["."]:
+        path = Path(target)
+        if path.is_file():
+            if path.suffix == ".pyi" and "__pycache__" not in path.resolve().parts:
+                candidates.add(path.resolve())
+            continue
+        for directory, names, filenames in os.walk(path):
+            names[:] = sorted(name for name in names if not skipped_directory(Path(name)))
+            candidates.update(
+                (Path(directory) / filename).resolve()
+                for filename in filenames if filename.endswith(".pyi")
+            )
+    for path in sorted(candidates):
+        if not excluded(path, root, patterns, exclude_tests):
+            read_tree(path)
 
 
 def file_metrics(report: dict[str, object], root: Path) -> list[dict[str, object]]:
@@ -58,6 +90,7 @@ def main() -> None:
         root = Path(request[side]).resolve()
         os.chdir(root)
         try:
+            validate_stubs(request["dirs"])
             report = build_report(request["dirs"])
             # Version evidence is required independently of Radon measurement
             # success, so a missing metric tool reports INCOMPLETE_METRICS.

@@ -294,3 +294,25 @@ func TestOptionalCheckComparisonCannotBecomeBlocking(t *testing.T) {
 		}
 	}
 }
+
+func TestChangeMalformedStubsMakeEitherSideIncomplete(t *testing.T) {
+	for _, side := range []string{"baseline", "candidate"} {
+		t.Run(side, func(t *testing.T) {
+			profiles := map[string]changeProfile{"baseline": changeTestProfile(t), "candidate": changeTestProfile(t)}
+			profile := profiles[side]
+			profile.InputError = "StructureError: Unparsable source: src/broken.pyi: invalid syntax"
+			profiles[side] = profile
+			payload, err := json.Marshal(profiles)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := &Runner{result: newRunResult("change"), outputMode: "json", baselineSHA: "abc"}
+			if r.normalizeChange(bytes.NewReader(payload), nil) {
+				t.Fatal("malformed stub accepted as complete")
+			}
+			if len(r.result.Measurements) != 0 || len(r.result.Findings) != 1 || r.result.Findings[0].Rule != "pyguard.change.INCOMPLETE_INPUT" || !strings.Contains(r.result.Findings[0].Evidence, "broken.pyi") {
+				t.Fatal(r.result)
+			}
+		})
+	}
+}
