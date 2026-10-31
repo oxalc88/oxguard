@@ -143,7 +143,7 @@ func TestDisplacementRequiresUnreducedWorkAndStructure(t *testing.T) {
 	}
 }
 
-func TestChangeMeasurementsUseOnlyIdenticalFilePaths(t *testing.T) {
+func TestChangeFileDeltasRequirePathOrFingerprintEvidence(t *testing.T) {
 	r := &Runner{result: newRunResult("change"), baselineSHA: "abc"}
 	r.compareChange(changeMetrics{}, changeMetrics{Cycles: 1, CouplingHotspots: 1}, []changeFileMetric{{File: "same.py", Cyclomatic: 3, MI: 40}, {File: "old.py", Cyclomatic: 9}}, []changeFileMetric{{File: "same.py", Cyclomatic: 2, MI: 50}, {File: "new.py", Cyclomatic: 9}})
 	deltas := 0
@@ -213,7 +213,7 @@ func changeTestProfile(t *testing.T) changeProfile {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return changeProfile{Structure: data, Versions: map[string]string{"python": "3.12", "grimp": "3.18", "networkx": "3.7", "pyan3": "2.9.0", "radon": "6.0.1"}, Files: []changeFileMetric{{File: "src/a.py", Cyclomatic: 1, MI: 100}}}
+	return changeProfile{Structure: data, Versions: map[string]string{"python": "3.12", "grimp": "3.18", "networkx": "3.7", "pyan3": "2.9.0", "radon": "6.0.1", "complexipy": "8.3.0"}, Functions: []changeFunctionMetric{}, Files: []changeFileMetric{{File: "src/a.py", SourceHash: "hash", MI: 100}}}
 }
 
 func TestChangeNormalizationRejectsIncompleteEvidence(t *testing.T) {
@@ -251,7 +251,7 @@ func TestChangeNormalizationRejectsIncompleteEvidence(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			r := &Runner{result: newRunResult("change"), outputMode: "json", baselineSHA: "abc"}
+			r := &Runner{root: t.TempDir(), result: newRunResult("change"), outputMode: "json", baselineSHA: "abc"}
 			complete := r.normalizeChange(bytes.NewReader(payload), []string{"diagnostic-001"})
 			if complete != (tc.rule == "") {
 				t.Fatal(complete, r.result.Findings)
@@ -306,7 +306,7 @@ func TestChangeMalformedStubsMakeEitherSideIncomplete(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			r := &Runner{result: newRunResult("change"), outputMode: "json", baselineSHA: "abc"}
+			r := &Runner{root: t.TempDir(), result: newRunResult("change"), outputMode: "json", baselineSHA: "abc"}
 			if r.normalizeChange(bytes.NewReader(payload), nil) {
 				t.Fatal("malformed stub accepted as complete")
 			}

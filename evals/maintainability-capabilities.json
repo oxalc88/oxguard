@@ -263,11 +263,18 @@
       "id": "change.function_complexity",
       "tsguard": "change.native_function_complexity_and_move_control",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "change.function_complexity_increase"
+          ],
+          "negative": [
+            "change.function_move_control",
+            "change.function_simplification_control"
+          ],
+          "boundary": [
+            "change.ambiguous_fingerprint_unmatched"
+          ]
         }
       },
       "python_candidate": "Radon function complexity and conservative identity matching"
@@ -276,11 +283,17 @@
       "id": "change.truthful_completeness",
       "tsguard": "change.cognitive_suppression_is_partial",
       "pyguard": {
-        "status": "planned",
+        "status": "implemented",
         "cases": {
-          "positive": [],
-          "negative": [],
-          "boundary": []
+          "positive": [
+            "change.cognitive_suppression_is_partial"
+          ],
+          "negative": [
+            "change.unused_foreign_suppression_completes"
+          ],
+          "boundary": [
+            "change.artifact_schema"
+          ]
         }
       },
       "python_candidate": "Explicit unsupported/suppressed measurement controls"

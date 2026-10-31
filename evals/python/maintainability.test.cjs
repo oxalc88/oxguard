@@ -210,6 +210,25 @@ const failurePolicies = ${JSON.stringify(FAILURE_POLICIES)};
 const caseId = path.basename(path.dirname(process.cwd()));
 const variant = path.basename(process.cwd());
 const command = process.argv[2] || 'criticality';
+
+const p7bCases = ['change.function_complexity_increase', 'change.function_move_control', 'change.function_simplification_control', 'change.ambiguous_fingerprint_unmatched', 'change.cognitive_suppression_is_partial', 'change.unused_foreign_suppression_completes', 'change.artifact_schema'];
+if (command === 'change' && p7bCases.includes(caseId)) {
+  const fs = require('node:fs');
+  const partial = caseId === 'change.cognitive_suppression_is_partial';
+  const increase = caseId === 'change.function_complexity_increase';
+  const ambiguous = caseId === 'change.ambiguous_fingerprint_unmatched';
+  const moved = caseId === 'change.function_move_control';
+  const findings = increase ? [{rule:'pyguard.change.FUNCTION_COMPLEXITY_INCREASE', status:'advisory', severity:'warning', category:'quality', gate:'change', level:'change', location:{file:'src/a.py',line:1,symbol:'work'}, related:[{file:'src/a.py',line:1,symbol:'work'}], evidence:'path_or_symbol '+ 'a'.repeat(40) +' from 0 to 1'}] : partial ? [{rule:'pyguard.change.INCOMPLETE_METRICS',evidence:'work (src/a.py)'}] : [];
+  const measurements = [{metric:'change.matched_functions',level:'change',location:{file:'.'},value:ambiguous?0:1,unit:'functions'},{metric:'change.matched_files',level:'change',location:{file:'.'},value:ambiguous?0:1,unit:'files'}];
+  if (!partial) {
+    measurements.push({metric:'change.delta.function.cognitive',location:{file:moved?'src/new.py':'src/a.py',symbol:'work'},value:increase?1:caseId==='change.function_simplification_control'?-1:0},{metric:'change.delta.function.cyclomatic',location:{file:moved?'src/new.py':'src/a.py',symbol:'work'},value:increase?1:0});
+    for (const side of ['baseline','candidate']) for (const metric of ['function.cognitive','function.cyclomatic','total_cognitive']) measurements.push({metric:'change.'+side+'.'+metric,value:1});
+  }
+  const profile = {cognitive_complete:true,files:[{file:'src/a.py',source_hash:'hash'}],functions:[{id:'f',location:{file:'src/a.py',line:1,symbol:'work'},fingerprint:'tokens',cognitive:0,cyclomatic:1}]};
+  const artifact = {schema_version:'1',baseline_sha:'a'.repeat(40),native_metrics:{baseline:profile,candidate:profile,policy:{candidate_config_applies_to_both:true}},file_matches:[{method:moved?'exact_fingerprint':'path_or_symbol'}],function_matches:[{method:moved?'exact_fingerprint':'path_or_symbol'}],baseline_structure:{},candidate_structure:{}};
+  fs.mkdirSync('.pyguard-cache',{recursive:true});fs.writeFileSync('.pyguard-cache/maintainability-change.json',JSON.stringify(artifact));
+  process.stdout.write(JSON.stringify({schema_version:'1',status:findings.length?'advisory':'pass',assessment:partial?'incomplete':'complete',exit_code:partial?1:0,gates:[{name:'change',status:findings.length?'advisory':'passed',normalization:partial?'partial':'complete'}],findings,measurements,artifacts:[{kind:'maintainability_change',path:'.pyguard-cache/maintainability-change.json'}],diagnostics:[]}));process.exit(partial?1:0);
+}
 if (command === 'change') {
   const incomplete = ['change.absent_baseline', 'change.unavailable_ref', 'change.unparsable_baseline_is_incomplete'].includes(caseId);
   const rule = caseId === 'change.unparsable_baseline_is_incomplete' ? 'INCOMPLETE_INPUT' : ['change.absent_baseline', 'change.unavailable_ref'].includes(caseId) ? 'BASELINE_UNAVAILABLE' : caseId === 'change.artificial_split_and_inert_baseline' ? 'POSSIBLE_COMPLEXITY_DISPLACEMENT' : caseId === 'change.new_dependency_cycle' ? 'NEW_DEPENDENCY_CYCLES' : caseId === 'change.coupling_increase' ? 'INCREASED_COUPLING' : null;
@@ -230,7 +249,7 @@ if (command === 'change') {
     }
     measurements.push({metric:'change.delta.file.cyclomatic',level:'change',location:{file:caseId === 'change.nested_project_prefix' ? 'src/clean.py' : 'src/pkg/core.py'},value:0,unit:'paths'});
   }
-  process.stdout.write(JSON.stringify({schema_version:'1',status:findings.length?'advisory':'pass',assessment:incomplete?'incomplete':'complete',gates:[{name:'change',status:incomplete?'not_run':findings.length?'advisory':'passed',normalization:incomplete?'not_run':'complete'}],exit_code:incomplete?1:0,findings,measurements,artifacts:[],diagnostics:[]}));process.exit(incomplete?1:0);
+  process.stdout.write(JSON.stringify({schema_version:'1',status:findings.length?'advisory':'pass',assessment:incomplete?'incomplete':'complete',gates:[{name:'change',status:incomplete?'not_run':findings.length?'advisory':'passed',normalization:incomplete?'not_run':'complete'}],exit_code:incomplete?1:0,findings,measurements,artifacts:incomplete?[]:[{kind:'maintainability_change',path:'.pyguard-cache/maintainability-change.json'}],diagnostics:[]}));process.exit(incomplete?1:0);
 }
 if (failurePolicies[caseId] && command === 'structure') {
   const partial = caseId === 'failure_policy.unparsable_is_incomplete';
@@ -335,7 +354,7 @@ test('harness cases match the capability spec exactly', () => {
     assert.equal(definition.kind, expected[i].kind);
     assert.ok(spec.capabilities.some(capability => capability.id === definition.capability));
   });
-  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'maintainability.failure_policies', 'structure.runtime_graph', 'structure.false_positive_controls', 'change.complexity_displacement', 'change.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
+  assert.deepEqual([...new Set(definitions.map(d => d.capability))], ['quality.zero_config_exception_handling', 'maintainability.delegation', 'maintainability.failure_policies', 'structure.runtime_graph', 'structure.false_positive_controls', 'change.complexity_displacement', 'change.false_positive_controls', 'structure.function_graph', 'structure.coupling', 'change.function_complexity', 'change.truthful_completeness', 'maintainability.async_delegation', 'quality.cognitive_complexity']);
   for (const kind of ['positive', 'negative', 'boundary']) assert.ok(expected.some(d => d.kind === kind));
 });
 
