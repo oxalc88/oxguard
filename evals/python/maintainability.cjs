@@ -1564,8 +1564,8 @@ const definitions = [
       assert.equal(structureMeasurement(result, 'change.candidate.total_branches'), 8);
       assert.equal(structureMeasurement(result, 'change.baseline.max_file_branches'), 8);
       assert.equal(structureMeasurement(result, 'change.candidate.max_file_branches'), 4);
-      for (const m of result.measurements.filter(m => m.metric.startsWith('change.delta.'))) assert.ok(['src/pkg/__init__.py', 'src/pkg/core.py'].includes(m.location.file));
-      assert.equal(result.artifacts.some(a => a.kind === 'maintainability_change'), false);
+      for (const m of result.measurements.filter(m => m.metric.startsWith('change.delta.file.'))) assert.ok(['src/pkg/__init__.py', 'src/pkg/core.py'].includes(m.location.file));
+      assert.equal(result.artifacts.some(a => a.kind === 'maintainability_change'), true);
     },
   },
   {
@@ -2230,6 +2230,78 @@ const definitions = [
       assert.equal(structureMeasurement(result, 'module.edges'), 9);
       assert.equal(result.exit_code, 0);
       assert.equal(blockingOutcome(result), false);
+    },
+  },
+  {
+    id: 'change.function_complexity_increase', capability: 'change.function_complexity', kind: 'positive', command: 'change',
+    gitBaseline: { 'src/a.py': 'def work(x):\n    return x\n' },
+    files: { 'src/a.py': 'def work(x):\n    if x:\n        return 1\n    return 0\n' },
+    check: ({ result }) => {
+      assertChangeComplete(result);
+      const finding = changeFinding(result, 'FUNCTION_COMPLEXITY_INCREASE');
+      assert.ok(finding);
+      assert.equal(finding.status, 'advisory'); assert.equal(finding.severity, 'warning'); assert.equal(finding.category, 'quality');
+      assert.equal(finding.level, 'change'); assert.equal(finding.location.symbol, 'work'); assert.equal(finding.location.line, 1);
+      assert.equal(finding.related[0].file, 'src/a.py'); assert.match(finding.evidence, /path_or_symbol.*[a-f0-9]{40}.*from 0 to 1/);
+      assert.equal(structureMeasurement(result, 'change.matched_functions'), 1);
+      assert.equal(result.measurements.find(m => m.metric === 'change.delta.function.cognitive' && m.location.file === 'src/a.py' && m.location.symbol === 'work').value, 1);
+      assert.equal(result.measurements.find(m => m.metric === 'change.delta.function.cyclomatic' && m.location.file === 'src/a.py' && m.location.symbol === 'work').value, 1);
+      for (const side of ['baseline', 'candidate']) for (const metric of ['function.cognitive', 'function.cyclomatic', 'total_cognitive']) assert.ok(result.measurements.some(m => m.metric === `change.${side}.${metric}`));
+    },
+  },
+  {
+    id: 'change.function_move_control', capability: 'change.function_complexity', kind: 'negative', command: 'change',
+    gitBaseline: { 'src/old.py': flatFunction }, files: { 'src/new.py': flatFunction },
+    check: ({ result, project }) => {
+      assertChangeComplete(result); assert.equal(changeFinding(result, 'FUNCTION_COMPLEXITY_INCREASE'), undefined);
+      assert.equal(structureMeasurement(result, 'change.matched_functions'), 1); assert.equal(structureMeasurement(result, 'change.matched_files'), 1);
+      for (const m of result.measurements.filter(m => m.metric.startsWith('change.delta.'))) { assert.equal(m.value, 0); assert.equal(m.location.file, 'src/new.py'); }
+      const artifact = JSON.parse(fs.readFileSync(path.join(project, result.artifacts.find(a => a.kind === 'maintainability_change').path), 'utf8'));
+      assert.equal(artifact.function_matches[0].method, 'exact_fingerprint'); assert.equal(artifact.file_matches[0].method, 'exact_fingerprint');
+    },
+  },
+  {
+    id: 'change.function_simplification_control', capability: 'change.function_complexity', kind: 'negative', command: 'change',
+    gitBaseline: { 'src/a.py': 'def work(x):\n    if x: return 1\n    return 0\n' }, files: { 'src/a.py': 'def work(x):\n    return x\n' },
+    check: ({ result }) => { assertChangeComplete(result); assert.equal(changeFinding(result, 'FUNCTION_COMPLEXITY_INCREASE'), undefined); assert.equal(result.measurements.find(m => m.metric === 'change.delta.function.cognitive' && m.location.file === 'src/a.py' && m.location.symbol === 'work').value, -1); },
+  },
+  {
+    id: 'change.ambiguous_fingerprint_unmatched', capability: 'change.function_complexity', kind: 'boundary', command: 'change',
+    gitBaseline: { 'src/a.py': flatFunction, 'src/b.py': flatFunction }, files: { 'src/c.py': flatFunction },
+    check: ({ result }) => { assertChangeComplete(result); assert.equal(structureMeasurement(result, 'change.matched_functions'), 0); assert.equal(structureMeasurement(result, 'change.matched_files'), 0); assert.equal(changeFinding(result, 'FUNCTION_COMPLEXITY_INCREASE'), undefined); },
+  },
+  {
+    id: 'change.cognitive_suppression_is_partial', capability: 'change.truthful_completeness', kind: 'positive', command: 'change', exitCode: 1,
+    gitBaseline: { 'src/a.py': 'def work(x):\n    return x\n' }, files: { 'src/a.py': 'def work(x): # noqa: complexipy\n    if x: return 1\n    return 0\n' },
+    check: ({ result }) => {
+      assert.equal(result.assessment, 'incomplete'); assert.equal(result.exit_code, 1);
+      assert.equal(result.gates.find(g => g.name === 'change').normalization, 'partial');
+      assert.match(changeFinding(result, 'INCOMPLETE_METRICS').evidence, /work.*src\/a.py/);
+      assert.equal(changeFinding(result, 'FUNCTION_COMPLEXITY_INCREASE'), undefined);
+      assert.ok(!result.measurements.some(m => ['change.candidate.function.cognitive', 'change.delta.function.cognitive', 'change.candidate.total_cognitive'].includes(m.metric)));
+    },
+  },
+  {
+    id: 'change.unused_foreign_suppression_completes', capability: 'change.truthful_completeness', kind: 'negative', command: 'change',
+    gitBaseline: { 'src/a.py': flatFunction }, files: { 'src/a.py': '# noqa: E501\n# type: ignore\n' + flatFunction },
+    check: ({ result }) => { assertChangeComplete(result); assert.equal(changeFinding(result, 'INCOMPLETE_METRICS'), undefined); assert.equal(result.findings.length, 0); assert.equal(structureMeasurement(result, 'change.matched_functions'), 1); },
+  },
+  {
+    id: 'change.artifact_schema', capability: 'change.truthful_completeness', kind: 'boundary', command: 'change',
+    gitBaseline: { 'src/a.py': flatFunction }, files: { 'src/a.py': flatFunction },
+    check: ({ result, project }) => {
+      assertChangeComplete(result);
+      const ref = result.artifacts.find(a => a.kind === 'maintainability_change'); assert.ok(ref);
+      assert.equal(ref.path, '.pyguard-cache/maintainability-change.json');
+      const artifact = JSON.parse(fs.readFileSync(path.join(project, ref.path), 'utf8'));
+      assert.equal(artifact.schema_version, '1'); assert.match(artifact.baseline_sha, /^[a-f0-9]{40}$/);
+      for (const key of ['native_metrics', 'file_matches', 'function_matches', 'baseline_structure', 'candidate_structure']) assert.ok(artifact[key]);
+      assert.ok(artifact.native_metrics.policy.candidate_config_applies_to_both);
+      for (const side of ['baseline', 'candidate']) {
+        const profile = artifact.native_metrics[side]; assert.equal(profile.cognitive_complete, true);
+        assert.ok(profile.files[0].source_hash); assert.ok(profile.files[0].file);
+        const f = profile.functions[0]; for (const key of ['id', 'location', 'fingerprint', 'cognitive', 'cyclomatic']) assert.ok(Object.hasOwn(f, key));
+      }
     },
   },
   {

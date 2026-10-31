@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "analysis"))
-from analyze_change import file_metrics
+from analyze_change import file_metrics, function_metrics
 
 ANALYZER = Path(__file__).resolve().parents[1] / "analysis" / "analyze_change.py"
 
@@ -123,6 +123,61 @@ class ChangeMetricsTests(unittest.TestCase):
             facts = file_metrics({"modules": [{"file": "a.py"}]}, root)
             self.assertEqual(facts[0]["cyclomatic"], 0)
             self.assertEqual(facts[0]["branches"], 0)
+
+
+class FunctionMetricsTests(unittest.TestCase):
+    def measure(self, source):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "a.py").write_text(source)
+            return function_metrics({"modules": [{"file": "a.py"}]}, root)
+
+    def test_identity_fingerprint_and_locations(self):
+        first = self.measure("def f(x):\n    if x: return 1\n    return 0\n")[0]
+        layout = self.measure("\n# comment\ndef f(x): # foreign comment\n  if x: return 1\n  return 0\n")[0]
+        self.assertEqual(first["fingerprint"], layout["fingerprint"])
+        self.assertNotEqual(first["id"], layout["id"])
+        self.assertEqual(layout["location"], {"file": "a.py", "line": 3, "symbol": "f"})
+        for source in ("def g(x):\n if x:return 1\n return 0\n",
+                       "def f(x):\n if x:return 2\n return 0\n"):
+            self.assertNotEqual(first["fingerprint"], self.measure(source)[0]["fingerprint"])
+
+    def test_native_suppressions_and_foreign_comments(self):
+        for comment in ("# noqa: complexipy", "# complexipy: ignore"):
+            for prefix, inline in ((comment + "\n", ""), ("", comment)):
+                metric = self.measure(f"{prefix}def f(x): {inline}\n if x: return 1\n return 0\n")[0]
+                self.assertIsNone(metric["cognitive"])
+                self.assertIn("omitted", metric["cognitive_error"])
+        for comment in ("# noqa", "# noqa: E501", "# type: ignore"):
+            metric = self.measure(f"def f(x): {comment}\n if x: return 1\n return 0\n")[0]
+            self.assertEqual(metric["cognitive"], 1)
+
+    def test_methods_async_and_closures_have_independent_scores(self):
+        metrics = self.measure("class C:\n async def method(self):\n  def inner(x):\n   if x: return 1\n   return 0\n  return inner(1)\n")
+        self.assertEqual([m["location"]["symbol"] for m in metrics], ["C.method", "C.method.inner"])
+        self.assertEqual([m["cyclomatic"] for m in metrics], [1, 2])
+        self.assertEqual([m["cognitive"] for m in metrics], [1, 1])
+
+    def test_function_local_class_methods_keep_ast_coverage(self):
+        metrics = self.measure("def outer():\n class Local:\n  def method(self, x):\n   if x: return 1\n   return 0\n return Local\n")
+        self.assertEqual([m["location"]["symbol"] for m in metrics], ["outer", "outer.Local.method"])
+        self.assertEqual([m["cyclomatic"] for m in metrics], [1, 2])
+        self.assertTrue(all(m["cognitive"] is not None for m in metrics))
+
+    def test_multiline_literal_indentation_is_preserved(self):
+        first = self.measure('class C:\n def method(self):\n  text = """first\nno indentation\n  last"""\n  return text\n')[0]
+        changed = self.measure('class C:\n def method(self):\n  text = """first\nno indentation\n last"""\n  return text\n')[0]
+        self.assertNotEqual(first["fingerprint"], changed["fingerprint"])
+        self.assertEqual(first["cognitive"], 0)
+        self.assertEqual(first["cyclomatic"], 1)
+
+    def test_complexipy_failure_keeps_identity_and_cyclomatic(self):
+        from unittest.mock import patch
+        with patch("complexipy.code_complexity", side_effect=ValueError("analyzer failed")):
+            metric = self.measure("def f(): return 0\n")[0]
+        self.assertEqual(metric["cyclomatic"], 1)
+        self.assertIsNone(metric["cognitive"])
+        self.assertIn("analyzer failed", metric["cognitive_error"])
 
 
 if __name__ == "__main__":

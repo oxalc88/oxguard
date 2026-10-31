@@ -59,6 +59,7 @@ func runChangeAdvisory(r *Runner) {
 		r.result.AddFinding(finding)
 	}
 	r.result.Measurements = append(r.result.Measurements, worker.result.Measurements...)
+	r.result.Artifacts = append(r.result.Artifacts, worker.result.Artifacts...)
 	// Worker diagnostics are persisted in the candidate checkout. Renumber
 	// references before merging to avoid collisions with check diagnostics.
 	ids := map[string]string{}
@@ -155,6 +156,7 @@ func runChange(r *Runner) int {
 
 type changeFileMetric struct {
 	File                string  `json:"file"`
+	SourceHash          string  `json:"source_hash"`
 	Cyclomatic          float64 `json:"cyclomatic"`
 	MI                  float64 `json:"maintainability_index"`
 	Halstead            float64 `json:"halstead_volume"`
@@ -162,11 +164,13 @@ type changeFileMetric struct {
 	MaxFunctionBranches int     `json:"max_function_branches"`
 }
 type changeProfile struct {
-	Structure    json.RawMessage    `json:"structure"`
-	Versions     map[string]string  `json:"versions"`
-	Files        []changeFileMetric `json:"files"`
-	InputError   string             `json:"input_error"`
-	MetricsError string             `json:"metrics_error"`
+	Functions      []changeFunctionMetric `json:"functions"`
+	CognitiveError string                 `json:"cognitive_error,omitempty"`
+	Structure      json.RawMessage        `json:"structure"`
+	Versions       map[string]string      `json:"versions"`
+	Files          []changeFileMetric     `json:"files"`
+	InputError     string                 `json:"input_error"`
+	MetricsError   string                 `json:"metrics_error"`
 }
 type changeMetrics struct {
 	Modules, Edges, Cycles, Depth, Wrappers, Branches, MaxFileBranches, MaxFunctionBranches int
@@ -270,7 +274,7 @@ func (r *Runner) normalizeChange(stdout io.Reader, refs []string) bool {
 		return false
 	}
 	r.compareChange(bm, am, b.Files, a.Files)
-	return true
+	return r.compareFunctionMetrics(b, a)
 }
 
 func displacedComplexity(b, a changeMetrics) bool {
@@ -306,15 +310,18 @@ func (r *Runner) compareChange(b, a changeMetrics, bfiles, afiles []changeFileMe
 		r.changeMeasure(prefix+"total_halstead_volume", ".", side.m.Halstead, "volume")
 		r.changeMeasure(prefix+"min_maintainability_index", ".", side.m.MinMI, "score")
 	}
-	before := map[string]changeFileMetric{}
+	before, after := map[string]changeFileMetric{}, map[string]changeFileMetric{}
 	for _, f := range bfiles {
 		before[f.File] = f
 	}
 	for _, f := range afiles {
-		if old, ok := before[f.File]; ok {
-			r.changeMeasure("change.delta.file.cyclomatic", f.File, f.Cyclomatic-old.Cyclomatic, "paths")
-			r.changeMeasure("change.delta.file.maintainability_index", f.File, f.MI-old.MI, "score")
-		}
+		after[f.File] = f
+	}
+	matches, _ := profileMatches(changeProfile{Files: bfiles}, changeProfile{Files: afiles})
+	for _, match := range matches {
+		old, f := before[match.Baseline], after[match.Candidate]
+		r.changeMeasure("change.delta.file.cyclomatic", f.File, f.Cyclomatic-old.Cyclomatic, "paths")
+		r.changeMeasure("change.delta.file.maintainability_index", f.File, f.MI-old.MI, "score")
 	}
 	add := func(rule, evidence, remediation string) {
 		r.result.AddFinding(Finding{Gate: "change", Level: "change", Rule: "pyguard.change." + rule, Status: StatusAdvisory, Severity: "warning", Category: "quality", Location: &Location{File: "."}, Evidence: "Baseline " + r.baselineSHA + ": " + evidence, Remediation: remediation})
