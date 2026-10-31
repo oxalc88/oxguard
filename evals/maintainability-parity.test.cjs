@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { assess } = require('./maintainability-parity.cjs');
+const { assess, exitStatus } = require('./maintainability-parity.cjs');
 const spec = require('./maintainability-capabilities.json');
 const pristine = JSON.parse(JSON.stringify(spec.capabilities));
 const restoreSpec = () => spec.capabilities.forEach((capability, i) => { capability.pyguard = JSON.parse(JSON.stringify(pristine[i].pyguard)); });
@@ -92,14 +92,37 @@ test('strict readiness rejects planned capabilities and missing declared Python 
   const original=JSON.parse(JSON.stringify(capability.pyguard));
   try {
     capability.pyguard={status:'planned',cases:{}};
-    assert.throws(()=>assess(evidence(),pythonEvidence(),{strict:true}),/Strict Python maintainability readiness/);
+  assert.equal(assess(evidence(),pythonEvidence(),{strict:true}).pyguard_maintainability_ready,false);
   } finally { capability.pyguard=original; }
   assert.throws(()=>assess(evidence(),pythonEvidence(r=>r.cases.pop()),{strict:true}),/Incomplete or unexpected Python/);
 });
 test('strict readiness rejects failing declared Python cases', () => {
   const pyguard=pythonEvidence(r=>{r.cases[0].outcome='fail';});
-  assert.throws(()=>assess(evidence(),pyguard,{strict:true}),/Strict Python maintainability readiness/);
-  assert.equal(cli([evidence(),pyguard],true).status,1);
+  assert.equal(assess(evidence(),pyguard,{strict:true}).pyguard_maintainability_ready,false);
+  const result=cli([evidence(),pyguard],true);
+  assert.equal(result.status,1,`${result.stderr}\n${result.stdout}`);
+  const diagnostic=JSON.parse(result.stdout);
+  assert.equal(diagnostic.pyguard_maintainability_ready,false);
+  assert.equal(diagnostic.capabilities.length,spec.capabilities.length);
+});
+test('strict mode ignores passing and failing evidence for deferred capabilities', () => {
+  const capability=spec.capabilities.find(c=>c.id==='change.native_duplication');
+  const original=JSON.parse(JSON.stringify(capability.pyguard));
+  try {
+    capability.pyguard={status:'deferred',cases:{positive:['change.native_duplication.p'],negative:['change.native_duplication.n'],boundary:['change.native_duplication.b']}};
+    const passing=pythonEvidence();
+    const passingResult=assess(evidence(),passing,{strict:true});
+    assert.equal(passingResult.capabilities.find(c=>c.id===capability.id).pyguard,'deferred');
+    assert.equal(passingResult.pyguard_maintainability_ready,true);
+    assert.equal(exitStatus(passingResult,passing,true),0);
+
+    const failing=pythonEvidence(r=>{r.cases.find(c=>c.capability===capability.id).outcome='fail';});
+    const failingResult=assess(evidence(),failing);
+    assert.equal(failingResult.capabilities.find(c=>c.id===capability.id).pyguard,'deferred');
+    assert.equal(failingResult.pyguard_maintainability_ready,true);
+    assert.equal(failingResult.pyguard_cases_passed,false);
+    assert.equal(exitStatus(failingResult,failing,true),0);
+  } finally { capability.pyguard=original; }
 });
 test('a failing Python seed case is not ready and fails the process', () => {
   const pyguard=pythonEvidence(r=>{ r.cases.find(c=>c.capability==='structure.function_graph'&&c.kind==='boundary').outcome='fail'; });

@@ -360,7 +360,7 @@ jobs:
           OXGUARD_REQUIRE_CURRENT_TRACES: ${{ inputs.tag && '1' || '0' }}
         run: node evals/level1-ready.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/level1-ready.json
       - uses: actions/upload-artifact@v4
-        if: needs.scope.outputs.docs_only != 'true'
+        if: always() && needs.scope.outputs.docs_only != 'true'
         with:
           name: oxguard-capability-parity
           path: |

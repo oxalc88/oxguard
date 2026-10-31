@@ -44,6 +44,10 @@ function capabilityPyguard(slot, capability, outcomes) {
   throw new Error(`Unknown pyguard status ${slot.status} for ${capability}`);
 }
 
+function exitStatus(result, pyguardReport, strict) {
+  return result.tsguard_capabilities_passed && (!pyguardReport || (strict ? result.pyguard_maintainability_ready : result.pyguard_cases_passed)) ? 0 : 1;
+}
+
 // The optional second argument keeps single-report callers working: without a
 // Python report nothing is evaluated, and pyguard values come from the spec
 // slot ('deferred' only; everything else stays 'not_evaluated').
@@ -80,20 +84,19 @@ function assess(tsguardReport, pyguardReport, { strict = false } = {}) {
     levels, deferred_tsguard_capabilities: spec.deferred_tsguard_capabilities,
     deferred_pyguard_capabilities: deferredPyguardCapabilities, capabilities: rows,
     limitation: 'The planned Tsguard code, structure and change capabilities have native evaluations. Python readiness covers the complete supported scope with deferred capabilities excluded; it is not full Tsguard parity. Provider limits and static-analysis boundaries remain explicit. This report does not replace retained Level 1 checks, platform verification or release authorization.' };
-  if (strict && pyguardReport && !result.pyguard_maintainability_ready) throw new Error('Strict Python maintainability readiness failed: supported capabilities must be implemented and all declared cases must pass');
   return result;
 }
 if (require.main === module) {
   const strict = process.argv.includes('--strict');
   const files = process.argv.slice(2).filter(arg => arg !== '--strict');
   const [tsguardFile, pyguardFile] = files;
-  if (!tsguardFile) throw new Error('Usage: node evals/maintainability-parity.cjs <tsguard.json> [<pyguard.json>]');
+  if (!tsguardFile) throw new Error('Usage: node evals/maintainability-parity.cjs [--strict] <tsguard.json> [<pyguard.json>]');
   const tsguard = JSON.parse(fs.readFileSync(tsguardFile, 'utf8'));
   const pyguard = pyguardFile ? JSON.parse(fs.readFileSync(pyguardFile, 'utf8')) : undefined;
   const result = assess(tsguard, pyguard, { strict });
   console.log(JSON.stringify(result, null, 2));
   // Default mode remains report-only for planned Python capabilities. Strict
-  // mode is used by CI when a Python report is supplied.
-  process.exitCode = result.tsguard_capabilities_passed && (!pyguard || result.pyguard_cases_passed) ? 0 : 1;
+  // mode is used by CI when a Python report is supplied and scores readiness.
+  process.exitCode = exitStatus(result, pyguard, strict);
 }
-module.exports = { assess };
+module.exports = { assess, exitStatus };
