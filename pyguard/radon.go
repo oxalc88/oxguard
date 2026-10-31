@@ -87,6 +87,7 @@ func runRadonEnforce(r *Runner, dirs []string, subCmd, grade, failMsg, okMsg str
 
 func runRadonMachine(r *Runner, dirs []string) int {
 	r.exportExcludeEnv()
+	defer addComplexityContext(r, dirs)
 	for _, gate := range []struct{ command, adapter string }{{"cc", "radon_cc"}, {"mi", "radon_mi"}} {
 		res := r.RunTool(toolSpec{gate: "radon", adapter: gate.adapter}, "radon "+gate.command, append(radonExcludeArgs(r, gate.command, "--json"), dirs...)...)
 		if !res.ok {

@@ -299,6 +299,12 @@ Only module-level, undecorated `def`/`async def` functions with plain positional
 
 Depth 3 or more reports advisory `pyguard.structure.LONG_DELEGATION_CHAIN`, and a chain across at least three files whose analyzed module-level functions all forward reports advisory `pyguard.structure.FRAGMENTED_DELEGATION`. Both are review cues, not architecture prescriptions; methods, nested/decorated functions, parameter defaults, `*args`, `**kwargs`, keyword-only and positional-only parameters, transformed or reordered arguments, annotation mismatches, tests and forwarding cycles are excluded boundaries. The findings never change the exit code or blocking outcome.
 
+## PyGuard function context (P9 PR 1)
+
+Structured `radon` runs measure `function.max_branch_nesting` at level `code`, in `levels`, including zero for flat functions. AST `if`/`elif`, conditional expressions, `for`/`async for`, `while`, `match` and exception handlers count as branches. Every syntactic child branch adds one level (including `elif`); `try`, `with`, boolean operators and comprehensions add none. Nested `def`/`async def`, methods, closures and lambdas start at zero; decorators/defaults/annotations execute in the enclosing scope. Named symbols follow module/class/function qualification; lambdas use `<lambda>@line:column` to distinguish anonymous boundaries. Locations use original files and one-based lines/columns.
+
+The v1 `.pyguard-cache/reports/complexity-context/maintainability-graph.json` artifact contains function IDs/locations, `max_branch_nesting`, `branch_locations` and resolved pyan3 call edges. Scope, test exclusions and source encodings reuse the structure helpers. Skipped sources or graph failures are marked in `partial`, `skipped` and `graph_error`; unknown evidence is never a zero measurement. Collector failures leave diagnostics without changing the original result. This evidence is independent of native CC, MI, Halstead and complexipy scores and never adds a threshold or blocking rule.
+
 ## Tsguard function context
 
 `function.branches` counts compiler branch constructs. `function.max_branch_nesting` measures their maximum structural nesting; callbacks start a new function boundary. `branch_locations` in the maintainability graph identifies the source paths. These are observations, not per-function FTA or cognitive scores. Structured FTA failures attach this context for the first failing file while preserving the native score/cap failure.

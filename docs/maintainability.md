@@ -96,6 +96,10 @@ File identity first uses the existing path, then only unique exact source hashes
 
 Full runtime call depth, arbitrary semantic rename inference, custom branch-expression scores and domain responsibility inference remain outside static analysis. The supported displacement checks combine lower per-file branches or native FTA maximum with unreduced branch work and increased structural cost. These facts do not prove every possible displacement or behavioral equivalence.
 
+## PyGuard complexity context (P9 PR 1)
+
+`quality.complexity_context` adds evidence to structured `radon` results, including early blocking CC/MI/Halstead failures. `function.max_branch_nesting` and the cached `maintainability_graph` show each function’s branch depth and locations; nested definitions, closures and lambdas reset depth. The graph reuses the existing pyan3 function-call pipeline. Context is informational and cannot change exit codes, blocking findings or assessment. `quality.compiler_unsafe_operations` and `quality.discarded_failures` are deferred follow-ups with no passing claim; existing scoped readiness and parity CLI exit policies are unchanged.
+
 ## Evaluation and parity
 
 `evals/maintainability.cjs` and `evals/review-gaps.cjs` run adversarial cases through the packed installed launcher in the existing npm/pnpm platform matrix. It tests the baseline, Biome syntax policy plus semantic-only native rules, preserved project policy, valid DI/boundaries/validation, exact repeated handlers, exception propagation/recording/fallback, runtime/type-only cycles, generated exclusions, deterministic IDs, bounded agent output, artificial splits, real branch reduction, missing refs, nested projects and inert baseline scripts/export attributes. It never runs in an ordinary guard invocation.

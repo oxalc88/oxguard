@@ -49,6 +49,20 @@ function functionMeasurement(result, metric, file, symbol) {
   return found;
 }
 
+function complexityGraph(result, project) {
+  const artifact = result.artifacts.find(a => a.kind === 'maintainability_graph');
+  assert.ok(artifact, 'missing maintainability graph');
+  assert.match(artifact.path, /^\.pyguard-cache\//);
+  const graph = JSON.parse(fs.readFileSync(path.join(project, artifact.path), 'utf8'));
+  assert.equal(graph.schema_version, '1');
+  assert.equal(graph.partial, false);
+  assert.ok(Array.isArray(graph.calls));
+  const ids = new Set(graph.functions.map(f => f.id));
+  assert.equal(ids.size, graph.functions.length);
+  for (const call of graph.calls) assert.ok(ids.has(call.caller) && ids.has(call.callee));
+  return graph;
+}
+
 function ranked(result, symbol) {
   return result.findings.find(f => f.rule === 'pyguard.criticality.ranked' && f.location.symbol === symbol);
 }
@@ -2302,6 +2316,115 @@ const definitions = [
         assert.ok(profile.files[0].source_hash); assert.ok(profile.files[0].file);
         const f = profile.functions[0]; for (const key of ['id', 'location', 'fingerprint', 'cognitive', 'cyclomatic']) assert.ok(Object.hasOwn(f, key));
       }
+    },
+  },
+  {
+    id: 'complexity_context.radon_failure_has_context',
+    capability: 'quality.complexity_context', kind: 'positive',
+    command: 'radon', exitCode: 1,
+    files: { 'src/deep.py': nestChain(11, 'deep') },
+    check: ({ result, project }) => {
+      assert.equal(result.exit_code, 1);
+      assert.equal(result.status, 'fail');
+      assert.equal(result.assessment, 'complete');
+      assert.equal(result.gates.find(g => g.name === 'radon').status, 'failed');
+      assert.ok(result.findings.some(f => f.rule === 'pyguard.radon.cc_exceeded' && f.status === 'blocking'));
+      assert.equal(functionMeasurement(result, 'function.max_branch_nesting', 'src/deep.py', 'deep.deep').value, 11);
+      const graph = complexityGraph(result, project);
+      assert.equal(graph.functions[0].branch_locations.length, 11);
+      assert.equal(graph.functions[0].branch_locations[10].line, 21);
+    },
+  },
+  {
+    id: 'complexity_context.flat_control',
+    capability: 'quality.complexity_context', kind: 'negative', command: 'radon',
+    files: { 'src/flat.py': flatFunction, 'src/tests/test_deep.py': nestChain(11, 'excluded') },
+    check: ({ result, project }) => {
+      complete(result, 'radon');
+      assert.equal(result.exit_code, 0);
+      assert.equal(result.status, 'pass');
+      assert.equal(result.findings.length, 0);
+      assert.equal(functionMeasurement(result, 'function.max_branch_nesting', 'src/flat.py', 'flat.flat').value, 0);
+      const graph = complexityGraph(result, project);
+      assert.equal(graph.functions.length, 1);
+      assert.deepEqual(graph.functions[0].branch_locations, []);
+    },
+  },
+  {
+    id: 'complexity_context.function_boundaries',
+    capability: 'quality.complexity_context', kind: 'boundary', command: 'radon',
+    files: { 'src/boundary.py': 'def outer(values):\n    for value in values:\n        if value:\n            def inner(x):\n                if x:\n                    if x > 1:\n                        if x > 2:\n                            return x\n                return 0\n            callback = lambda x: x if x else 0\n            return inner(callback(value))\n    return 0\n' },
+    check: ({ result, project }) => {
+      complete(result, 'radon');
+      assert.equal(result.exit_code, 0);
+      assert.equal(blockingOutcome(result), false);
+      const graph = complexityGraph(result, project);
+      for (const [symbol, depth, lines] of [
+        ['boundary.outer', 2, [2, 3]],
+        ['boundary.outer.inner', 3, [5, 6, 7]],
+        ['boundary.outer.<lambda>@10:24', 1, [10]],
+      ]) {
+        assert.equal(functionMeasurement(result, 'function.max_branch_nesting', 'src/boundary.py', symbol).value, depth);
+        const fact = graph.functions.find(f => f.location.symbol === symbol);
+        assert.ok(fact, symbol);
+        assert.equal(fact.max_branch_nesting, depth);
+        assert.deepEqual(fact.branch_locations.map(l => l.line), lines);
+      }
+      assert.equal(graph.functions.length, 3);
+      const byID = new Map(graph.functions.map(f => [f.id, f.location.symbol]));
+      assert.ok(graph.calls.some(c => byID.get(c.caller) === 'boundary.outer' && byID.get(c.callee) === 'boundary.outer.inner'));
+    },
+  },
+  {
+    id: 'complexity_context.narrowed_nested_scope',
+    capability: 'quality.complexity_context', kind: 'boundary', command: 'radon',
+    dirs: 'src/pkg/nested/calls.py',
+    files: { 'src/pkg/nested/calls.py': 'def target():\n    return 1\n\ndef caller():\n    return target()\n' },
+    check: ({ result, project }) => {
+      complete(result, 'radon');
+      const graph = complexityGraph(result, project);
+      assert.equal(graph.partial, false);
+      assert.equal(graph.graph_error, '');
+      assert.equal(graph.functions.length, 2);
+      const byID = new Map(graph.functions.map(f => [f.id, f.location.symbol]));
+      assert.deepEqual(graph.calls.map(c => [byID.get(c.caller), byID.get(c.callee)]),
+        [['pkg.nested.calls.caller', 'pkg.nested.calls.target']]);
+    },
+  },
+  {
+    id: 'complexity_context.class_headers',
+    capability: 'quality.complexity_context', kind: 'boundary', command: 'radon',
+    files: { 'src/headers.py': 'def outer(x, Base, Other, meta, decorate):\n    if x:\n        @decorate if x else decorate\n        class C(Base if x else Other, metaclass=meta if x else meta):\n            def method(self):\n                if x:\n                    return x\n        class D((lambda x: x if x else 0)(Base)):\n            pass\n' },
+    check: ({ result, project }) => {
+      complete(result, 'radon');
+      const graph = complexityGraph(result, project);
+      assert.equal(graph.functions.length, 3);
+      for (const [symbol, depth, lines] of [
+        ['headers.outer', 2, [2, 3, 4, 4]],
+        ['headers.outer.C.method', 1, [6]],
+        ['headers.outer.<lambda>@8:18', 1, [8]],
+      ]) {
+        assert.equal(functionMeasurement(result, 'function.max_branch_nesting', 'src/headers.py', symbol).value, depth);
+        const fact = graph.functions.find(f => f.location.symbol === symbol);
+        assert.equal(fact.max_branch_nesting, depth);
+        assert.deepEqual(fact.branch_locations.map(l => l.line).sort((a, b) => a - b), lines);
+      }
+    },
+  },
+  {
+    id: 'complexity_context.unicode_columns',
+    capability: 'quality.complexity_context', kind: 'boundary', command: 'radon',
+    files: { 'src/unicode.py': 'def outer():\n    é = lambda y: y if y else 0\n    return é(1)\n' },
+    check: ({ result, project }) => {
+      complete(result, 'radon');
+      const graph = complexityGraph(result, project);
+      assert.equal(graph.functions.length, 2);
+      const fact = graph.functions.find(f => f.location.symbol === 'unicode.outer.<lambda>@2:9');
+      assert.ok(fact);
+      assert.equal(fact.location.line, 2);
+      assert.equal(fact.location.column, 9);
+      assert.deepEqual(fact.branch_locations, [{file:'src/unicode.py', line:2, column:19}]);
+      assert.equal(functionMeasurement(result, 'function.max_branch_nesting', 'src/unicode.py', fact.location.symbol).value, 1);
     },
   },
   {

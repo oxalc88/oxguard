@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- PyGuard P9 PR 1 implements `quality.complexity_context`: structured radon runs retain per-function AST nesting measurements and a cached maintainability graph even on blocking complexity findings, without changing exit codes or blocking policy. Positive, negative and function-boundary evals cover it; Python compiler-unsafe-operation and discarded-failure capabilities are explicitly deferred with follow-up text, never counted as passing. (#23)
+
 - PyGuard P7b adds per-function Radon cyclomatic and complexipy cognitive baseline/candidate scores, cognitive totals, matched deltas and advisory `FUNCTION_COMPLEXITY_INCREASE` warnings with related baseline locations. Matching uses unique file/qualname, then unique exact token fingerprints; ambiguous copies remain unmatched. File matching also recognizes unique exact source hashes. Native complexipy suppressions (`# noqa: complexipy`, `# complexipy: ignore`) and failures leave unknown scores and partial change (exit 1), while foreign noqa/type-ignore comments remain complete. Candidate policy still applies to both sides and `check --baseline` remains advisory. The v1 `.pyguard-cache/maintainability-change.json` artifact records both profiles, policy, matches and structure; Python uses exact nullable cognitive scores and independently measures closures while parents retain native folding. Seven Git-fixture evals implement `change.function_complexity` and `change.truthful_completeness`; P8 duplication remains deferred. (#23)
 
 
