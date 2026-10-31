@@ -53,6 +53,9 @@ For Codex sessions, read the last `token_count` event in `~/.codex/sessions/`. F
 | 2026-10-30 | P7a change review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 2 | 1,256,894 | 152,126 | 6,963 | ~/.codex/sessions (p7a) |
 | 2026-10-30 | P7b implement (#23) | Codex CLI | implementer | gpt-6.1-sol | medium | 3 | 5,076,570 | 171,866 | 33,926 | ~/.codex/sessions (p7b) |
 | 2026-10-30 | P7b review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 2 | 1,127,306 | 116,234 | 9,665 | ~/.codex/sessions (p7b) |
+| 2026-10-31 | P9 decisions analysis (#23) | Codex CLI | analyst | gpt-6.1-sol | medium | 1 | 841,592 | 97,656 | 6,028 | ~/.codex/sessions (p9-read) |
+| 2026-10-31 | P9 PR 1 complexity context implement (#23) | Codex CLI | implementer | gpt-6.1-sol | medium | 2 | 5,198,288 | 138,192 | 31,163 | ~/.codex/sessions (p9-1) |
+| 2026-10-31 | P9 PR 1 complexity context review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 2 | 1,081,519 | 112,047 | 7,749 | ~/.codex/sessions (p9-1) |
 
 #32: 2 implementation rounds, 2 review rounds (round 1 requested 3 fixes, round 2 approved). Per session: mimo 681,389 (44,670 not cached, 29,103 output) and 1,161,033 (52,078 / 17,755); Sol 155,916 (31,342 / 1,950) and 288,963 (35,629 / 2,326). Codex's own "tokens used" lines for the two reviews were 33,292 and 37,955. During review 2, Sol started a `gpt-6-luna` session (142,660 total) that was not requested; it is not counted as a review.
 
@@ -83,6 +86,8 @@ P6 (delegation smells): deepseek-v4-flash wrote the first implementation. The se
 #23 P7a change: Sol implemented in two exec runs (initial and one review fix); despite `--disable multi_agent` each run spawned in-process subagent threads (implement/review, implement_stub_fix), whose sessions are counted in the 5 implementation sessions. Sol reviewed in 2 separate read-only sessions (round 1 CHANGES_REQUESTED, round 2 APPROVE).
 
 P7b: every prompt forbade auxiliary/multi-agent/subagent sessions; session_meta.source showed only `exec` for all 5 sessions (no subagent sessions). Review: round 1 CHANGES_REQUESTED (multiline decorators), round 2 approved.
+
+P9 analysis and PR 1: every prompt forbade auxiliary/multi-agent/subagent sessions; session_meta.source showed only `exec` for all 5 sessions (no subagent sessions). PR 1 review: round 1 CHANGES_REQUESTED (3 P2), round 2 approved.
 
 #31 (model roles doc): no token data was recorded for its sessions, so it has no row. After merging main, its docs-only CI run (40200327340) took 41 s.
 
