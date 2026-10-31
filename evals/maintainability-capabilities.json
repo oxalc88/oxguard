@@ -337,7 +337,10 @@
             "complexity_context.flat_control"
           ],
           "boundary": [
-            "complexity_context.function_boundaries"
+            "complexity_context.function_boundaries",
+            "complexity_context.narrowed_nested_scope",
+            "complexity_context.class_headers",
+            "complexity_context.unicode_columns"
           ]
         }
       },

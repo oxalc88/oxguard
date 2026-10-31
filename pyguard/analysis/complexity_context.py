@@ -5,6 +5,7 @@ import ast
 import json
 import os
 import sys
+import tokenize
 from pathlib import Path
 
 from analyze_structure import (
@@ -17,12 +18,17 @@ BRANCHES = (ast.If, ast.IfExp, ast.For, ast.AsyncFor, ast.While,
 FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
 
 
-def function_facts(tree: ast.AST, file: str, module: str) -> list[dict]:
+def function_facts(tree: ast.AST, file: str, module: str, source: str) -> list[dict]:
     facts = []
+    lines = source.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+    def column(node):
+        line = lines[node.lineno - 1]
+        return len(line.encode("utf-8")[:node.col_offset].decode("utf-8")) + 1
 
     def visit(node, scope, owner=None, depth=0):
         if isinstance(node, FUNCTIONS):
-            name = (f"<lambda>@{node.lineno}:{node.col_offset + 1}"
+            name = (f"<lambda>@{node.lineno}:{column(node)}"
                     if isinstance(node, ast.Lambda) else node.name)
             symbol = ".".join(filter(None, [scope, name]))
             # Headers execute in the enclosing scope, not the new function.
@@ -32,7 +38,7 @@ def function_facts(tree: ast.AST, file: str, module: str) -> list[dict]:
                         if isinstance(child, ast.AST):
                             visit(child, scope, owner, depth)
             fact = {"location": {"file": file, "line": node.lineno,
-                                 "column": node.col_offset + 1, "symbol": symbol},
+                                 "column": column(node), "symbol": symbol},
                     "max_branch_nesting": 0, "branch_locations": []}
             fact["id"] = json.dumps([file, node.lineno, symbol], separators=(",", ":"))
             facts.append(fact)
@@ -41,6 +47,12 @@ def function_facts(tree: ast.AST, file: str, module: str) -> list[dict]:
                 visit(child, symbol, fact, 0)
             return
         if isinstance(node, ast.ClassDef):
+            # Bases, keywords and decorators execute in the enclosing scope.
+            for field, value in ast.iter_fields(node):
+                if field != "body":
+                    for child in value if isinstance(value, list) else [value]:
+                        if isinstance(child, ast.AST):
+                            visit(child, scope, owner, depth)
             # Class bodies are another scope; methods begin at depth zero.
             for child in node.body:
                 visit(child, ".".join(filter(None, [scope, node.name])))
@@ -49,7 +61,7 @@ def function_facts(tree: ast.AST, file: str, module: str) -> list[dict]:
         if owner is not None and branch:
             owner["max_branch_nesting"] = max(owner["max_branch_nesting"], depth + 1)
             owner["branch_locations"].append(
-                {"file": file, "line": node.lineno, "column": node.col_offset + 1})
+                {"file": file, "line": node.lineno, "column": column(node)})
         for child in ast.iter_child_nodes(node):
             visit(child, scope, owner, depth + int(branch))
 
@@ -62,27 +74,39 @@ def build_context(targets: list[str]) -> dict:
     roots = project_import_roots(root)
     patterns = exclusion_patterns()
     functions, skipped, parsed = [], [], []
+    local_symbols = {}
     for path in sorted(collect_candidates(targets)):
         if excluded(path, root, patterns, os.environ.get("PYGUARD_EXCLUDE_TESTS") == "1"):
             continue
         file = relative_path(path, root)
         try:
             tree = read_tree(path)
+            with tokenize.open(path) as handle:
+                source = handle.read()
         except Exception as error:
             skipped.append({"file": file, "reason": str(error)})
             continue
         parsed.append(str(path))
-        functions.extend(function_facts(
-            tree, file, module_name(path, nearest_import_root(path, roots))))
+        module = module_name(path, nearest_import_root(path, roots))
+        facts = function_facts(tree, file, module, source)
+        functions.extend(facts)
+        for fact in facts:
+            location = fact["location"]
+            local_symbols.setdefault((file, location["line"]), []).append(
+                (location["symbol"].removeprefix(module + "."), fact["id"]))
     # Reuse the existing pyan3 function graph; AST facts add lambdas as
     # independent evidence boundaries without changing call-resolution policy.
-    index = {(f["location"]["file"], f["location"]["line"],
-              f["location"]["symbol"]): f["id"] for f in functions}
+    def ast_identifier(function):
+        # File and definition line anchor the identity. Match the complete
+        # local qualified name, allowing pyan to choose a different module root.
+        matches = [identifier for symbol, identifier in local_symbols.get(
+            (function["file"], function["line"]), [])
+            if function["symbol"] == symbol or function["symbol"].endswith("." + symbol)]
+        return matches[0] if len(matches) == 1 else None
     calls, graph_error = [], ""
     try:
         graph, dropped = build_function_graph(parsed, root)
-        identifiers = [index.get((f["file"], f["line"], f["symbol"]))
-                       for f in graph["functions"]]
+        identifiers = [ast_identifier(f) for f in graph["functions"]]
         for call in graph["calls"]:
             caller, callee = identifiers[call["caller"]], identifiers[call["callee"]]
             if caller is not None and callee is not None:

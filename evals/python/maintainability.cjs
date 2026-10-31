@@ -2376,6 +2376,58 @@ const definitions = [
     },
   },
   {
+    id: 'complexity_context.narrowed_nested_scope',
+    capability: 'quality.complexity_context', kind: 'boundary', command: 'radon',
+    dirs: 'src/pkg/nested/calls.py',
+    files: { 'src/pkg/nested/calls.py': 'def target():\n    return 1\n\ndef caller():\n    return target()\n' },
+    check: ({ result, project }) => {
+      complete(result, 'radon');
+      const graph = complexityGraph(result, project);
+      assert.equal(graph.partial, false);
+      assert.equal(graph.graph_error, '');
+      assert.equal(graph.functions.length, 2);
+      const byID = new Map(graph.functions.map(f => [f.id, f.location.symbol]));
+      assert.deepEqual(graph.calls.map(c => [byID.get(c.caller), byID.get(c.callee)]),
+        [['pkg.nested.calls.caller', 'pkg.nested.calls.target']]);
+    },
+  },
+  {
+    id: 'complexity_context.class_headers',
+    capability: 'quality.complexity_context', kind: 'boundary', command: 'radon',
+    files: { 'src/headers.py': 'def outer(x, Base, Other, meta, decorate):\n    if x:\n        @decorate if x else decorate\n        class C(Base if x else Other, metaclass=meta if x else meta):\n            def method(self):\n                if x:\n                    return x\n        class D((lambda x: x if x else 0)(Base)):\n            pass\n' },
+    check: ({ result, project }) => {
+      complete(result, 'radon');
+      const graph = complexityGraph(result, project);
+      assert.equal(graph.functions.length, 3);
+      for (const [symbol, depth, lines] of [
+        ['headers.outer', 2, [2, 3, 4, 4]],
+        ['headers.outer.C.method', 1, [6]],
+        ['headers.outer.<lambda>@8:18', 1, [8]],
+      ]) {
+        assert.equal(functionMeasurement(result, 'function.max_branch_nesting', 'src/headers.py', symbol).value, depth);
+        const fact = graph.functions.find(f => f.location.symbol === symbol);
+        assert.equal(fact.max_branch_nesting, depth);
+        assert.deepEqual(fact.branch_locations.map(l => l.line).sort((a, b) => a - b), lines);
+      }
+    },
+  },
+  {
+    id: 'complexity_context.unicode_columns',
+    capability: 'quality.complexity_context', kind: 'boundary', command: 'radon',
+    files: { 'src/unicode.py': 'def outer():\n    é = lambda y: y if y else 0\n    return é(1)\n' },
+    check: ({ result, project }) => {
+      complete(result, 'radon');
+      const graph = complexityGraph(result, project);
+      assert.equal(graph.functions.length, 2);
+      const fact = graph.functions.find(f => f.location.symbol === 'unicode.outer.<lambda>@2:9');
+      assert.ok(fact);
+      assert.equal(fact.location.line, 2);
+      assert.equal(fact.location.column, 9);
+      assert.deepEqual(fact.branch_locations, [{file:'src/unicode.py', line:2, column:19}]);
+      assert.equal(functionMeasurement(result, 'function.max_branch_nesting', 'src/unicode.py', fact.location.symbol).value, 1);
+    },
+  },
+  {
     id: 'async_delegation.return_await_chain',
     capability: 'maintainability.async_delegation',
     kind: 'positive',

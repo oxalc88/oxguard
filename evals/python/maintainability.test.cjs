@@ -323,9 +323,18 @@ if (caseId.startsWith('complexity_context.')) {
     : boundary ? [['boundary.outer', 2, [2, 3]], ['boundary.outer.inner', 3, [5, 6, 7]], ['boundary.outer.<lambda>@10:24', 1, [10]]]
     : [['flat.flat', 0, []]];
   const functions = rows.map(([symbol, depth, lines]) => ({ id: symbol, location: {file, symbol, line:1}, max_branch_nesting: depth, branch_locations: lines.map(line => ({ file, line })) }));
+  const extra = {
+    'complexity_context.narrowed_nested_scope': {file:'src/pkg/nested/calls.py', rows:[['pkg.nested.calls.target',0,[],1],['pkg.nested.calls.caller',0,[],4]], calls:[{caller:'pkg.nested.calls.caller',callee:'pkg.nested.calls.target'}]},
+    'complexity_context.class_headers': {file:'src/headers.py', rows:[['headers.outer',2,[2,3,4,4],1],['headers.outer.C.method',1,[6],5],['headers.outer.<lambda>@8:18',1,[8],8,18]]},
+    'complexity_context.unicode_columns': {file:'src/unicode.py', rows:[['unicode.outer',0,[],1],['unicode.outer.<lambda>@2:9',1,[2],2,9]]},
+  }[caseId];
+  if (extra) functions.splice(0, functions.length, ...extra.rows.map(([symbol,depth,lines,line,column=1]) => ({
+    id:symbol, location:{file:extra.file,symbol,line,column}, max_branch_nesting:depth,
+    branch_locations:lines.map(line => ({file:extra.file,line,column:caseId.endsWith('unicode_columns')?19:1})),
+  })));
   const artifact = '.pyguard-cache/reports/complexity-context/maintainability-graph.json';
   fs.mkdirSync(path.dirname(artifact), {recursive:true});
-  fs.writeFileSync(artifact, JSON.stringify({schema_version:'1', functions, calls:boundary?[{caller:'boundary.outer',callee:'boundary.outer.inner'}]:[], partial:false}));
+  fs.writeFileSync(artifact, JSON.stringify({schema_version:'1', functions, calls:extra?.calls || (boundary?[{caller:'boundary.outer',callee:'boundary.outer.inner'}]:[]), partial:false, graph_error:''}));
   const findings = positive ? [{rule:'pyguard.radon.cc_exceeded', status:'blocking'}] : [];
   process.stdout.write(JSON.stringify({schema_version:'1', status:positive?'fail':'pass', assessment:'complete', exit_code:positive?1:0,
     gates:[{name:'radon', status:positive?'failed':'passed'}], findings,

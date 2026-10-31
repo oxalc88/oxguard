@@ -14,7 +14,7 @@ from complexity_context import function_facts
 
 class ComplexityContextTests(unittest.TestCase):
     def test_boundaries_and_locations(self):
-        facts = function_facts(ast.parse('''async def outer(xs):
+        source = '''async def outer(xs):
     for x in xs:
         if x:
             def inner(y):
@@ -23,7 +23,8 @@ class ComplexityContextTests(unittest.TestCase):
                         y -= 1
             callback = lambda y: y if y else 0
             return inner(callback(x))
-'''), "src/a.py", "a")
+'''
+        facts = function_facts(ast.parse(source), "src/a.py", "a", source)
         self.assertEqual([f["max_branch_nesting"] for f in facts], [2, 2, 1])
         self.assertEqual([f["location"]["symbol"] for f in facts],
                          ["a.outer", "a.outer.inner", "a.outer.<lambda>@8:24"])
@@ -31,17 +32,75 @@ class ComplexityContextTests(unittest.TestCase):
                          [[2, 3], [5, 6], [8]])
 
     def test_headers_execute_in_parent_scope(self):
-        facts = function_facts(ast.parse('''def outer(x):
+        source = '''def outer(x):
     if x:
         def inner(y=1 if x else 0):
             return y
     return inner
-'''), "a.py", "a")
+'''
+        facts = function_facts(ast.parse(source), "a.py", "a", source)
         self.assertEqual([f["max_branch_nesting"] for f in facts], [2, 0])
         self.assertEqual(len(facts[0]["branch_locations"]), 2)
 
+    def test_class_headers_execute_in_parent_scope(self):
+        source = """def outer(x, Base, Other, meta, decorate):
+    if x:
+        @decorate if x else decorate
+        class C(Base if x else Other, metaclass=meta if x else meta):
+            def method(self):
+                if x:
+                    return x
+        class D((lambda x: x if x else 0)(Base)):
+            pass
+"""
+        facts = function_facts(ast.parse(source), "a.py", "a", source)
+        self.assertEqual([f["max_branch_nesting"] for f in facts], [2, 1, 1])
+        self.assertEqual([f["location"]["symbol"] for f in facts],
+                         ["a.outer", "a.outer.C.method", "a.outer.<lambda>@8:18"])
+        self.assertEqual(sorted(l["line"] for l in facts[0]["branch_locations"]), [2, 3, 4, 4])
+        self.assertEqual(facts[2]["branch_locations"][0]["line"], 8)
+
+    def test_unicode_columns_and_physical_lines(self):
+        source = 'def outer():\n    é = lambda y: y if y else 0; text = "\u2028"; ø = lambda: 1\n'
+        facts = function_facts(ast.parse(source), "a.py", "a", source)
+        self.assertEqual(facts[1]["location"],
+                         {"file": "a.py", "line": 2, "column": 9,
+                          "symbol": "a.outer.<lambda>@2:9"})
+        self.assertEqual(facts[1]["branch_locations"],
+                         [{"file": "a.py", "line": 2, "column": 19}])
+        self.assertEqual(facts[2]["location"]["column"], source.split("\n")[1].rindex("lambda") + 1)
+
+    def test_narrowed_nested_scope_preserves_resolved_calls(self):
+        helper = Path(__file__).resolve().parents[1] / "analysis" / "complexity_context.py"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "pkg/nested").mkdir(parents=True)
+            (root / "pkg/nested/calls.py").write_text("""def target():
+    return 1
+
+def outer():
+    def inner():
+        return target()
+    return inner()
+
+class Worker:
+    def run(self):
+        return target()
+""")
+            for target in ["pkg/nested/calls.py", "pkg/nested", "."]:
+                with self.subTest(target=target):
+                    subprocess.run([sys.executable, str(helper), str(root / "graph.json"), target],
+                                   cwd=root, capture_output=True, text=True, check=True)
+                    graph = json.loads((root / "graph.json").read_text())
+                    self.assertFalse(graph["partial"], graph["graph_error"])
+                    names = {f["id"]: f["location"]["symbol"] for f in graph["functions"]}
+                    self.assertEqual({(names[c["caller"]], names[c["callee"]]) for c in graph["calls"]},
+                                     {("pkg.nested.calls.outer", "pkg.nested.calls.outer.inner"),
+                                      ("pkg.nested.calls.outer.inner", "pkg.nested.calls.target"),
+                                      ("pkg.nested.calls.Worker.run", "pkg.nested.calls.target")})
+
     def test_branch_types(self):
-        facts = function_facts(ast.parse('''def work(x):
+        source = '''def work(x):
     try:
         for y in x:
             while y:
@@ -51,7 +110,8 @@ class ComplexityContextTests(unittest.TestCase):
         match x:
             case 1:
                 return 1 if x else 0
-'''), "a.py", "a")
+'''
+        facts = function_facts(ast.parse(source), "a.py", "a", source)
         self.assertEqual(facts[0]["max_branch_nesting"], 3)
         self.assertEqual([l["line"] for l in facts[0]["branch_locations"]], [3, 4, 5, 7, 8, 10])
 
