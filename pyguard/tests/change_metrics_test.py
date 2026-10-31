@@ -3,6 +3,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -57,6 +58,21 @@ class ChangeStubTests(unittest.TestCase):
         for profile in output.values():
             self.assertEqual([item["file"] for item in profile["files"]], ["a.py"])
             self.assertEqual([item["file"] for item in profile["structure"]["modules"]], ["a.py"])
+
+    def test_multiline_decorators_keep_unchanged_comparisons_complete(self):
+        for prefix, indent in (("", ""), ("class C:\n", "    ")):
+            with self.subTest(prefix=prefix):
+                source = prefix + textwrap.indent(
+                    "@(\n    decorator\n)\ndef f(x):\n    if x: return 1\n    return 0\n",
+                    indent,
+                )
+                output = self.analyze({"a.py": source}, {"a.py": source})
+                self.assert_complete(output)
+                before = output["baseline"]["functions"]
+                self.assertEqual(len(before), 1)
+                self.assertEqual(before, output["candidate"]["functions"])
+                self.assertEqual(before[0]["cyclomatic"], 2)
+                self.assertEqual(before[0]["cognitive"], 1)
 
     def test_invalid_stub_encoding_is_input_error(self):
         output = self.analyze(candidate={"bad.pyi": b"VALUE: str = '\xff'\n"})
@@ -151,6 +167,23 @@ class FunctionMetricsTests(unittest.TestCase):
         for comment in ("# noqa", "# noqa: E501", "# type: ignore"):
             metric = self.measure(f"def f(x): {comment}\n if x: return 1\n return 0\n")[0]
             self.assertEqual(metric["cognitive"], 1)
+
+    def test_multiline_decorator_layout_preserves_fingerprints_and_scores(self):
+        for prefix, indent in (("", ""), ("class C:\n", "    "),
+                               ("def outer():\n", "    ")):
+            for definition in ("def f(x):", "async def f(x):"):
+                for decorator in ("decorator", "left @ right"):
+                    with self.subTest(prefix=prefix, definition=definition, decorator=decorator):
+                        body = f"{definition}\n    if x: return 1\n    return 0\n"
+                        compact = f"@({decorator})\n@other\n" + body
+                        multiline = f"@(\n    # @decoy\n    {decorator}\n)\n@other\n" + body
+                        first = self.measure(prefix + textwrap.indent(compact, indent))[-1]
+                        layout = self.measure(prefix + textwrap.indent(multiline, indent))[-1]
+                        self.assertEqual(first["fingerprint"], layout["fingerprint"])
+                        self.assertEqual(layout["cyclomatic"], 2)
+                        self.assertEqual(layout["cognitive"], 1)
+                        for key in ("cyclomatic", "cognitive"):
+                            self.assertEqual(first[key], layout[key])
 
     def test_methods_async_and_closures_have_independent_scores(self):
         metrics = self.measure("class C:\n async def method(self):\n  def inner(x):\n   if x: return 1\n   return 0\n  return inner(1)\n")

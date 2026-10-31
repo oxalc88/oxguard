@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import tokenize
+from bisect import bisect_right
 from pathlib import Path
 
 from analyze_structure import (
@@ -101,6 +102,18 @@ def function_metrics(report: dict[str, object], root: Path) -> list[dict[str, ob
             source = handle.read()
         lines = io.StringIO(source).readlines()
         tree = ast.parse(source)
+        # Only a statement-leading @ opens a decorator; other @ tokens may
+        # be matrix operators inside its expression. NL leaves the logical
+        # statement open, unlike NEWLINE, including inside parentheses.
+        decorator_lines = []
+        statement_start = True
+        for token in tokenize.generate_tokens(io.StringIO(source).readline):
+            if token.type in {tokenize.COMMENT, tokenize.NL, tokenize.INDENT,
+                              tokenize.DEDENT, tokenize.ENDMARKER}:
+                continue
+            if statement_start and token.type == tokenize.OP and token.string == "@":
+                decorator_lines.append(token.start[0])
+            statement_start = token.type == tokenize.NEWLINE
 
         def visit(node, parents=(), *, lines, file):
             for child in ast.iter_child_nodes(node):
@@ -110,7 +123,11 @@ def function_metrics(report: dict[str, object], root: Path) -> list[dict[str, ob
                 if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     # Include decorators and directly preceding comments: native
                     # complexipy recognizes ignore comments above a definition.
-                    start = min([child.lineno, *(d.lineno for d in child.decorator_list)]) - 1
+                    start = child.lineno - 1
+                    if child.decorator_list:
+                        # AST expression locations omit opening @/parentheses.
+                        first_expression = child.decorator_list[0].lineno
+                        start = decorator_lines[bisect_right(decorator_lines, first_expression) - 1] - 1
                     while (start > 0 and lines[start - 1].lstrip().startswith("#")
                            and len(lines[start - 1]) - len(lines[start - 1].lstrip()) >= child.col_offset):
                         start -= 1
