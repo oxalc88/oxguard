@@ -10,7 +10,7 @@ function declaredPyguardCases() {
     for (const [kind, ids] of Object.entries(capability.pyguard.cases || {})) {
       for (const id of ids) {
         if (declared.has(id)) throw new Error(`Duplicate pyguard case ${id} in capability spec`);
-        declared.set(id, { capability: capability.id, kind });
+        declared.set(id, { capability: capability.id, kind, status: capability.pyguard.status });
       }
     }
   }
@@ -21,13 +21,16 @@ function validatePyguard(report, declared) {
   if (report.schema_version !== '1' || report.suite !== 'maintainability.python' || !report.evaluator_sha256 || !Array.isArray(report.cases)) throw new Error('Invalid Python maintainability evidence');
   if (new Set(report.cases.map(c => c.id)).size !== report.cases.length) throw new Error('Duplicate Python maintainability case id');
   if (report.cases.some(c => !['pass', 'fail'].includes(c.outcome))) throw new Error('Unsupported Python case cannot establish readiness');
+  const unexpected = [];
   for (const c of report.cases) {
     const expected = declared.get(c.id);
-    if (!expected) throw new Error(`Unexpected Python maintainability case ${c.id}`);
+    if (!expected) { unexpected.push(c.id); continue; }
     if (c.capability !== expected.capability || c.kind !== expected.kind) throw new Error(`Misdeclared Python maintainability case ${c.id}`);
   }
-  const expected = [...declared.keys()].sort();
-  if (JSON.stringify(report.cases.map(c => c.id).sort()) !== JSON.stringify(expected)) throw new Error('Incomplete or unexpected Python maintainability case set');
+  const actual = new Set(report.cases.map(c => c.id));
+  const required = [...declared.keys()].filter(id => declared.get(id).status !== 'deferred');
+  const missing = required.filter(id => !actual.has(id)).sort();
+  return { missing, unexpected: unexpected.sort() };
 }
 
 function capabilityPyguard(slot, capability, outcomes) {
@@ -58,7 +61,8 @@ function assess(tsguardReport, pyguardReport, { strict = false } = {}) {
   if (JSON.stringify(report.cases.map(c => c.id).sort()) !== JSON.stringify(expected)) throw new Error('Incomplete or unexpected Tsguard maintainability case set');
   if (report.cases.some(c => !['pass', 'fail'].includes(c.outcome))) throw new Error('Unsupported native case cannot establish Tsguard readiness');
   const declared = declaredPyguardCases();
-  if (pyguardReport) validatePyguard(pyguardReport, declared);
+  const pythonCaseSetDiagnostics = pyguardReport ? validatePyguard(pyguardReport, declared) : { missing: [], unexpected: [] };
+  const pythonCaseSetComplete = pythonCaseSetDiagnostics.missing.length === 0 && pythonCaseSetDiagnostics.unexpected.length === 0;
   const outcomes = new Map(pyguardReport ? pyguardReport.cases.map(c => [c.id, c.outcome]) : []);
   const rows = spec.capabilities.map(capability => {
     const native = report.cases.find(c => c.id === capability.tsguard);
@@ -70,8 +74,8 @@ function assess(tsguardReport, pyguardReport, { strict = false } = {}) {
     return { id: capability.id, tsguard: native.outcome, pyguard, pyguard_cases: pyguardCases, python_candidate: capability.python_candidate };
   });
   const tsguardPassed = rows.every(r => r.tsguard === 'pass') && report.cases.every(c => c.outcome === 'pass');
-  const pyguardReady = rows.every(r => r.pyguard === 'deferred' || r.pyguard === 'pass');
-  const pyguardCasesPassed = Boolean(pyguardReport) && pyguardReport.cases.every(c => c.outcome === 'pass');
+  const pyguardReady = rows.every(r => r.pyguard === 'deferred' || r.pyguard === 'pass') && pythonCaseSetComplete;
+  const pyguardCasesPassed = Boolean(pyguardReport) && pythonCaseSetComplete && pyguardReport.cases.every(c => c.outcome === 'pass');
   const levels = Object.fromEntries(Object.entries(spec.levels).map(([level, ids])=>[level,{
     implemented:true, evaluated_cases:ids.length, native_evals_passed:ids.every(id=>report.cases.find(c=>c.id===id)?.outcome==='pass'),
   }]));
@@ -83,6 +87,7 @@ function assess(tsguardReport, pyguardReport, { strict = false } = {}) {
     maintainability_parity_ready: tsguardPassed && pyguardReady,
     levels, deferred_tsguard_capabilities: spec.deferred_tsguard_capabilities,
     deferred_pyguard_capabilities: deferredPyguardCapabilities, capabilities: rows,
+    python_case_set_diagnostics: pythonCaseSetDiagnostics,
     limitation: 'The planned Tsguard code, structure and change capabilities have native evaluations. Python readiness covers the complete supported scope with deferred capabilities excluded; it is not full Tsguard parity. Provider limits and static-analysis boundaries remain explicit. This report does not replace retained Level 1 checks, platform verification or release authorization.' };
   return result;
 }

@@ -94,7 +94,22 @@ test('strict readiness rejects planned capabilities and missing declared Python 
     capability.pyguard={status:'planned',cases:{}};
   assert.equal(assess(evidence(),pythonEvidence(),{strict:true}).pyguard_maintainability_ready,false);
   } finally { capability.pyguard=original; }
-  assert.throws(()=>assess(evidence(),pythonEvidence(r=>r.cases.pop()),{strict:true}),/Incomplete or unexpected Python/);
+  const missing=assess(evidence(),pythonEvidence(r=>r.cases.pop()),{strict:true});
+  assert.equal(missing.pyguard_maintainability_ready,false);
+  assert.equal(missing.pyguard_cases_passed,false);
+  assert.ok(missing.python_case_set_diagnostics.missing.length>0);
+});
+test('strict CLI prints diagnostics and exits 1 for missing or extra Python evidence', () => {
+  const incomplete=pythonEvidence(r=>r.cases.pop());
+  const extra=pythonEvidence(r=>r.cases.push({id:'unplanned.case',capability:'structure.function_graph',kind:'negative',outcome:'pass'}));
+  for (const [python, diagnosticKey] of [[incomplete,'missing'],[extra,'unexpected']]) {
+    const result=cli([evidence(),python],true);
+    assert.equal(result.status,1,`${result.stderr}\n${result.stdout}`);
+    const report=JSON.parse(result.stdout);
+    assert.equal(report.pyguard_maintainability_ready,false);
+    assert.equal(report.pyguard_cases_passed,false);
+    assert.ok(report.python_case_set_diagnostics[diagnosticKey].length>0);
+  }
 });
 test('strict readiness rejects failing declared Python cases', () => {
   const pyguard=pythonEvidence(r=>{r.cases[0].outcome='fail';});
@@ -115,6 +130,12 @@ test('strict mode ignores passing and failing evidence for deferred capabilities
     assert.equal(passingResult.capabilities.find(c=>c.id===capability.id).pyguard,'deferred');
     assert.equal(passingResult.pyguard_maintainability_ready,true);
     assert.equal(exitStatus(passingResult,passing,true),0);
+
+    const deferredOnlyMissing=pythonEvidence(r=>{r.cases=r.cases.filter(c=>c.capability!==capability.id);});
+    const deferredOnlyResult=assess(evidence(),deferredOnlyMissing,{strict:true});
+    assert.equal(deferredOnlyResult.pyguard_maintainability_ready,true);
+    assert.deepEqual(deferredOnlyResult.python_case_set_diagnostics.missing,[]);
+    assert.equal(exitStatus(deferredOnlyResult,deferredOnlyMissing,true),0);
 
     const failing=pythonEvidence(r=>{r.cases.find(c=>c.capability===capability.id).outcome='fail';});
     const failingResult=assess(evidence(),failing);
@@ -191,15 +212,13 @@ test('an implemented capability with a missing boundary property or an empty cas
     assert.ok(absent.capabilities.filter(c=>c.pyguard!=='deferred').every(c=>c.pyguard==='fail'));
   } finally { restoreSpec(); }
 });
-test('invalid, mismatched or incomplete Python reports are rejected', () => {
+test('invalid or misdeclared Python reports are rejected', () => {
   const mutations = [
     r=>{ r.suite='pyguard.parity'; },
     r=>{ r.schema_version='2'; },
     r=>{ delete r.evaluator_sha256; },
     r=>{ r.cases.push({ ...r.cases[0] }); },
     r=>{ r.cases[0].outcome='unsupported'; },
-    r=>{ r.cases.pop(); },
-    r=>{ r.cases.push({ id:'criticality.unplanned', capability:'structure.function_graph', kind:'negative', outcome:'pass' }); },
     r=>{ r.cases[0].kind='boundary'; },
     r=>{ r.cases[0].capability='structure.coupling'; },
     r=>{ delete r.cases; },
@@ -207,5 +226,10 @@ test('invalid, mismatched or incomplete Python reports are rejected', () => {
   for (const mutate of mutations) {
     assert.throws(()=>assess(evidence(),pythonEvidence(mutate)),/Unsupported|Duplicate|Unexpected|Misdeclared|Incomplete|Invalid/);
   }
+  const extra=assess(evidence(),pythonEvidence(r=>r.cases.push({ id:'criticality.unplanned', capability:'structure.function_graph', kind:'negative', outcome:'pass' })));
+  assert.deepEqual(extra.python_case_set_diagnostics.unexpected,['criticality.unplanned']);
+  assert.equal(extra.pyguard_maintainability_ready,false);
+  const missing=assess(evidence(),pythonEvidence(r=>r.cases.pop()));
+  assert.ok(missing.python_case_set_diagnostics.missing.length>0);
   assert.doesNotThrow(()=>assess(evidence(),pythonEvidence()));
 });
