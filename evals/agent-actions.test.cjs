@@ -406,7 +406,9 @@ test("artifact read evidence requires an observed successful command", () => {
 	}
 });
 
-test("capture setup creates a real Python baseline and branch-preserving split", () => {
+test("capture setup creates a real Python baseline and branch-preserving split", {
+	skip: process.platform === "win32" ? "Capture scripts require a POSIX environment (Linux or macOS)" : false,
+}, () => {
 	const { spawnSync } = require("node:child_process");
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "oxguard-setup-"));
 	const run = (command, args, options = {}) => {
