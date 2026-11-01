@@ -90,7 +90,7 @@ pyproj() { # session envpython
 J
   for t in pyguard uv python; do printf '#!/bin/sh\nexec %s %s %s %s "$@"\n' "$NODE" "$REC" "$S/config.json" "$t" > $S/bin/$t; chmod +x $S/bin/$t; done
 }
-for s in quality review focused; do pyproj $s $C/py-env; done
+for s in quality review focused structure change; do pyproj $s $C/py-env; done
 # repair env: venv lacking mypy, hash lock for mypy available offline
 RE=$C/replay/python/repair-env; rm -rf $RE; UV_CACHE_DIR=$C/uv-cache $UV venv -q --python $C/py-env/bin/python $RE
 grep -v -i -E '^\s*$' $R/evals/python/requirements.txt > $C/req-full.txt
@@ -100,7 +100,7 @@ pyproj repair $RE
 cp $R/evals/python/requirements.txt $C/replay/python/repair/project/toolchain-requirements.lock
 for i in $(seq 0 11); do echo "value$i: int = \"$i\""; done > $C/replay/python/quality/project/src/main.py
 echo 'value: int = 1' > $C/replay/python/repair/project/src/main.py
-for s in review focused; do cat > $C/replay/python/$s/project/src/main.py <<'T'
+for s in review focused structure; do cat > $C/replay/python/$s/project/src/main.py <<'T'
 def target(x: int) -> int:
     return x + 1
 def a() -> int:
@@ -111,4 +111,48 @@ def c() -> int:
     return target(3)
 T
 done
+# change: the same branch-preserving split as TypeScript, with real Git refs.
+G=$C/replay/python/change/project
+cat > $G/src/main.py <<'T'
+def original(x: int) -> int:
+    total = 0
+    if x > 1:
+        total += 1
+    if x > 2:
+        total += 2
+    if x > 3:
+        total += 3
+    if x > 4:
+        total += 4
+    return total
+T
+(cd $G && git init -q && printf '.pyguard-cache/\n__pycache__/\n' > .gitignore && git add -A && git -c user.name=fixture -c user.email=fixture@example.invalid commit -qm baseline)
+cat > $G/src/a.py <<'T'
+def a(x: int) -> int:
+    total = 0
+    if x > 1:
+        total += 1
+    if x > 2:
+        total += 2
+    return total
+T
+cat > $G/src/b.py <<'T'
+def b(x: int) -> int:
+    total = 0
+    if x > 3:
+        total += 3
+    if x > 4:
+        total += 4
+    return total
+T
+cat > $G/src/main.py <<'T'
+from a import a
+from b import b
+
+
+def original(x: int) -> int:
+    return a(x) + b(x)
+T
+(cd $G && git add -A && git -c user.name=fixture -c user.email=fixture@example.invalid commit -qm candidate)
+git -C $G rev-parse HEAD~1 > $C/replay/python/change/baseline.txt
 echo SETUP_OK

@@ -58,6 +58,14 @@ For Codex sessions, read the last `token_count` event in `~/.codex/sessions/`. F
 | 2026-10-31 | P9 PR 1 complexity context review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 2 | 1,081,519 | 112,047 | 7,749 | ~/.codex/sessions (p9-1) |
 | 2026-10-31 | P9 PR 2 strict readiness implement (#23) | Codex CLI | implementer | gpt-6-luna | default | 3 | 2,032,319 | 102,591 | 18,636 | ~/.codex/sessions (p9-2) |
 | 2026-10-31 | P9 PR 2 strict readiness review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 3 | 811,511 | 90,999 | 8,524 | ~/.codex/sessions (p9-2) |
+| 2026-10-31 | P9 PR 3 python agent capture implement (#23) | Codex CLI | implementer | gpt-6.1-sol | medium | 2 | 1,923,159 | 70,999 | 17,813 | ~/.codex/sessions (p9-3) |
+| 2026-10-31 | P9 PR 3 python agent capture review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 2 | 602,192 | 101,072 | 2,915 | ~/.codex/sessions (p9-3) |
+| 2026-10-31 | P9 PR 3 Windows-skip analysis 1 (#23) | Claude Code | analyst | claude-opus-5-5 | high | 1 | 541,293 | 8,864 | 8,838 | claude -p JSON (p9-3-read) |
+| 2026-10-31 | P9 PR 3 setup.sh test analysis 2 (#23) | Claude Code | analyst | claude-opus-5-5 | high | 1 | 180,213 | 3,974 | 3,962 | claude -p JSON (p9-3-read) |
+| 2026-10-31 | P9 PR 3 cancelled docs/skip edit (#23) | Codex CLI | implementer | gpt-6-luna | default | 1 | 64,517 | 6,533 | 718 | ~/.codex/sessions (p9-3) |
+| 2026-10-31 | P9 PR 3 cancelled docs/skip edit review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 1 | 91,186 | 15,794 | 401 | ~/.codex/sessions (p9-3) |
+| 2026-10-31 | P9 PR 3 setup.sh test tightening (#23) | Codex CLI | implementer | gpt-6-luna | default | 1 | 122,819 | 11,075 | 1,512 | ~/.codex/sessions (p9-3) |
+| 2026-10-31 | P9 PR 3 setup.sh test tightening review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 1 | 54,358 | 8,790 | 450 | ~/.codex/sessions (p9-3) |
 
 #32: 2 implementation rounds, 2 review rounds (round 1 requested 3 fixes, round 2 approved). Per session: mimo 681,389 (44,670 not cached, 29,103 output) and 1,161,033 (52,078 / 17,755); Sol 155,916 (31,342 / 1,950) and 288,963 (35,629 / 2,326). Codex's own "tokens used" lines for the two reviews were 33,292 and 37,955. During review 2, Sol started a `gpt-6-luna` session (142,660 total) that was not requested; it is not counted as a review.
 
@@ -100,3 +108,5 @@ Values at 2026-10-25 08:40 Lima; #32 values are final.
 Deps certifi/filelock: 1 deepseek implementation session and 1 separate deepseek review session (approved in round 1 with only P3 notes: no issue reference in the changelog, filelock's requires_python moved to >=3.11, old pins still appear in recorded traces, which are not stale). No other model was used.
 
 Deps x/sys/x/term: 1 deepseek implementation session and 1 separate deepseek review session (approved in round 1 with only P3 notes: changelog wording on the go directive, no issue reference, and the pre-existing oxDevelop module path in pyguard/go.mod). No other model was used.
+
+P9 PR 3 follow-up: Opus 5.5 (effort high, `claude -p --permission-mode plan`, read-only tools, 0 subagents) ran two analyses. Run 1 checked whether skipping on Windows was correct: 15 turns, input 26, output 8,838, cache read 478,662, cache creation 53,767, USD 0.70. Run 2 checked whether the setup.sh test is still needed: 11 turns, input 12, output 3,962, cache read 149,523, cache creation 26,716, USD 0.32. For those rows, total = input + output + cache read + cache creation, and not cached = input + output. The docs and skip-message edit from the first recommendation was cancelled before it was committed and then thrown away, but its Luna and Sol sessions are recorded above. After that, Luna applied the second recommendation (keep the test, use a helper for the branch counts, drop the structure assertion, check the TypeScript baseline and that `__pycache__/` is ignored), and Sol approved in round 1. The Codex sandbox blocked the bash spawn (EPERM), so the test was run outside it (21/21). Every session_meta.source was `exec`, so there were no subagent sessions.

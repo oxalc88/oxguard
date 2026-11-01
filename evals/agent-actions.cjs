@@ -50,6 +50,79 @@ const REQUIRED_SESSIONS = {
 	],
 	focused: [["SKILL.md"], ["workflows/check.md", "workflows/review.md"]],
 };
+// Optional D5b sessions do not change the contract of existing recordings.
+const PYTHON_SCENARIOS = {
+	structure: "python.structure.v1",
+	change: "python.change.baseline.v1",
+};
+const SCENARIO_FILES = [["SKILL.md"], ["workflows/review.md"]];
+const explanation = (r) => typeof r?.explanation === "string" && r.explanation.length > 0 &&
+	Array.isArray(r.limitations) && r.limitations.length > 0;
+function explicitBaseline(argv = []) {
+	const index = argv.indexOf("--baseline");
+	const value = index >= 0 ? argv[index + 1] : argv.find((a) => a.startsWith("--baseline="))?.slice(11);
+	return value && !value.startsWith("-") ? value : undefined;
+}
+function scorePythonScenarios(trace, check, checks) {
+	if (trace.language !== "python") return;
+	for (const [name, scenario] of Object.entries(PYTHON_SCENARIOS)) {
+		if (trace.sessions?.[name]?.scenario !== scenario) continue;
+		const files = Object.keys(trace.sessions[name].skill_files || {});
+		check(`agent.python_${name}_manifest`, SCENARIO_FILES.every((g) => g.some((f) => files.includes(f))));
+		if (name === "structure") {
+			const event = trace.structure_review?.events?.find((e) => e.tool === "pyguard" && e.argv?.[0] === "structure");
+			const native = event?.result, response = trace.structure_review?.response;
+			check("agent.python_structure_interpretation",
+				native?.command === "structure" && native.assessment === "complete" &&
+				["pass", "advisory"].includes(native.status) && native.exit_code === 0 && event.exit_code === 0 &&
+				["module.count", "module.edges", "function.fan_in", "function.fan_out", "function.call_depth"]
+					.every((metric) => native.measurements?.some((m) => m.metric === metric)) &&
+				response?.semantic_status === native.status && response.assessment === "complete" &&
+				response.exit_code === 0 && response.blocks_shipping === false &&
+				response.maintainability_proven === false && explanation(response));
+			continue;
+		}
+		const events = trace.change_events || [];
+		const event = events.find((e) => e.tool === "pyguard" && e.argv?.[0] === "change" && explicitBaseline(e.argv));
+		const missing = events.find((e) => e.tool === "pyguard" && e.argv?.[0] === "change" && !explicitBaseline(e.argv));
+		const native = event?.result, incomplete = missing?.result;
+		const review = trace.change_review, response = review?.response;
+		const artifact = review?.artifact;
+		check("agent.python_change_explicit_baseline",
+			Boolean(review?.baseline) && explicitBaseline(event?.argv) === review.baseline &&
+			response?.baseline === review.baseline && artifact?.baseline_sha === review.baseline &&
+			/^[a-f0-9]{40}$/.test(review.baseline));
+		check("agent.python_change_artifact",
+			review?.artifact_path === ".pyguard-cache/maintainability-change.json" && review.artifact_read === true &&
+			native?.artifacts?.some((a) => a.kind === "maintainability_change" && a.path === review.artifact_path) &&
+			artifact?.schema_version === "1" && artifact.baseline_structure && artifact.candidate_structure &&
+			Array.isArray(artifact.file_matches) && Array.isArray(artifact.function_matches) &&
+			artifact.native_metrics?.policy?.candidate_config_applies_to_both === true &&
+			["baseline", "candidate"].every((side) => {
+				const profile = artifact.native_metrics?.[side];
+				return profile?.cognitive_complete === true && Array.isArray(profile.files) &&
+					Array.isArray(profile.functions) && profile.functions.length > 0 &&
+					profile.functions.every((f) => Number.isFinite(f.cognitive) && Number.isFinite(f.cyclomatic));
+			}));
+		check("agent.python_change_interpretation",
+			native?.command === "change" && native.assessment === "complete" && native.status === "advisory" &&
+			native.exit_code === 0 && event.exit_code === 0 &&
+			["baseline", "candidate"].every((side) =>
+				["total_branches", "total_cyclomatic", "function.cyclomatic", "function.cognitive"]
+					.every((metric) => native.measurements?.some((m) => m.metric === `change.${side}.${metric}`))) &&
+			response?.change?.semantic_status === "advisory" && response.change.assessment === "complete" &&
+			response.change.exit_code === 0 && response.change.simplification_proven === false && explanation(response.change));
+		check("agent.python_change_incomplete_interpretation",
+			incomplete?.command === "change" && incomplete.assessment === "incomplete" &&
+			incomplete.exit_code === 1 && missing.exit_code === 1 &&
+			incomplete.findings?.some((f) => f.rule === "pyguard.change.BASELINE_UNAVAILABLE") &&
+			response?.incomplete?.semantic_status === incomplete.status && response.incomplete.assessment === "incomplete" &&
+			response.incomplete.exit_code === 1 && response.incomplete.simplification_proven === false && explanation(response.incomplete));
+		check("agent.python_change_duplication_boundary", response?.duplication?.capability === "change.native_duplication" &&
+			response.duplication.outcome === "deferred");
+		checks.push({ id: "change.native_duplication", outcome: "deferred" });
+	}
+}
 // A session is stale when the inventory or any skill file it recorded has changed.
 function freshness(trace, directory) {
 	const inventory = skillInventory(directory);
@@ -265,9 +338,10 @@ function score(trace, skill) {
 				responseChange.limitations.length > 0,
 		);
 	}
+	scorePythonScenarios(trace, check, checks);
 	return {
 		language: trace.language,
-		ready: checks.every((c) => c.outcome === "pass"),
+		ready: checks.every((c) => ["pass", "deferred"].includes(c.outcome)),
 		current: stale.length === 0,
 		stale,
 		checks,
@@ -406,4 +480,6 @@ module.exports = {
 	skillFileHashes,
 	compareSkills,
 	REQUIRED_SESSIONS,
+	PYTHON_SCENARIOS,
+	SCENARIO_FILES,
 };

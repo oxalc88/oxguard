@@ -10,6 +10,8 @@ const {
 	skillInventory,
 	skillFileHashes,
 	REQUIRED_SESSIONS,
+	PYTHON_SCENARIOS,
+	SCENARIO_FILES,
 } = require("../agent-actions.cjs");
 const GUARD = { typescript: "tsguard", python: "pyguard" };
 const sha = (file) =>
@@ -20,7 +22,7 @@ const canonical = (file) =>
 	file.match(/(?:^|\/)(SKILL\.md|(?:workflows|references)\/[\w-]+\.md)$/)?.[1];
 // Declared minimum: the first file of each required group not already observed.
 function declared(session, observed) {
-	return REQUIRED_SESSIONS[session]
+	return (REQUIRED_SESSIONS[session] || SCENARIO_FILES)
 		.filter((group) => !group.some((f) => observed.includes(f)))
 		.map((group) => group[0]);
 }
@@ -53,10 +55,24 @@ function lastJson(file) {
 	const text = fs.readFileSync(file, "utf8").trim();
 	return JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
 }
-// "exit 0 effort medium model gpt-6.1-sol" written by run-codex.sh
+// The version must come from the recording, never the assembler's environment.
 function agentOf(dir) {
-	const [, , , effort, , model] = fs.readFileSync(path.join(dir, "agent-exit.txt"), "utf8").split(/\s+/);
-	return { agent: "codex-cli 0.164.0 exec", model, effort };
+	const versionFile = path.join(dir, "agent-version.txt");
+	if (!fs.existsSync(versionFile))
+		throw Error(`${dir}: missing recorded CLI provenance (agent-version.txt); re-record this session`);
+	const version = fs.readFileSync(versionFile, "utf8").trim();
+	if (!/^codex-cli \S+$/.test(version))
+		throw Error(`${versionFile}: invalid recorded CLI version`);
+	const exit = fs.readFileSync(path.join(dir, "agent-exit.txt"), "utf8").trim();
+	const match = /^exit 0 effort (\S+) model (\S+)$/.exec(exit);
+	if (!match) throw Error(`${dir}: unsuccessful recording or missing model/effort provenance`);
+	return { agent: `${version} exec`, provider: "openai", model: match[2], effort: match[1] };
+}
+function observedArtifactRead(stream, artifact) {
+	return lines(stream).some(({ type, item }) =>
+		type === "item.completed" && item?.type === "command_execution" &&
+		item.exit_code === 0 && /\b(cat|sed|head|tail|nl|less|awk)\b/.test(item.command) &&
+		item.command.includes(artifact));
 }
 function session(language, name, dir) {
 	const guard = GUARD[language],
@@ -80,9 +96,18 @@ function session(language, name, dir) {
 }
 function fromCaptures(language, dirs, note = "") {
 	const guard = GUARD[language];
+	const names = ["quality", "repair", "review", "focused"];
+	if (language === "python") {
+		for (const name of Object.keys(PYTHON_SCENARIOS)) {
+			if (dirs[name] && fs.existsSync(path.join(dirs[name], "agent-stream.jsonl"))) names.push(name);
+		}
+	}
 	const s = Object.fromEntries(
-		["quality", "repair", "review", "focused"].map((n) => [n, session(language, n, dirs[n])]),
+		names.map((n) => [n, session(language, n, dirs[n])]),
 	);
+	for (const name of Object.keys(PYTHON_SCENARIOS)) {
+		if (s[name]) s[name].record.scenario = PYTHON_SCENARIOS[name];
+	}
 	const inventories = new Set(Object.values(s).map((x) => JSON.stringify(x.inventory)));
 	if (inventories.size !== 1) throw Error("Sessions were recorded with different skill inventories");
 	const q = lines(path.join(dirs.quality, "events.jsonl")),
@@ -97,14 +122,14 @@ function fromCaptures(language, dirs, note = "") {
 	const response = structuredClone(raw);
 	response.routes = Object.fromEntries(Object.entries(response.routes).map(([k, v]) => [k, route(v)]));
 	response.skill_reads = s.review.reads;
-	const efforts = [...new Set(Object.values(s).map((x) => `${x.record.model} effort ${x.record.effort}`))];
+	const agents = [...new Set(Object.values(s).map((x) => `${x.record.agent}; provider ${x.record.provider}; ${x.record.model} effort ${x.record.effort}`))];
 	const trace = {
 		schema_version: "2",
 		language,
 		skill_inventory: [...s.quality.inventory],
 		sessions: Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.record])),
 		capture_date: new Date().toISOString().slice(0, 10),
-		provenance: `Fresh history-free Codex agents (codex-cli 0.164.0 exec; ${efforts.join("; ")}; --ephemeral --ignore-user-config --ignore-rules, memories disabled, no login shell, sandbox danger-full-access with the fixture project as working directory), one agent per session, using the router skill installed in disposable projects outside the repository. Per-session skill_files hash the installed skill files each agent read (successful shell reads in its stream) plus the declared minimum. Setup supplied the actual bounded quality, missing-tool, advisory${language === "typescript" ? " and change" : ""} results; subsequent retrieval, edits, offline installation and verification were agent choices recorded by evals/record-agent-command.cjs. Scored quality events keep the original --dirs src scope; wider exploratory invocations are recorded separately.`,
+		provenance: `Fresh history-free Codex agents (${agents.join("; ")}; --ephemeral --ignore-user-config --ignore-rules, memories disabled, no login shell, sandbox danger-full-access with the fixture project as working directory), one agent per session, using the router skill installed in disposable projects outside the repository. Per-session skill_files hash the installed skill files each agent read (successful shell reads in its stream) plus the declared minimum. Setup supplied the actual bounded quality, missing-tool, advisory${language === "typescript" || s.change ? " and change" : ""} results; subsequent retrieval, edits, offline installation and verification were agent choices recorded by evals/record-agent-command.cjs. Scored quality events keep the original --dirs src scope; wider exploratory invocations are recorded separately.`,
 		additional_verification: note,
 		agent_tasks: Object.keys(s).map((k) => `codex_${language}_${k}`),
 		omitted_events: q.filter(scored),
@@ -118,6 +143,23 @@ function fromCaptures(language, dirs, note = "") {
 		},
 	};
 	if (language === "typescript") trace.change_events = lines(path.join(dirs.change, "events.jsonl"));
+	if (s.structure) {
+		trace.structure_review = {
+			events: lines(path.join(dirs.structure, "events.jsonl")),
+			response: s.structure.response,
+		};
+	}
+	if (s.change) {
+		const artifactPath = ".pyguard-cache/maintainability-change.json";
+		trace.change_events = lines(path.join(dirs.change, "events.jsonl"));
+		trace.change_review = {
+			baseline: fs.readFileSync(path.join(dirs.change, "baseline.txt"), "utf8").trim(),
+			artifact_path: artifactPath,
+			artifact: JSON.parse(fs.readFileSync(path.join(dirs.change, "project", artifactPath), "utf8")),
+			artifact_read: observedArtifactRead(path.join(dirs.change, "agent-stream.jsonl"), artifactPath),
+			response: s.change.response,
+		};
+	}
 	trace.skill_layout = "router";
 	trace.focused_review = {
 		input: lines(path.join(dirs.focused, "events.jsonl"))[0].result,
@@ -159,15 +201,15 @@ if (require.main === module) {
 	else if (mode === "captures") {
 		// captures <language> <capture-root> [session=dir ...] [--note file]
 		const [root, ...rest] = args, dirs = {};
-		for (const n of ["quality", "repair", "review", "focused", "change"]) dirs[n] = path.join(root, language, n);
+		for (const n of ["quality", "repair", "review", "focused", "change", "structure"]) dirs[n] = path.join(root, language, n);
 		let note = "";
 		for (let i = 0; i < rest.length; i++) {
 			if (rest[i] === "--note") note = fs.readFileSync(rest[++i], "utf8").trim();
 			else { const [k, v] = rest[i].split("="); dirs[k] = path.resolve(v); }
 		}
-		if (language !== "typescript") delete dirs.change;
+		if (language !== "python") delete dirs.structure;
 		trace = fromCaptures(language, dirs, note);
 	} else throw Error("Usage: assemble.cjs from-v1 <language> <v1.json> <skill-dir> | captures <language> <root> [session=dir] [--note file]");
 	process.stdout.write(JSON.stringify(trace, null, 2) + "\n");
 }
-module.exports = { fromCaptures, fromV1, observedReads };
+module.exports = { fromCaptures, fromV1, observedReads, agentOf, observedArtifactRead };
