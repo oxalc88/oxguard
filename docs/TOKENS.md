@@ -58,8 +58,8 @@ For Codex sessions, read the last `token_count` event in `~/.codex/sessions/`. F
 | 2026-10-31 | P9 PR 1 complexity context review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 2 | 1,081,519 | 112,047 | 7,749 | ~/.codex/sessions (p9-1) |
 | 2026-10-31 | P9 PR 2 strict readiness implement (#23) | Codex CLI | implementer | gpt-6-luna | default | 3 | 2,032,319 | 102,591 | 18,636 | ~/.codex/sessions (p9-2) |
 | 2026-10-31 | P9 PR 2 strict readiness review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 3 | 811,511 | 90,999 | 8,524 | ~/.codex/sessions (p9-2) |
-| 2026-10-31 | P9 PR 3 python agent capture implement (#23) | Codex CLI | implementer | gpt-6.1-sol | medium | 1 | 1,839,636 | 65,300 | 17,267 | ~/.codex/sessions (p9-3) |
-| 2026-10-31 | P9 PR 3 python agent capture review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 1 | 351,754 | 54,026 | 1,548 | ~/.codex/sessions (p9-3) |
+| 2026-10-31 | P9 PR 3 python agent capture implement (#23) | Codex CLI | implementer | gpt-6.1-sol | medium | 2 | 1,923,159 | 70,999 | 17,813 | ~/.codex/sessions (p9-3) |
+| 2026-10-31 | P9 PR 3 python agent capture review (#23) | Codex CLI | reviewer | gpt-6.1-sol | medium | 2 | 602,192 | 101,072 | 2,915 | ~/.codex/sessions (p9-3) |
 
 #32: 2 implementation rounds, 2 review rounds (round 1 requested 3 fixes, round 2 approved). Per session: mimo 681,389 (44,670 not cached, 29,103 output) and 1,161,033 (52,078 / 17,755); Sol 155,916 (31,342 / 1,950) and 288,963 (35,629 / 2,326). Codex's own "tokens used" lines for the two reviews were 33,292 and 37,955. During review 2, Sol started a `gpt-6-luna` session (142,660 total) that was not requested; it is not counted as a review.
 
