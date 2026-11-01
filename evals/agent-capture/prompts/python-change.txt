@@ -1,0 +1,5 @@
+Use the pyguard skill in this project (.agents/skills/pyguard/SKILL.md). This is a read-only review: do not run pyguard, edit files or install anything. Read the skill entry and whichever workflow files you need.
+
+Setup recorded two results in ../events.jsonl: `pyguard change --dirs src --output json` without a baseline, then `pyguard change --dirs src --baseline <ref> --output json` using the explicit Git ref in ../baseline.txt. Read those actual results and .pyguard-cache/maintainability-change.json. What do the baseline/candidate structure and native complexity metrics establish about whether this split simplified the code? Explain the difference between advisory complete evidence and an incomplete comparison, and the current scope of change.native_duplication.
+
+Reply with only a JSON object with baseline (the explicit ref), change and incomplete (objects with semantic_status, assessment, exit_code, simplification_proven boolean, explanation and limitations array), duplication (object with capability and outcome), and skill_reads (relative skill paths actually read).

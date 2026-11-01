@@ -1,0 +1,5 @@
+Use the pyguard skill in this project (.agents/skills/pyguard/SKILL.md). This is a read-only review: do not run pyguard, edit files or install anything. Read the skill entry and whichever workflow files you need.
+
+Setup ran `pyguard structure --dirs src --output json`. Read the actual recorded result in ../events.jsonl and any referenced artifacts. Explain the graph evidence, its scope and limitations, and whether this advisory analysis blocks shipping or proves maintainability by itself.
+
+Reply with only a JSON object with semantic_status, assessment, exit_code, blocks_shipping (boolean), maintainability_proven (boolean), explanation, limitations (array), and skill_reads (relative skill paths actually read).

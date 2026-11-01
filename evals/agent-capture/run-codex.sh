@@ -4,6 +4,9 @@ set -uo pipefail
 [ -x ~/.local/bin/mise ] && eval "$(~/.local/bin/mise activate bash)"
 S=${OXGUARD_CAPTURE_DIR:-/workspace/oxguard-capture}/replay/$1/$2; E=${4:-medium}
 cd $S/project
+# Capture provenance from the executable used for this recording, never the assembler's CLI.
+codex --version > "$S/agent-version.txt" || exit 1
+[ -s "$S/agent-version.txt" ] || { echo "codex --version returned no provenance" >&2; exit 1; }
 PATH="$S/bin:$PATH" timeout 1500 codex exec --json --ephemeral --ignore-user-config --ignore-rules --skip-git-repo-check \
   -m gpt-6.1-sol -c model_reasoning_effort="\"$E\"" -c features.memories=false -c allow_login_shell=false \
   --sandbox danger-full-access -C $S/project \

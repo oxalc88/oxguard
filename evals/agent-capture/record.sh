@@ -15,8 +15,12 @@ cd $R/typescript/change/project && ../bin/tsguard change --dirs src --baseline $
 cd $R/python/quality/project && ../bin/pyguard mypy --dirs src --output agent >/dev/null || true
 cd $R/python/repair/project && ../bin/pyguard mypy --dirs src --output json >/dev/null || true
 for s in review focused; do cd $R/python/$s/project && ../bin/pyguard criticality --dirs src --output json >/dev/null; done
+cd $R/python/structure/project && ../bin/pyguard structure --dirs src --output json >/dev/null
+# Retain both incomplete (no explicit baseline) and complete advisory evidence.
+cd $R/python/change/project && ../bin/pyguard change --dirs src --output json >/dev/null || true
+cd $R/python/change/project && ../bin/pyguard change --dirs src --baseline $(cat ../baseline.txt) --output json >/dev/null
 if [ -n "$P" ]; then
-  for L in typescript python; do for s in quality repair review focused change; do
+  for L in typescript python; do for s in quality repair review focused change structure; do
     case " $* " in *" $L/$s "*) ;; *) [ -d $P/$L/$s ] && rm -rf $R/$L/$s && cp -a $P/$L/$s $R/$L/$s;; esac
   done; done
   rm -rf $R/python/repair-env && cp -a $P/python/repair-env $R/python/repair-env

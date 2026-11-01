@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Python agent capture adds opt-in structure and explicit-baseline change scenarios, artifact-backed scoring, incomplete-result interpretation and deferred duplication reporting. New recordings retain their actual CLI version; existing traces remain compatible.
+
 - Python maintainability parity CI now uses strict readiness: supplied evidence must cover every declared case for every supported implemented capability and all cases must pass. Deferred `quality.compiler_unsafe_operations`, `quality.discarded_failures` and P8 `change.native_duplication` count neither as pass nor failure and are listed explicitly. `pyguard_maintainability_ready` means complete supported Python scope with deferred items excluded, not full Tsguard parity; default mode continues to report planned capabilities without treating them as ready. (#23 P9 PR 2)
 
 - PyGuard P9 PR 1 implements `quality.complexity_context`: structured radon runs retain per-function AST nesting measurements and a cached maintainability graph even on blocking complexity findings, without changing exit codes or blocking policy. Positive, negative and function-boundary evals cover it; Python compiler-unsafe-operation and discarded-failure capabilities are explicitly deferred with follow-up text, never counted as passing. (#23)
