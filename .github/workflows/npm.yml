@@ -353,14 +353,14 @@ jobs:
         if: needs.scope.outputs.docs_only != 'true'
         run: |
           node evals/parity.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/parity.json
-          node evals/maintainability-parity.cjs eval-reports/tsguard/maintainability.json eval-reports/pyguard/maintainability.json > eval-reports/maintainability-parity.json
+          node evals/maintainability-parity.cjs --strict eval-reports/tsguard/maintainability.json eval-reports/pyguard/maintainability.json > eval-reports/maintainability-parity.json
       - name: Require Level 1 contract completion (agent traces block releases only)
         if: needs.scope.outputs.docs_only != 'true'
         env:
           OXGUARD_REQUIRE_CURRENT_TRACES: ${{ inputs.tag && '1' || '0' }}
         run: node evals/level1-ready.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/level1-ready.json
       - uses: actions/upload-artifact@v4
-        if: needs.scope.outputs.docs_only != 'true'
+        if: always() && needs.scope.outputs.docs_only != 'true'
         with:
           name: oxguard-capability-parity
           path: |
