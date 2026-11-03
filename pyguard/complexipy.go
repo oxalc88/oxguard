@@ -17,9 +17,8 @@ import (
 const complexipyThreshold = 20.0
 
 // complexipySpec is the analyzer contract for one complexipy invocation. The
-// advisory flag is load-bearing: above-threshold findings must never change the
-// exit code or the gate/overall status, in any output mode. The next release is
-// expected to make them blocking (drop advisory then); see CHANGELOG.
+// advisory flag is load-bearing: cognitive warnings above 20 must never change
+// the exit code or the blocking outcome, in any output mode.
 func complexipySpec(report string) toolSpec {
 	return toolSpec{gate: "radon", adapter: "complexipy_cognitive", advisory: true, reportPath: report}
 }

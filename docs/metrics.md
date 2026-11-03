@@ -98,7 +98,7 @@ exclude = ["*/fixtures/*"]     # add project-specific patterns without touching 
 ## Cognitive Complexity (pyguard, advisory)
 
 **Tool:** complexipy 8.3.0  
-**Threshold:** 20 per function (advisory in this release)
+**Threshold:** 20 per function (advisory)
 
 Cognitive complexity counts how much a reader has to keep in mind while following a
 function: nesting, breaks in the linear flow, boolean operator sequences, recursion and
@@ -106,11 +106,7 @@ nested callback boundaries. Unlike cyclomatic complexity it penalizes deeply nes
 more than a flat sequence of independent branches, because nesting makes the same number
 of paths harder to hold in working memory.
 
-Each function produces one `complexipy.cognitive` measurement at level `code` with unit
-`score`. A score above 20 yields the warning `pyguard.complexipy.cognitive_exceeded`;
-exactly 20 is clean. In this release the warning never changes the exit code or the
-gate/overall pass–fail status, even under strict gate expectations. The next release makes
-it blocking, so extract helpers or flatten nesting now for functions above 20.
+Each function produces one `complexipy.cognitive` measurement at level `code` with unit `score`. A score above 20 yields the warning `pyguard.complexipy.cognitive_exceeded`; exactly 20 is clean. Cognitive complexity stays advisory: this warning never blocks or changes the exit code or the gate/overall pass–fail status, even under strict gate expectations. Review the control flow and required behavior before deciding whether to extract helpers or flatten nesting.
 
 complexipy folds nested functions into their enclosing function: a nested `def` has no
 separate report row, and its complexity is counted toward the outer function's score.

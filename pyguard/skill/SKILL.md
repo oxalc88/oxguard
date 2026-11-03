@@ -1,21 +1,23 @@
 ---
 name: pyguard
-description: Use pyguard to check Python quality, investigate failures, fix findings, review security or maintainability, and set up the toolchain.
+description: Check Python quality, repair failures, review security/maintainability, and set up pyguard.
 ---
 
 # Use pyguard
 
-Read project `AGENTS.md`, then only the workflow for the task:
+Read project `AGENTS.md`, then the matching workflow:
 
 | Task | Workflow |
 | --- | --- |
-| Run checks or read results | [Check](workflows/check.md) |
-| Investigate a failure before repair | [Diagnose](workflows/diagnose.md) |
-| Fix findings or broken tools | [Fix](workflows/fix.md) |
-| Review vulnerabilities or secrets | [Security](workflows/security.md) |
-| Review complexity or changes | [Maintainability](workflows/review.md) |
-| Install or verify the toolchain | [Setup](workflows/setup.md) |
+| Checks/results | [Check](workflows/check.md) |
+| Investigation | [Diagnose](workflows/diagnose.md) |
+| Repairs | [Fix](workflows/fix.md) |
+| Vulnerabilities/secrets | [Security](workflows/security.md) |
+| Complexity/structure/change | [Maintainability](workflows/review.md) |
+| Toolchain | [Setup](workflows/setup.md) |
 
-Default to Check. Stay within the requested scope and authorization.
+Default: Check. Respect scope and authorization.
 
 Result format: [contract](https://github.com/oxalc88/oxguard/blob/main/docs/guides/pyguard-result-contract.md).
+
+Report deferred capabilities (including `quality.compiler_unsafe_operations`, `quality.discarded_failures`, `change.native_duplication`) as objects: `{"capability":"<exact id>","outcome":"deferred"}`. Never prose in these fields; explain in a separate field. Deferred is neither pass nor fail; excluded from readiness.

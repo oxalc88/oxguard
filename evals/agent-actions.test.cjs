@@ -210,7 +210,7 @@ test("completion rejects missing native cases and passing totals with hidden fai
 	assert.equal(assess(...r).level1_agent_contract_ready, false);
 });
 
-// Optional Python maintainability evidence; legacy fixture() has no such declarations.
+// Optional Python maintainability evidence; the recorded fixture declares both scenarios.
 function pythonMaintainability(trace) {
 	const { PYTHON_SCENARIOS, SCENARIO_FILES } = require("./agent-actions.cjs");
 	for (const [name, scenario] of Object.entries(PYTHON_SCENARIOS)) {
@@ -265,11 +265,38 @@ test("new Python scenarios pass supported evidence and report duplication as def
 });
 test("existing Python traces do not opt into new structure/change requirements", () => {
 	const { trace, skill } = fixture();
+	delete trace.sessions.structure;
+	delete trace.sessions.change;
+	// Stray evidence and claims are not scored without a declared scenario (agent-actions.cjs:69).
+	trace.structure_review.response.maintainability_proven = true;
 	trace.change_events = [];
 	trace.change_review = { response: { change: { simplification_proven: true } } };
 	const result = score(trace, skill);
 	assert.equal(result.ready, true);
 	assert.equal(result.checks.some((c) => c.id.startsWith("agent.python_")), false);
+	assert.equal(result.checks.some((c) => c.id === "change.native_duplication"), false);
+});
+test("a declared Python change session rejects simplification_proven claims", () => {
+	for (const [key, id] of [
+		["change", "agent.python_change_interpretation"],
+		["incomplete", "agent.python_change_incomplete_interpretation"],
+	]) {
+		const { trace, skill } = fixture(); // recorded trace declares python.change.baseline.v1
+		trace.change_review.response[key].simplification_proven = true;
+		const result = score(trace, skill);
+		assert.equal(result.ready, false);
+		assert.equal(result.checks.find((c) => c.id === id)?.outcome, "fail", id);
+	}
+	// The legacy stub is rejected once the scenario is declared (agent-actions.cjs:85-122).
+	const { trace, skill } = fixture();
+	trace.change_events = [];
+	trace.change_review = { response: { change: { simplification_proven: true } } };
+	const result = score(trace, skill);
+	assert.equal(result.ready, false);
+	for (const id of ["agent.python_change_explicit_baseline", "agent.python_change_artifact",
+		"agent.python_change_interpretation", "agent.python_change_incomplete_interpretation",
+		"agent.python_change_duplication_boundary"])
+		assert.equal(result.checks.find((c) => c.id === id)?.outcome, "fail", id);
 });
 test("Python structure rejects missing graph evidence and unsupported maintainability claims", () => {
 	for (const mutate of [
