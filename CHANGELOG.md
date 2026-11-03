@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Refreshed the PyGuard skill and maintainability docs for structure, explicit-baseline change comparisons and complexity context. Readiness means the complete supported Python scope with deferred capabilities excluded, not full Tsguard parity; cognitive complexity stays advisory above 20. Python agent traces require fresh recordings, performed separately from this skill/docs refresh. (#23 P9 PR 4; D4a, D6a)
+- Refreshed the PyGuard skill and maintainability docs for structure, explicit-baseline change comparisons and complexity context. Readiness means the complete supported Python scope with deferred capabilities excluded, not full Tsguard parity; cognitive complexity stays advisory above 20. The Python agent trace was re-recorded from scratch against this skill revision; the previous trace is kept in evals/agent-traces/history/python-before-skill-docs.json. (#23 P9 PR 4; D4a, D6a)
 
 ### Added
 
