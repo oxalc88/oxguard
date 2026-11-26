@@ -4,7 +4,8 @@ const { parity } = require("./parity.cjs");
 const { evaluate } = require("./agent-actions.cjs");
 // Agent traces are recorded evidence, not a deterministic gate: on pull requests
 // stale or failing traces only warn; releases (strict) require ready and current.
-function assess(ts, behavior, python, { strict = false } = {}) {
+function assess(ts, behavior, python, { strict = false, reuse } = {}) {
+	if (strict && reuse) throw Error("Release completion requires exact-candidate evidence");
 	const expectedTs = require("./cases.json")
 		.cases.map((c) => c.id)
 		.sort();
@@ -24,7 +25,7 @@ function assess(ts, behavior, python, { strict = false } = {}) {
 		)
 	)
 		throw Error("Completion requires every case in the current corpus");
-	const shared = parity(ts, behavior, python),
+	const shared = parity(ts, behavior, python, { reuse }),
 		agents = evaluate();
 	const ready =
 		shared.shared_capabilities_ready &&

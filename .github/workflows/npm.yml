@@ -13,6 +13,10 @@ on:
         description: Reuse matching trusted main verification; never publish
         type: boolean
         default: true
+      release-compatibility:
+        description: Exercise all release verification checks without publishing
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       tag:
@@ -40,62 +44,79 @@ jobs:
     name: Detect docs-only change
     runs-on: ubuntu-latest
     outputs:
-      docs_only: ${{ steps.scope.outputs.docs_only }}
+      docs_only: ${{ steps.decision.outputs.docs_only }}
+      reused_component: ${{ steps.decision.outputs.component }}
+      reuse_run_id: ${{ steps.decision.outputs.run_id }}
+    env:
+      PR_BASE: ${{ github.event.pull_request.base.sha }}
+      PR_HEAD: ${{ github.event.pull_request.head.sha }}
+      PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+      CANDIDATE_SHA: ${{ github.sha }}
     steps:
-      - name: Detect docs-only change
-        id: scope
+      - uses: actions/checkout@v5
+        if: github.event_name == 'pull_request' && !inputs.tag && !inputs.sha
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: github.event_name == 'pull_request' && !inputs.tag && !inputs.sha
+        with:
+          node-version: 24
+      - name: Plan exact PR impact and find trusted base evidence
+        id: plan
+        if: github.event_name == 'pull_request' && !inputs.tag && !inputs.sha
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/component-verification.cjs plan
+      - name: Restore unchanged-component reports from trusted main
+        if: steps.plan.outputs.run_id != ''
+        id: restore
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.plan.outputs.artifact }}
+          path: reused-evidence
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.plan.outputs.run_id }}
+      - name: Verify exact base evidence and complete case sets
+        id: verify
+        if: steps.restore.outcome == 'success'
+        env:
+          REUSED_COMPONENT: ${{ steps.plan.outputs.component }}
+          REUSE_RUN_ID: ${{ steps.plan.outputs.run_id }}
+        run: node scripts/component-verification.cjs verify reused-evidence
+      - name: Transfer verified unchanged-component reports
+        if: steps.verify.outputs.valid == 'true'
+        id: transfer
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: oxguard-reused-component
+          path: reused-evidence/
+          if-no-files-found: error
+      - name: Publish component decision
+        id: decision
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          CHANGED_FILES: ${{ github.event.pull_request.changed_files || 0 }}
+          DOCS_ONLY: ${{ steps.plan.outputs.docs_only }}
+          COMPONENT: ${{ steps.plan.outputs.component }}
+          RUN_ID: ${{ steps.plan.outputs.run_id }}
+          VALID: ${{ steps.verify.outputs.valid }}
+          TRANSFER: ${{ steps.transfer.outcome }}
         run: |
-          # Docs-only list: *.md anywhere except tsguard/skill/ and pyguard/skill/,
-          # plus docs/** (any file type), LICENSE and .github/ISSUE_TEMPLATE/**.
-          # Renamed or copied files always run fully: a docs-only destination can hide a code change.
-          # API failure, zero files or more than 3000 files keep docs_only=false (full run).
+          component=none
+          run_id=
           docs_only=false
-          case "${CHANGED_FILES:-0}" in
-            ''|*[!0-9]*) CHANGED_FILES=3001 ;;
-          esac
-          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "${PR_NUMBER:-}" ] && [ "$CHANGED_FILES" -le 3000 ]; then
-            if rows="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[] | [.status, .filename, (.previous_filename // "")] | @tsv')"; then
-              count=0
-              eligible=true
-              while IFS=$'\t' read -r status file previous; do
-                [ -n "$file" ] || continue
-                count=$((count + 1))
-                case "$status" in
-                  renamed|copied)
-                    eligible=false
-                    break
-                    ;;
-                esac
-                if [ -n "$previous" ]; then
-                  eligible=false
-                  break
-                fi
-                case "$file" in
-                  tsguard/skill/*|pyguard/skill/*)
-                    eligible=false
-                    break
-                    ;;
-                  docs/*|LICENSE|.github/ISSUE_TEMPLATE/*|*.md) ;;
-                  *)
-                    eligible=false
-                    break
-                    ;;
-                esac
-              done <<< "$rows"
-              if [ "$eligible" = true ] && [ "$count" -gt 0 ] && [ "$count" -le 3000 ]; then
-                docs_only=true
-              fi
-            fi
+          if [ "$DOCS_ONLY" = true ]; then docs_only=true; fi
+          if [ "$VALID" = true ] && [ "$TRANSFER" = success ]; then
+            case "$COMPONENT" in npm|pyguard) component="$COMPONENT"; run_id="$RUN_ID";; esac
           fi
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
-          echo "docs-only decision: docs_only=$docs_only (event=$EVENT_NAME, changed_files=$CHANGED_FILES)"
+          echo "component=$component" >> "$GITHUB_OUTPUT"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "Verification decision: docs_only=$docs_only reused_component=$component base_run=$run_id"
+          echo "Verification decision: docs_only=$docs_only reused_component=$component base_run=$run_id" >> "$GITHUB_STEP_SUMMARY"
 
   npm:
     name: ${{ matrix.manager.name }} ${{ matrix.manager.version }} / ${{ matrix.os }}
@@ -117,29 +138,29 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag)
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && (needs.scope.outputs.reused_component != 'npm' || (matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest'))
         with:
           ref: ${{ inputs.sha || inputs.tag || github.sha }}
       - uses: actions/setup-go@v6
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag)
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm'
         with:
           go-version-file: tsguard/go.mod
           cache-dependency-path: tsguard/go.sum
       - uses: actions/setup-node@v4
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag)
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && (needs.scope.outputs.reused_component != 'npm' || (matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest'))
         with:
           node-version: 24
       - name: Install pnpm test tool
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (matrix.manager.name == 'pnpm')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm' && (matrix.manager.name == 'pnpm')
         run: npm install --global pnpm@${{ matrix.manager.version }}
       - name: Find trusted verification for these inputs
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag))
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm' && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility))
         id: evidence
         run: node scripts/verification-evidence.cjs lookup
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Restore trusted verification reports
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (steps.evidence.outputs.run_id != '')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm' && (steps.evidence.outputs.run_id != '')
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -148,40 +169,45 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ steps.evidence.outputs.run_id }}
       - name: Validate restored inputs and reports
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag))
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm' && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility))
         id: reuse
         run: node scripts/verification-evidence.cjs check eval-reports
       - name: Go regression tests
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && runner.os != 'Windows')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm' && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && runner.os != 'Windows')
         run: go test ./...
         working-directory: tsguard
       - name: Eval harness regression tests
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest')
-        run: node --test scripts/verification-evidence.test.cjs evals/evals.test.cjs evals/platform-smoke.test.cjs evals/python/evals.test.cjs evals/python/maintainability.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest')
+        run: node --test scripts/verification-evidence.test.cjs scripts/component-verification.test.cjs evals/evals.test.cjs evals/platform-smoke.test.cjs evals/python/evals.test.cjs evals/python/maintainability.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
       - name: Fresh distribution verification (unlocked npm transitive dependencies)
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag)
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm'
         run: |
           node -e "require('node:fs').rmSync('eval-reports', { recursive: true, force: true })"
           node --test npm/distribution.test.cjs
         env:
           TSGUARD_PACKAGE_MANAGER: ${{ matrix.manager.name }}
-          OXGUARD_DISTRIBUTION_ONLY: ${{ (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag)) && '0' || '1' }}
-          OXGUARD_EVAL_REPORT_DIR: ${{ (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag)) && 'eval-reports' || '' }}
+          OXGUARD_DISTRIBUTION_ONLY: ${{ (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility)) && '0' || '1' }}
+          OXGUARD_EVAL_REPORT_DIR: ${{ (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility)) && 'eval-reports' || '' }}
           OXGUARD_EVAL_REVISION: ${{ inputs.sha || github.sha }}
           OXGUARD_EVAL_BASELINE_REF: ${{ matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest' && github.event.pull_request.base.sha || '' }}
       - name: Record successful verification inputs
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag))
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm' && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility))
         run: node scripts/verification-evidence.cjs record eval-reports
       - name: Upload capability eval reports
-        if: always() && needs.scope.outputs.docs_only != 'true' && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag))
+        if: always() && needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'npm' && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility))
         uses: actions/upload-artifact@v4
         with:
           name: oxguard-evals-${{ matrix.os }}
           path: eval-reports/
           if-no-files-found: error
+      - name: Reuse unchanged Tsguard component evidence
+        if: needs.scope.outputs.reused_component == 'npm' && matrix.manager.version != '10.34.5'
+        env:
+          RUN_ID: ${{ needs.scope.outputs.reuse_run_id }}
+        run: echo "Tsguard inputs unchanged; verified base main run $RUN_ID. Distribution was not rerun in this PR."
       # Keep legacy check names until branch-protection requirements can be verified.
       - name: pnpm 10 release-only compatibility
-        if: needs.scope.outputs.docs_only != 'true' && matrix.manager.version == '10.34.5' && !inputs.tag
+        if: needs.scope.outputs.docs_only != 'true' && matrix.manager.version == '10.34.5' && !inputs.tag && !inputs.release-compatibility
         run: echo 'pnpm 10 compatibility runs on releases only; no distribution test executed.'
       - name: Docs-only fast path
         if: needs.scope.outputs.docs_only == 'true'
@@ -203,24 +229,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard'
         with:
           ref: ${{ inputs.sha || inputs.tag || github.sha }}
       - uses: actions/setup-go@v6
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard'
         with:
           go-version-file: pyguard/go.mod
           cache-dependency-path: pyguard/go.sum
       - uses: actions/setup-node@v4
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard'
         with:
           node-version: 24
       - uses: actions/setup-python@v5
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard'
         with:
           python-version: '3.12'
       - name: Install pinned eval toolchain
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard'
         shell: bash
         run: |
           python -m pip install uv==0.12.19
@@ -230,13 +256,13 @@ jobs:
           uv pip install --python "$EVAL_PY" --require-hashes -r evals/python/requirements.txt
           echo "EVAL_PY=$EVAL_PY" >> "$GITHUB_ENV"
       - name: Find trusted verification for these inputs
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag)
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility)
         id: evidence
         run: node scripts/verification-evidence.cjs lookup
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Restore trusted verification reports
-        if: needs.scope.outputs.docs_only != 'true' && (steps.evidence.outputs.run_id != '')
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (steps.evidence.outputs.run_id != '')
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -245,30 +271,30 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ steps.evidence.outputs.run_id }}
       - name: Validate restored inputs and reports
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag)
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility)
         id: reuse
         run: node scripts/verification-evidence.cjs check eval-reports/pyguard
       - name: Repository identity hook regression tests
-        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true')
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (steps.reuse.outputs.hit != 'true')
         shell: bash
         run: |
           python scripts/test-identity-hooks.py
           python scripts/test-release-docs.py
           python -m unittest discover -s experiments/test-selection -p "test_*.py"
       - name: Shared result contract tests
-        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true')
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (steps.reuse.outputs.hit != 'true')
         run: go test ./...
         working-directory: contract
       - name: PyGuard regression tests
-        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true')
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (steps.reuse.outputs.hit != 'true')
         run: go test ./...
         working-directory: pyguard
       - name: Owned helper source-location tests
-        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true')
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (steps.reuse.outputs.hit != 'true')
         shell: bash
         run: '"$EVAL_PY" pyguard/tests/analysis_contract_test.py'
       - name: Evaluate Python behavior and contract parity
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag) && (steps.reuse.outputs.hit != 'true')
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility) && (steps.reuse.outputs.hit != 'true')
         shell: bash
         env:
           EVAL_REVISION: ${{ inputs.sha || github.sha }}
@@ -284,26 +310,31 @@ jobs:
           fi
           node evals/python/run.cjs "${ARGS[@]}"
       - name: Evaluate Python maintainability parity
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag) && (steps.reuse.outputs.hit != 'true')
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility) && (steps.reuse.outputs.hit != 'true')
         shell: bash
         run: |
           node evals/python/maintainability.cjs --binary "$RUNNER_TEMP/pyguard-eval.exe" --python "$EVAL_PY" --output eval-reports/pyguard/maintainability.json
       - name: Python platform smoke (existing cases)
-        if: needs.scope.outputs.docs_only != 'true' && matrix.os != 'ubuntu-latest' && !inputs.tag
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && matrix.os != 'ubuntu-latest' && !inputs.tag && !inputs.release-compatibility
         shell: bash
         run: |
           (cd pyguard && go build -o "$RUNNER_TEMP/pyguard-eval.exe" .)
           node evals/python/platform-smoke.cjs "$RUNNER_TEMP/pyguard-eval.exe" . "$EVAL_PY"
       - name: Record successful verification inputs
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag)
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility)
         run: node scripts/verification-evidence.cjs record eval-reports/pyguard
       - name: Upload Python behavior and parity reports
-        if: always() && needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag)
+        if: always() && needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard' && (matrix.os == 'ubuntu-latest' || inputs.tag || inputs.release-compatibility)
         uses: actions/upload-artifact@v4
         with:
           name: oxguard-python-evals-${{ matrix.os }}
           path: eval-reports/pyguard/
           if-no-files-found: error
+      - name: Reuse unchanged PyGuard component evidence
+        if: needs.scope.outputs.reused_component == 'pyguard'
+        env:
+          RUN_ID: ${{ needs.scope.outputs.reuse_run_id }}
+        run: echo "PyGuard inputs unchanged; verified base main run $RUN_ID. Python verification was not rerun in this PR."
       - name: Docs-only fast path
         if: needs.scope.outputs.docs_only == 'true'
         run: |
@@ -346,29 +377,45 @@ jobs:
         if: needs.scope.outputs.docs_only != 'true'
         with:
           ref: ${{ inputs.sha || inputs.tag || github.sha }}
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         if: needs.scope.outputs.docs_only != 'true'
         with:
           node-version: 24
       - uses: actions/download-artifact@v4
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'npm'
         with:
           name: oxguard-evals-ubuntu-latest
           path: eval-reports/tsguard
       - uses: actions/download-artifact@v4
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'pyguard'
         with:
           name: oxguard-python-evals-ubuntu-latest
           path: eval-reports/pyguard
+      - uses: actions/download-artifact@v4
+        if: needs.scope.outputs.reused_component == 'npm' || needs.scope.outputs.reused_component == 'pyguard'
+        with:
+          name: oxguard-reused-component
+          path: ${{ needs.scope.outputs.reused_component == 'npm' && 'eval-reports/tsguard' || 'eval-reports/pyguard' }}
+      - name: Evaluate parity with verified unchanged-component evidence
+        if: needs.scope.outputs.reused_component == 'npm' || needs.scope.outputs.reused_component == 'pyguard'
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          CANDIDATE_SHA: ${{ github.sha }}
+          REUSED_COMPONENT: ${{ needs.scope.outputs.reused_component }}
+          REUSE_RUN_ID: ${{ needs.scope.outputs.reuse_run_id }}
+        run: node scripts/component-verification.cjs parity eval-reports
       - name: Produce parity matrix (gaps are not passes)
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component == 'none'
         run: |
           node evals/parity.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/parity.json
           node evals/maintainability-parity.cjs --strict eval-reports/tsguard/maintainability.json eval-reports/pyguard/maintainability.json > eval-reports/maintainability-parity.json
       - name: Require Level 1 contract completion (agent traces block releases only)
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component == 'none'
         env:
-          OXGUARD_REQUIRE_CURRENT_TRACES: ${{ inputs.tag && '1' || '0' }}
+          OXGUARD_REQUIRE_CURRENT_TRACES: ${{ (inputs.tag || inputs.release-compatibility) && '1' || '0' }}
         run: node evals/level1-ready.cjs eval-reports/tsguard/npm-linux-x64/candidate.json eval-reports/pyguard/candidate/behavior.json eval-reports/pyguard/candidate/parity.json eval-reports/level1-ready.json
       - uses: actions/upload-artifact@v4
         if: always() && needs.scope.outputs.docs_only != 'true'
@@ -379,6 +426,7 @@ jobs:
             eval-reports/parity.md
             eval-reports/level1-ready.json
             eval-reports/maintainability-parity.json
+            eval-reports/verification-provenance.json
           if-no-files-found: error
       - name: Docs-only fast path
         if: needs.scope.outputs.docs_only == 'true'

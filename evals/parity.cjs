@@ -3,10 +3,16 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const spec = require('./capabilities.json');
-function parity(tsguard, behavior, contract) {
-  for (const report of [tsguard, behavior, contract]) {
+function parity(tsguard, behavior, contract, { reuse } = {}) {
+  // Only the component-verification wrapper supplies reuse, after validating
+  // exact Git impact, a trusted base run and its original report hashes.
+  const revision = reuse ? reuse.revision : tsguard.revision;
+  if (reuse && (!['npm', 'pyguard'].includes(reuse.component) || !/^[0-9a-f]{40}$/.test(reuse.base) ||
+      !/^[0-9a-f]{40}$/.test(revision) || reuse.base === revision || !/^[0-9a-f]{40}$/.test(reuse.tree) || !/^\d+$/.test(reuse.run_id))) throw new Error('Invalid component evidence origin');
+  for (const [index, report] of [tsguard, behavior, contract].entries()) {
     if (report.schema_version !== '1' || !report.corpus_sha256 || !report.evaluator_sha256 || !report.toolchain || !report.cases?.length || new Set(report.cases.map(c => c.id)).size !== report.cases.length) throw new Error('Invalid capability report');
-    if (report.revision !== tsguard.revision) throw new Error('Parity requires reports from the same candidate revision');
+    const expectedRevision = reuse && (index === 0 ? reuse.component === 'npm' : reuse.component === 'pyguard') ? reuse.base : revision;
+    if (report.revision !== expectedRevision) throw new Error('Parity requires reports from the same candidate revision or the verified unchanged component');
     for (const key of ['platform', 'arch', 'node']) if (report.environment[key] !== tsguard.environment[key]) throw new Error('Parity requires the same environment');
     if (report.cases.some(c => !['pass', 'fail', 'unsupported', 'skipped'].includes(c.outcome))) throw new Error('Invalid capability outcome');
   }
@@ -18,10 +24,10 @@ function parity(tsguard, behavior, contract) {
     return c.outcome;
   };
   const rows = spec.capabilities.map(c => ({ id: c.id, tsguard: find(tsguard, c.tsguard), pyguard: find(c.lane === 'behavior' ? behavior : contract, c.pyguard), cases: { tsguard: c.tsguard, pyguard: c.pyguard }, equivalent: 'same quality intent; language-specific rules/metrics remain different' }));
-  return { schema_version: '1', capability_map_sha256: crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, 'capabilities.json'))).digest('hex'), revision: tsguard.revision, evidence: { tsguard: { corpus: tsguard.corpus_sha256, evaluator: tsguard.evaluator_sha256, toolchain: tsguard.toolchain }, pyguard: { corpus: behavior.corpus_sha256, evaluator: behavior.evaluator_sha256, toolchain: behavior.toolchain } }, shared_capabilities_ready: rows.every(c => c.tsguard === 'pass' && c.pyguard === 'pass'), pyguard_agent_ready: contract.cases.filter(c => c.id.startsWith('contract.') || c.id.startsWith('input.')).every(c => c.outcome === 'pass'), totals: { both_pass: rows.filter(c => c.tsguard === 'pass' && c.pyguard === 'pass').length, gaps: rows.filter(c => c.tsguard !== 'pass' || c.pyguard !== 'pass').length }, capabilities: rows };
+  return { schema_version: '1', capability_map_sha256: crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, 'capabilities.json'))).digest('hex'), revision, ...(reuse ? { reused_evidence: reuse } : {}), evidence: { tsguard: { corpus: tsguard.corpus_sha256, evaluator: tsguard.evaluator_sha256, toolchain: tsguard.toolchain }, pyguard: { corpus: behavior.corpus_sha256, evaluator: behavior.evaluator_sha256, toolchain: behavior.toolchain } }, shared_capabilities_ready: rows.every(c => c.tsguard === 'pass' && c.pyguard === 'pass'), pyguard_agent_ready: contract.cases.filter(c => c.id.startsWith('contract.') || c.id.startsWith('input.')).every(c => c.outcome === 'pass'), totals: { both_pass: rows.filter(c => c.tsguard === 'pass' && c.pyguard === 'pass').length, gaps: rows.filter(c => c.tsguard !== 'pass' || c.pyguard !== 'pass').length }, capabilities: rows };
 }
 function markdown(report) {
-  return `# OxGuard capability parity\n\nRevision: ${report.revision}\nShared capabilities ready: ${report.shared_capabilities_ready}\nPyGuard agent ready: ${report.pyguard_agent_ready}\n\nThese are capability-level equivalents, not equal analyzer scores. Unsupported, failed, skipped and untested cases are not passes.\n\n| Capability | Tsguard | PyGuard |\n|---|---|---|\n` + report.capabilities.map(c => `| ${c.id} | ${c.tsguard} | ${c.pyguard} |`).join('\n') + '\n';
+  return `# OxGuard capability parity\n\nRevision: ${report.revision}\n${report.reused_evidence ? `Unchanged component: ${report.reused_evidence.component}; verified source ${report.reused_evidence.base} (main run ${report.reused_evidence.run_id}).\n` : ''}Shared capabilities ready: ${report.shared_capabilities_ready}\nPyGuard agent ready: ${report.pyguard_agent_ready}\n\nThese are capability-level equivalents, not equal analyzer scores. Unsupported, failed, skipped and untested cases are not passes.\n\n| Capability | Tsguard | PyGuard |\n|---|---|---|\n` + report.capabilities.map(c => `| ${c.id} | ${c.tsguard} | ${c.pyguard} |`).join('\n') + '\n';
 }
 if (require.main === module) {
   const [ts, behavior, contract, output] = process.argv.slice(2);

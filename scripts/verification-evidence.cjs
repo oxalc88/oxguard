@@ -146,4 +146,4 @@ if (require.main === module) {
     throw new Error('Usage: verification-evidence.cjs lookup | check <reports-dir> | record <reports-dir>');
   }).catch(error => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = { lookup, hash, reusableEnvironment, trustedRun, files, requiredReports, validate };
+module.exports = { lookup, hash, reusableEnvironment, trustedRun, files, requiredReports, validate, api };
