@@ -3,7 +3,8 @@
 1. Branch from an up-to-date `origin/main` in a separate worktree. Never push with `--force` and never commit to `main` directly.
 2. Commit with the repository identity (see `docs/guides/git-identity.md`).
 3. Before opening a PR, run the full gate: `go vet` and `go test` in `contract`, `tsguard` and `pyguard`; `node --test evals/evals.test.cjs` and the harness tests; `python3 scripts/test-identity-hooks.py`; `python3 scripts/test-release-docs.py`; `node --test npm/distribution.test.cjs`; and `node evals/agent-actions.cjs` (0 fail, 0 stale).
-4. Open the PR with `--base main`. Merge with a merge commit, and only when every CI check is green. If anything fails, fix it; do not merge.
+4. Complete the agreed implementation scope before requesting review: update all affected manifests, generated lockfiles, checksums, tests, and documentation. A draft opened only to run remote CI is not implementation-complete; list actual blockers, resolve them on the branch, and request review only when implementation and verification are complete. Never mark pending work as done.
+5. Open the PR with `--base main`. Merge with a merge commit, and only when every CI check is green. If anything fails, fix it; do not merge.
 
 # Model selection
 

@@ -28,7 +28,7 @@ var requiredUvDevDeps = []string{
 	"pyan3",
 	"networkx",
 	"complexipy==8.3.0",
-	"grimp==3.18",
+	"grimp==3.20",
 }
 
 // declaredUvDevDeps reads pyproject.toml and returns the declared PEP 508

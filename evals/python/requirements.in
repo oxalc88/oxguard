@@ -13,7 +13,7 @@ defusedxml==0.7.1
 deptry==0.25.1
 detect-secrets==1.5.0
 filelock==4.2.4
-grimp==3.18
+grimp==3.20
 idna==3.20
 iniconfig==2.3.0
 Jinja2==3.1.6
@@ -23,7 +23,7 @@ markdown-it-py==4.2.0
 MarkupSafe==3.0.4
 mdurl==0.1.2
 msgpack==1.2.3
-mypy==2.4.0
+mypy==2.4.1
 mypy_extensions==1.1.0
 networkx==3.7
 packageurl-python==0.17.6
@@ -46,7 +46,7 @@ radon==6.0.1
 requests==2.34.2
 requirements-parser==0.13.1
 rich==15.0.0
-ruff==0.17.2
+ruff==0.17.6
 six==1.17.0
 sortedcontainers==2.4.0
 stevedore==5.9.1
