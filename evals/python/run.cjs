@@ -9,6 +9,7 @@ const { performance } = require('node:perf_hooks');
 const { validate } = require('../run.cjs');
 const { compare, markdown } = require('../compare.cjs');
 const corpus = require('./cases.json');
+const { selectCases } = require('../platform-smoke.cjs');
 function digest(files, baseDirectory = __dirname) {
   const hash = crypto.createHash('sha256');
   for (const file of files.toSorted()) { hash.update(path.relative(baseDirectory, file).replaceAll('\\', '/')); hash.update('\0'); hash.update(fs.readFileSync(file)); hash.update('\0'); }
@@ -25,7 +26,9 @@ function checked(response, context) {
   if (response.error || response.signal || response.status === null) throw new Error(`${context}: ${response.error?.message || response.signal || 'no exit status'}`);
   return response;
 }
-function evaluate({ binary, source, python, revision = 'unspecified', reportDirectory }) {
+function evaluate({ binary, source, python, revision = 'unspecified', reportDirectory, caseIds }) {
+  const selectedCases = selectCases(corpus.cases, caseIds);
+  if (caseIds && reportDirectory) throw new Error('Platform smoke cannot write full eval evidence');
   binary = path.resolve(binary); source = path.resolve(source); python = path.resolve(python);
   const temporary = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pyguard-evals-')));
   const env = { ...process.env, PATH: `${path.dirname(python)}${path.delimiter}${process.env.PATH}`, VIRTUAL_ENV: path.dirname(path.dirname(python)), UV_NO_SYNC: '1', UV_OFFLINE: '1', NO_COLOR: '1' };
@@ -54,7 +57,7 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
     const outputFlag = /--output\s/.test(preflight.stdout);
     const rootFlag = /--root\s/.test(preflight.stdout);
     const cases = [];
-    for (const c of corpus.cases) {
+    for (const c of selectedCases) {
       const root = path.join(temporary, c.id, 'project'); fs.mkdirSync(path.dirname(root), { recursive: true }); fs.cpSync(path.join(__dirname, 'fixtures', c.fixture), root, { recursive: true });
       fs.mkdirSync(path.join(root, 'tools'), { recursive: true });
       fs.cpSync(path.join(source, 'pyguard', 'analysis'), path.join(root, 'tools', 'analysis'), { recursive: true });
@@ -135,10 +138,10 @@ function evaluate({ binary, source, python, revision = 'unspecified', reportDire
       } catch (error) { entry.errors.push(error.message); }
       if (entry.outcome === 'fail') entry.failure_output = { stdout: response.stdout.slice(0, 4096), stderr: response.stderr.slice(0, 4096) };
     }
-    const base = { schema_version: '1', corpus_version: corpus.version, corpus_sha256: digest([path.join(__dirname, 'cases.json'), ...walk(path.join(__dirname, 'fixtures'))]), evaluator_sha256: digest([__filename, path.join(__dirname, '../run.cjs'), path.join(__dirname, '../compare.cjs')]), revision, toolchain, environment: { platform: process.platform, arch: process.arch, node: process.version }, cli_version: version.stdout.trim(), source_analysis_sha256: digest(walk(path.join(source, 'pyguard', 'analysis')), path.join(source, 'pyguard', 'analysis')), execution_path: 'native Go CLI + uv + pinned Python environment; scripts copied from evaluated source, as setup deploys them', detection: { precision: null, recall: null, reason: 'Analyzer oracles cover legacy behavior; contract cases assert exact findings separately. No aggregate production accuracy is claimed' } };
+    const base = { schema_version: '1', corpus_version: corpus.version, corpus_sha256: digest([path.join(__dirname, 'cases.json'), ...walk(path.join(__dirname, 'fixtures'))]), evaluator_sha256: digest([__filename, path.join(__dirname, '../run.cjs'), path.join(__dirname, '../compare.cjs'), require.resolve('../platform-smoke.cjs')]), revision, toolchain, environment: { platform: process.platform, arch: process.arch, node: process.version }, cli_version: version.stdout.trim(), source_analysis_sha256: digest(walk(path.join(source, 'pyguard', 'analysis')), path.join(source, 'pyguard', 'analysis')), execution_path: 'native Go CLI + uv + pinned Python environment; scripts copied from evaluated source, as setup deploys them', detection: { precision: null, recall: null, reason: 'Analyzer oracles cover legacy behavior; contract cases assert exact findings separately. No aggregate production accuracy is claimed' } };
     const report = lane => {
       const selected = cases.filter(c => corpus.cases.find(spec => spec.id === c.id).lane === lane);
-      return { ...base, suite: `pyguard.${lane}`, totals: Object.fromEntries(['pass', 'fail', 'unsupported', 'skipped'].map(outcome => [outcome, selected.filter(c => c.outcome === outcome).length])), cases: selected };
+      return { ...base, suite: `pyguard.${lane}${caseIds ? '.platform-smoke' : ''}`, totals: Object.fromEntries(['pass', 'fail', 'unsupported', 'skipped'].map(outcome => [outcome, selected.filter(c => c.outcome === outcome).length])), cases: selected };
     };
     const behavior = report('behavior'); const parity = report('parity');
     const result = { behavior, parity, agent_ready: parity.cases.filter(c => c.id.startsWith('contract.') || c.id.startsWith('input.')).every(c => c.outcome === 'pass'), parity_ready: parity.cases.every(c => c.outcome === 'pass') };

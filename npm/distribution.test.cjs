@@ -16,6 +16,8 @@ const host = `${process.platform}-${process.arch}`;
 const binaryName = process.platform === 'win32' ? 'tsguard.exe' : 'tsguard';
 const version = '0.0.0-npm-test';
 const manager = process.env.TSGUARD_PACKAGE_MANAGER || 'npm';
+const distributionOnly = process.env.OXGUARD_DISTRIBUTION_ONLY === '1';
+assert.ok(!distributionOnly || !process.env.OXGUARD_EVAL_REPORT_DIR, 'Distribution-only runs cannot produce full eval reports');
 assert.ok(['npm', 'pnpm'].includes(manager), `Unsupported test package manager: ${manager}`);
 
 function run(command, args, cwd, expected = 0, timeout = 120000) {
@@ -226,6 +228,14 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     t.diagnostic(`Capability evals: ${JSON.stringify(candidate.totals)}; detection: ${JSON.stringify(candidate.detection)}`);
   }
 
+  if (distributionOnly && manager === 'npm' && process.platform !== 'linux') {
+    const { evaluate } = require('../evals/run.cjs');
+    const { tsguard } = require('../evals/platform-smoke.cjs');
+    const smoke = evaluate({ command: [process.execPath, launcher], auditRegistry: auditProvider.registry, suite: 'platform-smoke', caseIds: tsguard });
+    assert.equal(smoke.totals.fail + smoke.totals.unsupported, 0, JSON.stringify(smoke.cases.filter(c => c.outcome !== 'pass' && c.outcome !== 'skipped')));
+    t.diagnostic(`Platform capability smoke: ${JSON.stringify(smoke.totals)}`);
+  }
+
   // Exercise the actual gates with no analyzer listed as a consumer dependency.
   fs.mkdirSync(path.join(consumer, 'src'));
   fs.writeFileSync(path.join(consumer, 'src/add.ts'), 'export function add(a: number, b: number): number { return a + b; }\n');
@@ -418,16 +428,18 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   assert.ifError(missingDependency.error);
   assert.equal(missingDependency.status, 1);
   assert.equal(JSON.parse(missingDependency.stdout).findings[0].category, 'tool_missing');
-  const maintainability = require('../evals/maintainability.cjs').evaluate({ execute, structured, root: consumer });
-  const maintainabilityParity = require('../evals/maintainability-parity.cjs').assess(maintainability);
-  assert.equal(maintainabilityParity.tsguard_capabilities_passed, true);
-  assert.equal(maintainabilityParity.tsguard_scope_ready, true);
-  assert.equal(maintainabilityParity.maintainability_parity_ready, false);
-  t.diagnostic(`Installed maintainability evals: ${JSON.stringify(maintainability)}`);
-  if (process.env.OXGUARD_EVAL_REPORT_DIR) {
-    const reportDirectory = path.resolve(process.env.OXGUARD_EVAL_REPORT_DIR);
-    fs.mkdirSync(reportDirectory, { recursive: true });
-    fs.writeFileSync(path.join(reportDirectory, 'maintainability.json'), JSON.stringify(maintainability, null, 2) + '\n');
+  if (!distributionOnly) {
+    const maintainability = require('../evals/maintainability.cjs').evaluate({ execute, structured, root: consumer });
+    const maintainabilityParity = require('../evals/maintainability-parity.cjs').assess(maintainability);
+    assert.equal(maintainabilityParity.tsguard_capabilities_passed, true);
+    assert.equal(maintainabilityParity.tsguard_scope_ready, true);
+    assert.equal(maintainabilityParity.maintainability_parity_ready, false);
+    t.diagnostic(`Installed maintainability evals: ${JSON.stringify(maintainability)}`);
+    if (process.env.OXGUARD_EVAL_REPORT_DIR) {
+      const reportDirectory = path.resolve(process.env.OXGUARD_EVAL_REPORT_DIR);
+      fs.mkdirSync(reportDirectory, { recursive: true });
+      fs.writeFileSync(path.join(reportDirectory, 'maintainability.json'), JSON.stringify(maintainability, null, 2) + '\n');
+    }
   }
   run('go', ['build', '-o', installedBinary, path.join(__dirname, 'testdata/cli.go')], root);
   const contextProcess = spawnSync(process.execPath, [launcher, 'context', '--output', 'json', 'argument with spaces'], {

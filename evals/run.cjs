@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { isDeepStrictEqual } = require('node:util');
 const corpus = require('./cases.json');
+const { selectCases } = require('./platform-smoke.cjs');
 const { generatedInput } = require('./generated-inputs.cjs');
 
 function walk(directory) {
@@ -97,7 +98,9 @@ function validate(testCase, result, processResult, root) {
   return errors;
 }
 
-function evaluate({ command, revision = 'unspecified', suite = 'candidate', reportFile, auditRegistry }) {
+function evaluate({ command, revision = 'unspecified', suite = 'candidate', reportFile, auditRegistry, caseIds }) {
+  const selectedCases = selectCases(corpus.cases, caseIds);
+  if (caseIds && (suite !== 'platform-smoke' || reportFile)) throw new Error('Platform smoke cannot write full eval evidence');
   if (!Array.isArray(command) || !command.length) throw new Error('command must be a non-empty argv array');
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'oxguard-eval-'));
   const invoke = (args, cwd) => {
@@ -111,7 +114,7 @@ function evaluate({ command, revision = 'unspecified', suite = 'candidate', repo
     const structured = help.status === 0 && /--output\s/.test(help.stdout);
     const criticality = /tsguard criticality\s/.test(help.stdout);
     const cases = [];
-    for (const testCase of corpus.cases) {
+    for (const testCase of selectedCases) {
       const entry = { id: testCase.id, origin: testCase.origin, outcome: 'fail', errors: [], duration_ms: 0, stdout_bytes: 0, stderr_bytes: 0 };
       cases.push(entry);
       if (!structured || (testCase.command === 'criticality' && !criticality)) {
@@ -199,7 +202,7 @@ function evaluate({ command, revision = 'unspecified', suite = 'candidate', repo
       if (fs.existsSync(packageFile)) toolchain = JSON.parse(fs.readFileSync(packageFile)).dependencies || null;
     }
     const report = { schema_version: '1', corpus_version: corpus.version, corpus_sha256: corpusDigest(), suite, revision,
-      evaluator_sha256: crypto.createHash('sha256').update(fs.readFileSync(__filename)).update(fs.readFileSync(path.join(__dirname, '../npm/testdata/audit-registry.cjs'))).digest('hex'), toolchain,
+      evaluator_sha256: crypto.createHash('sha256').update(fs.readFileSync(__filename)).update(fs.readFileSync(path.join(__dirname, '../npm/testdata/audit-registry.cjs'))).update(fs.readFileSync(require.resolve('./platform-smoke.cjs'))).digest('hex'), toolchain,
       costs: { total_case_duration_ms: times.reduce((sum, value) => sum + value, 0), p50_case_duration_ms: percentile(0.5), p95_case_duration_ms: percentile(0.95), max_agent_bytes: Math.max(0, ...cases.map(c => c.agent_bytes || 0)), max_agent_lines: Math.max(0, ...cases.map(c => c.agent_lines || 0)) },
       environment: { platform: process.platform, arch: process.arch, node: process.version },
       cli_version: version.stdout.trim(), execution_path: 'caller-supplied argv; installed launcher in CI',

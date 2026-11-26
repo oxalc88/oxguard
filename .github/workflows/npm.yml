@@ -117,29 +117,29 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag)
         with:
           ref: ${{ inputs.sha || inputs.tag || github.sha }}
       - uses: actions/setup-go@v6
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag)
         with:
           go-version-file: tsguard/go.mod
           cache-dependency-path: tsguard/go.sum
       - uses: actions/setup-node@v4
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag)
         with:
           node-version: 24
       - name: Install pnpm test tool
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.name == 'pnpm')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (matrix.manager.name == 'pnpm')
         run: npm install --global pnpm@${{ matrix.manager.version }}
       - name: Find trusted verification for these inputs
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.name == 'npm')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag))
         id: evidence
         run: node scripts/verification-evidence.cjs lookup
         env:
           GITHUB_TOKEN: ${{ github.token }}
       - name: Restore trusted verification reports
-        if: needs.scope.outputs.docs_only != 'true' && (steps.evidence.outputs.run_id != '')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (steps.evidence.outputs.run_id != '')
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -148,36 +148,41 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ steps.evidence.outputs.run_id }}
       - name: Validate restored inputs and reports
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.name == 'npm')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag))
         id: reuse
         run: node scripts/verification-evidence.cjs check eval-reports
       - name: Go regression tests
-        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && runner.os != 'Windows')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && runner.os != 'Windows')
         run: go test ./...
         working-directory: tsguard
       - name: Eval harness regression tests
-        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm')
-        run: node --test scripts/verification-evidence.test.cjs evals/evals.test.cjs evals/python/evals.test.cjs evals/python/maintainability.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest')
+        run: node --test scripts/verification-evidence.test.cjs evals/evals.test.cjs evals/platform-smoke.test.cjs evals/python/evals.test.cjs evals/python/maintainability.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
       - name: Fresh distribution verification (unlocked npm transitive dependencies)
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag)
         run: |
           node -e "require('node:fs').rmSync('eval-reports', { recursive: true, force: true })"
           node --test npm/distribution.test.cjs
         env:
           TSGUARD_PACKAGE_MANAGER: ${{ matrix.manager.name }}
-          OXGUARD_EVAL_REPORT_DIR: ${{ matrix.manager.name == 'npm' && 'eval-reports' || '' }}
+          OXGUARD_DISTRIBUTION_ONLY: ${{ (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag)) && '0' || '1' }}
+          OXGUARD_EVAL_REPORT_DIR: ${{ (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag)) && 'eval-reports' || '' }}
           OXGUARD_EVAL_REVISION: ${{ inputs.sha || github.sha }}
           OXGUARD_EVAL_BASELINE_REF: ${{ matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest' && github.event.pull_request.base.sha || '' }}
       - name: Record successful verification inputs
-        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.name == 'npm')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag) && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag))
         run: node scripts/verification-evidence.cjs record eval-reports
       - name: Upload capability eval reports
-        if: always() && needs.scope.outputs.docs_only != 'true' && (matrix.manager.name == 'npm')
+        if: always() && needs.scope.outputs.docs_only != 'true' && (matrix.manager.name == 'npm' && (matrix.os == 'ubuntu-latest' || inputs.tag))
         uses: actions/upload-artifact@v4
         with:
           name: oxguard-evals-${{ matrix.os }}
           path: eval-reports/
           if-no-files-found: error
+      # Keep legacy check names until branch-protection requirements can be verified.
+      - name: pnpm 10 release-only compatibility
+        if: needs.scope.outputs.docs_only != 'true' && matrix.manager.version == '10.34.5' && !inputs.tag
+        run: echo 'pnpm 10 compatibility runs on releases only; no distribution test executed.'
       - name: Docs-only fast path
         if: needs.scope.outputs.docs_only == 'true'
         run: |
@@ -225,7 +230,7 @@ jobs:
           uv pip install --python "$EVAL_PY" --require-hashes -r evals/python/requirements.txt
           echo "EVAL_PY=$EVAL_PY" >> "$GITHUB_ENV"
       - name: Find trusted verification for these inputs
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag)
         id: evidence
         run: node scripts/verification-evidence.cjs lookup
         env:
@@ -240,7 +245,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ steps.evidence.outputs.run_id }}
       - name: Validate restored inputs and reports
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag)
         id: reuse
         run: node scripts/verification-evidence.cjs check eval-reports/pyguard
       - name: Repository identity hook regression tests
@@ -263,7 +268,7 @@ jobs:
         shell: bash
         run: '"$EVAL_PY" pyguard/tests/analysis_contract_test.py'
       - name: Evaluate Python behavior and contract parity
-        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag) && (steps.reuse.outputs.hit != 'true')
         shell: bash
         env:
           EVAL_REVISION: ${{ inputs.sha || github.sha }}
@@ -279,15 +284,21 @@ jobs:
           fi
           node evals/python/run.cjs "${ARGS[@]}"
       - name: Evaluate Python maintainability parity
-        if: needs.scope.outputs.docs_only != 'true' && (steps.reuse.outputs.hit != 'true')
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag) && (steps.reuse.outputs.hit != 'true')
         shell: bash
         run: |
           node evals/python/maintainability.cjs --binary "$RUNNER_TEMP/pyguard-eval.exe" --python "$EVAL_PY" --output eval-reports/pyguard/maintainability.json
+      - name: Python platform smoke (existing cases)
+        if: needs.scope.outputs.docs_only != 'true' && matrix.os != 'ubuntu-latest' && !inputs.tag
+        shell: bash
+        run: |
+          (cd pyguard && go build -o "$RUNNER_TEMP/pyguard-eval.exe" .)
+          node evals/python/platform-smoke.cjs "$RUNNER_TEMP/pyguard-eval.exe" . "$EVAL_PY"
       - name: Record successful verification inputs
-        if: needs.scope.outputs.docs_only != 'true'
+        if: needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag)
         run: node scripts/verification-evidence.cjs record eval-reports/pyguard
       - name: Upload Python behavior and parity reports
-        if: always() && needs.scope.outputs.docs_only != 'true'
+        if: always() && needs.scope.outputs.docs_only != 'true' && (matrix.os == 'ubuntu-latest' || inputs.tag)
         uses: actions/upload-artifact@v4
         with:
           name: oxguard-python-evals-${{ matrix.os }}

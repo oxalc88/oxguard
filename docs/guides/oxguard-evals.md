@@ -15,7 +15,7 @@ node --test evals/evals.test.cjs
 OXGUARD_EVAL_REPORT_DIR=eval-reports node --test npm/distribution.test.cjs
 ```
 
-The harness builds, packs and installs the real npm distribution and runs each case in a fresh temporary project. Set `TSGUARD_PACKAGE_MANAGER=pnpm` to exercise pnpm. For a package already installed elsewhere:
+The harness builds, packs and installs the real npm distribution and runs each case in a fresh temporary project. Regular CI runs full capability and maintainability evals once on Linux npm. `OXGUARD_DISTRIBUTION_ONLY=1` retains installed integration checks without running the full maintainability suite; non-Linux npm additionally executes the platform cases in `evals/platform-smoke.cjs`. PyGuard uses those same explicit case selections through `evals/python/platform-smoke.cjs` on macOS and Windows; the full Python reports still run on Linux. Smoke results never feed the parity gate. Release calls retain full npm and Python evals on all three OSs while this change is validated. Set `TSGUARD_PACKAGE_MANAGER=pnpm` to exercise pnpm. For a package already installed elsewhere:
 
 ```sh
 node evals/run.cjs --launcher /absolute/path/node_modules/@oxguard/tsguard/bin/tsguard.cjs \
