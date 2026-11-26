@@ -391,7 +391,7 @@ test('the report runs every declared case exactly once and passes with a faithfu
   const report = evaluate({ binary, python: process.execPath, root: temporary(t), invoke: standInInvoke(binary) });
   assert.equal(report.schema_version, '1');
   assert.equal(report.suite, 'maintainability.python');
-  assert.equal(report.evaluator_sha256, crypto.createHash('sha256').update(fs.readFileSync(harness)).digest('hex'));
+  assert.equal(report.evaluator_sha256, crypto.createHash('sha256').update(fs.readFileSync(harness)).update(fs.readFileSync(require.resolve('../platform-smoke.cjs'))).digest('hex'));
   assert.deepEqual(report.cases.map(c => c.id).toSorted(), declared().map(d => d.id).toSorted());
   assert.equal(new Set(report.cases.map(c => c.id)).size, report.cases.length);
   assert.equal(report.cases.length, definitions.length);
@@ -402,6 +402,19 @@ test('the report runs every declared case exactly once and passes with a faithfu
     assert.equal(entry.kind, expected.kind);
     assert.ok(Number.isFinite(entry.duration_ms) && entry.duration_ms >= 0);
   }
+});
+
+test('platform smoke executes only the selected known answers and reports failures', t => {
+  const binary = standInBinary(t);
+  const caseIds = require('../platform-smoke.cjs').pythonMaintainability;
+  const options = { binary, python: process.execPath, caseIds, root: temporary(t) };
+  const report = evaluate({ ...options, invoke: standInInvoke(binary) });
+  assert.equal(report.suite, 'maintainability.python.platform-smoke');
+  assert.deepEqual(report.cases.map(c => c.id).sort(), [...caseIds].sort());
+  assert.ok(report.cases.every(c => c.outcome === 'pass'), JSON.stringify(report.cases));
+  const failed = evaluate({ ...options, invoke: () => ({ status: null, error: 'fixture startup failure' }) });
+  assert.equal(failed.cases.length, caseIds.length);
+  assert.ok(failed.cases.every(c => c.outcome === 'fail'));
 });
 
 test('a failing assertion is recorded as a failing case and the run continues', t => {

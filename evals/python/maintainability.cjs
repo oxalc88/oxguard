@@ -16,7 +16,7 @@ const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 
 const ANALYSIS = path.join(__dirname, '..', '..', 'pyguard', 'analysis');
-const EVALUATOR_SHA256 = crypto.createHash('sha256').update(fs.readFileSync(__filename)).digest('hex');
+const EVALUATOR_SHA256 = crypto.createHash('sha256').update(fs.readFileSync(__filename)).update(fs.readFileSync(require.resolve('../platform-smoke.cjs'))).digest('hex');
 // managed=false keeps uv in the caller-provided pinned environment (same
 // policy as evals/python/fixtures); a project-local .venv would hide pyan3.
 const PYPROJECT = ['[project]', 'name = "oxguard-maintainability-eval"', 'version = "0.0.0"', 'requires-python = ">=3.12"', '[tool.uv]', 'managed = false', ''].join('\n');
