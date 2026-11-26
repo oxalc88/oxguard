@@ -2729,12 +2729,13 @@ function project(definition, base, variant = 'project') {
   return dir;
 }
 
-function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
+function evaluate({ binary, python, root = os.tmpdir(), invoke, caseIds } = {}) {
+  const selected = require('../platform-smoke.cjs').selectCases(definitions, caseIds);
   const execute = invoke || spawnInvoke({ binary, python });
   const base = fs.realpathSync(fs.mkdtempSync(path.join(root, 'pyguard-maintainability-')));
   const cases = [];
   try {
-    for (const definition of definitions) {
+    for (const definition of selected) {
       const start = performance.now();
       let outcome = 'pass';
       let error;
@@ -2798,7 +2799,7 @@ function evaluate({ binary, python, root = os.tmpdir(), invoke } = {}) {
       if (error) entry.error = error;
       cases.push(entry);
     }
-    return { schema_version: '1', suite: 'maintainability.python', evaluator_sha256: EVALUATOR_SHA256, cases };
+    return { schema_version: '1', suite: caseIds ? 'maintainability.python.platform-smoke' : 'maintainability.python', evaluator_sha256: EVALUATOR_SHA256, cases };
   } finally {
     fs.rmSync(base, { recursive: true, force: true });
   }

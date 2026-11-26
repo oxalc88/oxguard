@@ -136,7 +136,7 @@ override in the temporary test consumer supplies its unpublished native optional
 dependency. This verifies resolution under pnpm's isolated dependency layout
 rather than relying on a native dependency installed at the project root.
 Consumer install scripts are disabled. No local override is needed for published
-packages. CI exercises npm and pnpm 10.34.5/12.6.0 on Linux, macOS and Windows.
+packages. Regular CI exercises npm and pnpm 12.6.0 on Linux, macOS and Windows. pnpm 10.34.5 runs distribution checks on release calls only until April 30, 2027 (security support end); remove its legacy checks after that date. pnpm 11 is not a separate compatibility target. Set `OXGUARD_DISTRIBUTION_ONLY=1` to omit the full maintainability suite while retaining installed CLI checks (and selected platform-sensitive capability checks on non-Linux npm). Full capability and maintainability reports run on Linux npm for regular CI; release calls also retain full npm evals on macOS and Windows until platform smoke coverage is measured.
 
 To retain tarballs for manual testing, for example on macOS arm64:
 

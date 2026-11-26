@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { isDeepStrictEqual } = require('node:util');
 const corpus = require('./cases.json');
+const { selectCases } = require('./platform-smoke.cjs');
 const { generatedInput } = require('./generated-inputs.cjs');
 
 function walk(directory) {
@@ -97,7 +98,9 @@ function validate(testCase, result, processResult, root) {
   return errors;
 }
 
-function evaluate({ command, revision = 'unspecified', suite = 'candidate', reportFile, auditRegistry }) {
+function evaluate({ command, revision = 'unspecified', suite = 'candidate', reportFile, auditRegistry, caseIds }) {
+  const selectedCases = selectCases(corpus.cases, caseIds);
+  if (caseIds && (suite !== 'platform-smoke' || reportFile)) throw new Error('Platform smoke cannot write full eval evidence');
   if (!Array.isArray(command) || !command.length) throw new Error('command must be a non-empty argv array');
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'oxguard-eval-'));
   const invoke = (args, cwd) => {
@@ -111,7 +114,7 @@ function evaluate({ command, revision = 'unspecified', suite = 'candidate', repo
     const structured = help.status === 0 && /--output\s/.test(help.stdout);
     const criticality = /tsguard criticality\s/.test(help.stdout);
     const cases = [];
-    for (const testCase of corpus.cases) {
+    for (const testCase of selectedCases) {
       const entry = { id: testCase.id, origin: testCase.origin, outcome: 'fail', errors: [], duration_ms: 0, stdout_bytes: 0, stderr_bytes: 0 };
       cases.push(entry);
       if (!structured || (testCase.command === 'criticality' && !criticality)) {
