@@ -1,0 +1,73 @@
+name: Temporary live dependency audit
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  npm-audit:
+    if: github.head_ref == 'chore/upgrade-analyzer-dependencies'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        manager: [npm, pnpm@10.34.5, pnpm@12.6.0]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Resolve and audit toolchain against public npm registry
+        shell: bash
+        env:
+          MANAGER: ${{ matrix.manager }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/oxguard-audit"
+          node -e 'const fs=require("node:fs"); fs.writeFileSync(process.env.RUNNER_TEMP+"/oxguard-audit/package.json",JSON.stringify({name:"oxguard-audit",version:"1.0.0",private:true,dependencies:require("./npm/toolchain.json")},null,2))'
+          cd "$RUNNER_TEMP/oxguard-audit"
+          if [ "$MANAGER" = npm ]; then
+            npm install --ignore-scripts --no-audit --no-fund
+            npm audit --audit-level=high --json
+          else
+            npm install --global "$MANAGER"
+            pnpm install --ignore-scripts
+            pnpm audit --audit-level high --json
+          fi
+  python-audit:
+    if: github.head_ref == 'chore/upgrade-analyzer-dependencies'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Audit exact hash-locked evaluator dependencies
+        shell: bash
+        run: |
+          python -m pip install uv==0.12.19
+          uv venv "$RUNNER_TEMP/python-audit"
+          uv pip install --python "$RUNNER_TEMP/python-audit/bin/python" --require-hashes -r evals/python/requirements.txt
+          "$RUNNER_TEMP/python-audit/bin/python" -m pip_audit --local --format json
+  go-audit:
+    if: github.head_ref == 'chore/upgrade-analyzer-dependencies'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [contract, tsguard, pyguard]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: tsguard/go.mod
+          cache: false
+      - name: Audit Go modules
+        working-directory: ${{ matrix.module }}
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
