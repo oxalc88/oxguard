@@ -1477,7 +1477,7 @@ def main() -> int:
         except ImportError as error:
             raise StructureError(
                 "tool_missing",
-                f"grimp is not installed. Run: uv add --group dev grimp==3.18 ({error})",
+                f"grimp is not installed. Run: uv add --group dev grimp==3.20 ({error})",
             ) from error
         try:
             import networkx  # noqa: F401
