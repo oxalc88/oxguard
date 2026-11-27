@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -347,14 +346,9 @@ func runOpengrep(r *Runner) int {
 		args = append(args, "--json")
 	}
 	// Exclusions, project/default ignore scope and root targets; see security_scope.go.
-	scan, err := securityScanArgs(r.root, r.excludeDirs, binaryPath)
+	scan, err := securityScanArgs(r.root, r.excludeDirs)
 	if err != nil {
-		category := "invalid_configuration"
-		var tool *scopeToolError
-		if errors.As(err, &tool) {
-			category = "analyzer_failure"
-		}
-		return r.executionFailure("security", category, err.Error())
+		return r.executionFailure("security", "invalid_configuration", err.Error())
 	}
 	if scan.empty {
 		return r.recordEmptySecurityScan()

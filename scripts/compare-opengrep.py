@@ -22,6 +22,7 @@ import statistics
 import subprocess
 import tempfile
 import time
+import unicodedata
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("baseline", type=Path, nargs="?", help="verified v1.23.0 Linux x64 asset")
@@ -75,6 +76,9 @@ def tree(extra=None, drop=()):
 
 
 def case(cid, group, files, expect="identical", note="", **options):
+    if options.pop("workaround", False):
+        # The documented workaround for the deferred nested-test limit: an empty .semgrepignore at the Git root.
+        files = {**files, "../../.semgrepignore": ""}
     return {"id": cid, "group": group, "files": files, "expect": expect, "note": note, **options}
 
 
@@ -159,8 +163,9 @@ CASES = [
     case("monorepo.no-ignore-files", "matrix", tree({".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}), git_subdir="packages/app", expect="identical",
          must_skip=["tests/a.ts", "src/gen/g.ts", "lib/l.ts"], note="defaults apply; Git-root and scan-directory .gitignore honored"),
     case("monorepo.scan-root-file", "matrix", tree({".semgrepignore": "docs/\n", ".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}), git_subdir="packages/app",
-         expect="identical", must_scan=["tests/a.ts", "test/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "src/gen/g.ts", "lib/l.ts"],
-         note="OxGuard restores the test paths Opengrep's built-ins would hide: root entries and nested directories (src/tests)"),
+         expect="approved-deferred", approved_paths=["src/tests/t.ts"], approved_label="approved-deferred", must_scan=["tests/a.ts", "test/a.ts"],
+         must_skip=["docs/d.ts", "src/gen/g.ts", "lib/l.ts", "src/tests/t.ts"],
+         note="the shim keeps root entries `tests/` and `test/` scanned as in 1.23.0; the nested `src/tests` stays skipped by Opengrep's built-ins (deferred to a follow-up; workaround: an empty .semgrepignore at the Git root)"),
     case("monorepo.scan-root-file-and-empty-git-root-file", "matrix", tree({".semgrepignore": "docs/\n", "../../.semgrepignore": "", ".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}),
          git_subdir="packages/app", expect="identical", must_scan=["tests/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "src/gen/g.ts", "lib/l.ts"],
          note="an empty .semgrepignore at the Git root: native replacement, no restoration needed"),
@@ -171,67 +176,97 @@ CASES = [
     case("monorepo.git-root-equals-scan-root", "matrix", tree({".semgrepignore": "docs/\n", ".gitignore": "lib/\n"}), git=True, expect="identical", must_scan=["tests/a.ts"],
          must_skip=["docs/d.ts", "lib/l.ts"], note="unchanged when the scan root is the Git root"),
     # Nested test paths with a scan-root .semgrepignore only (language-agnostic rule so *_test.go files are analyzed).
-    case("nested-tests.basic", "matrix", NESTED, git_subdir="packages/app", rule="generic", expect="identical", **NESTED_CHECKS,
+    # DEFERRED (owner-approved split, follow-up branch feat/opengrep-nested-test-restoration): with a scan-root .semgrepignore only, Opengrep 2.1.0's
+    # built-ins still hide test directories and *_test.go files below each root entry. Everything else must match 1.23.0.
+    case("deferred.nested-test-paths", "matrix", NESTED, git_subdir="packages/app", rule="generic", expect="approved-deferred", approved_label="approved-deferred",
+         approved_paths=["src/tests/t.ts", "src/tests/deep/tests/n.ts", "src/test/u.ts", "src/testsuite/s.ts", "lib/pkg/testsuite/s.ts", "lib/pkg/test/u.ts", "src/a_test.go",
+                         "src/tests/c_test.go", "lib/pkg/b_test.go"],
+         must_scan=["tests/t0.ts", "root_test.go", "src/a.ts", "src/contest/x.ts"], must_skip=["src/tests/t.ts", "src/a_test.go", "docs/d.ts"],
+         note="nested test, tests, testsuite directories and nested *_test.go files stay skipped; root-level entries and other files match 1.23.0"),
+    case("deferred.directory-named-test-go", "matrix", {"src/foo_test.go/a.ts": EVAL, "src/ok.ts": "export const ok = 1;\n", ".semgrepignore": ""}, git_subdir="packages/app",
+         expect="approved-deferred", approved_label="approved-deferred", approved_paths=["src/foo_test.go/a.ts"], must_skip=["src/foo_test.go/a.ts"], must_scan=["src/ok.ts"],
+         note="a directory named like the *_test.go built-in stays skipped natively until the follow-up"),
+    case("deferred.case-variants", "matrix", {**NESTED, "src/Tests/a.ts": EVAL, "src/TEST/b.ts": EVAL, "src/TestSuite/c.ts": EVAL, "src/a_TEST.go": EVAL, "src/b_test.GO": EVAL},
+         git_subdir="packages/app", rule="generic", expect="approved-deferred", approved_label="approved-deferred",
+         approved_paths=["src/tests/t.ts", "src/tests/deep/tests/n.ts", "src/test/u.ts", "src/testsuite/s.ts", "lib/pkg/testsuite/s.ts", "lib/pkg/test/u.ts", "src/a_test.go",
+                         "src/tests/c_test.go", "lib/pkg/b_test.go"],
+         must_scan=["src/Tests/a.ts", "src/TEST/b.ts", "src/TestSuite/c.ts", "src/a_TEST.go", "src/b_test.GO"],
+         note="Opengrep's built-ins are case-sensitive: other spellings are scanned natively and need no restoration"),
+    case("deferred.hostile-names-outside-test-paths", "matrix", {**NESTED, "src/lf\nname/a.ts": EVAL, "src/q \"x\" 's'/b.ts": EVAL, "src/u\u2028y/c.ts": EVAL, "src/-d/e.ts": EVAL},
+         git_subdir="packages/app", rule="generic", expect="approved-deferred", approved_label="approved-deferred",
+         approved_paths=["src/tests/t.ts", "src/tests/deep/tests/n.ts", "src/test/u.ts", "src/testsuite/s.ts", "lib/pkg/testsuite/s.ts", "lib/pkg/test/u.ts", "src/a_test.go",
+                         "src/tests/c_test.go", "lib/pkg/b_test.go"],
+         must_scan=["src/lf\nname/a.ts", "src/q \"x\" 's'/b.ts", "src/u\u2028y/c.ts", "src/-d/e.ts"],
+         note="hostile names outside test paths are scanned natively, identical to 1.23.0"),
+    case("workaround.basic", "matrix", NESTED, git_subdir="packages/app", workaround=True, rule="generic", expect="identical", **NESTED_CHECKS,
          note="nested test, tests, testsuite directories and nested *_test.go files are scanned as in 1.23.0"),
-    case("nested-tests.project-ignored-stays-excluded", "matrix", {**NESTED, ".semgrepignore": "docs/\nig/\n", "src/ig/tests/i.ts": EVAL, "src/ig/z_test.go": EVAL},
-         git_subdir="packages/app", rule="generic", expect="identical", must_skip=["src/ig/tests/i.ts", "src/ig/z_test.go"], must_scan=["src/tests/t.ts"],
+    case("workaround.project-ignored-stays-excluded", "matrix", {**NESTED, ".semgrepignore": "docs/\nig/\n", "src/ig/tests/i.ts": EVAL, "src/ig/z_test.go": EVAL},
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical", must_skip=["src/ig/tests/i.ts", "src/ig/z_test.go"], must_scan=["src/tests/t.ts"],
          note="a nested test directory and a *_test.go file the project .semgrepignore excludes stay excluded"),
-    case("nested-tests.gitignored-stays-excluded", "matrix", {**NESTED, "../../.gitignore": "gi/\ngi_file_test.go\n", ".gitignore": "ni_test.go\nni/\n", "src/gi/tests/g.ts": EVAL,
+    case("workaround.gitignored-stays-excluded", "matrix", {**NESTED, "../../.gitignore": "gi/\ngi_file_test.go\n", ".gitignore": "ni_test.go\nni/\n", "src/gi/tests/g.ts": EVAL,
                                                                "src/gi_file_test.go": EVAL, "src/ni/tests/n.ts": EVAL, "src/ni_test.go": EVAL},
-         git_subdir="packages/app", rule="generic", expect="identical", must_skip=["src/gi/tests/g.ts", "src/gi_file_test.go", "src/ni/tests/n.ts", "src/ni_test.go"],
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical", must_skip=["src/gi/tests/g.ts", "src/gi_file_test.go", "src/ni/tests/n.ts", "src/ni_test.go"],
          must_scan=["src/tests/t.ts"], note="nested test paths ignored by the Git-root or the scan-directory .gitignore stay excluded"),
-    case("nested-tests.deep", "matrix", {**NESTED, "src/a/b/c/d/tests/e/f/tests/g.ts": EVAL, "src/a/b/c/d/tests/e/f/h_test.go": EVAL, "lib/x/y/z/testsuite/q.ts": EVAL},
-         git_subdir="packages/app", rule="generic", expect="identical", must_scan=["src/a/b/c/d/tests/e/f/tests/g.ts", "src/a/b/c/d/tests/e/f/h_test.go", "lib/x/y/z/testsuite/q.ts"],
+    case("workaround.deep", "matrix", {**NESTED, "src/a/b/c/d/tests/e/f/tests/g.ts": EVAL, "src/a/b/c/d/tests/e/f/h_test.go": EVAL, "lib/x/y/z/testsuite/q.ts": EVAL},
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical", must_scan=["src/a/b/c/d/tests/e/f/tests/g.ts", "src/a/b/c/d/tests/e/f/h_test.go", "lib/x/y/z/testsuite/q.ts"],
          note="deeply nested directories, test directories inside test directories, nested *_test.go inside them"),
-    case("nested-tests.baseline-inside-stays-excluded", "matrix", {**NESTED, "src/tests/vendor/v.ts": EVAL, "src/tests/x.min.js": EVAL, "src/tests/dist/d.ts": EVAL,
+    case("workaround.baseline-inside-stays-excluded", "matrix", {**NESTED, "src/tests/vendor/v.ts": EVAL, "src/tests/x.min.js": EVAL, "src/tests/dist/d.ts": EVAL,
                                                                     "src/tests/node_modules/n.ts": EVAL, "src/tests/build/b.ts": EVAL},
-         git_subdir="packages/app", rule="generic", expect="approved-reduction", approved_paths=["src/tests/vendor/v.ts", "src/tests/x.min.js", "src/tests/build/b.ts"],
+         git_subdir="packages/app", workaround=True, rule="generic", expect="approved-reduction", approved_paths=["src/tests/vendor/v.ts", "src/tests/x.min.js", "src/tests/build/b.ts"],
          must_skip=["src/tests/vendor/v.ts", "src/tests/x.min.js", "src/tests/dist/d.ts", "src/tests/node_modules/n.ts", "src/tests/build/b.ts"], must_scan=["src/tests/t.ts"],
          note="the baseline layer applies inside nested tests (1.23.0 scanned vendor, build and minified files once a project file existed)"),
-    case("nested-tests.no-duplicate-reports", "matrix", {**NESTED, "src/tests/tests/inner.ts": EVAL, "src/tests/tests/inner_test.go": EVAL}, git_subdir="packages/app", rule="generic",
+    case("workaround.no-duplicate-reports", "matrix", {**NESTED, "src/tests/tests/inner.ts": EVAL, "src/tests/tests/inner_test.go": EVAL}, git_subdir="packages/app", workaround=True, rule="generic",
          expect="identical", must_scan=["src/tests/tests/inner.ts", "src/tests/tests/inner_test.go"], unique_findings=True,
          note="overlapping candidates are reported exactly once: Opengrep skips test directories nested in a target"),
     # Adversarial names and hostile layouts for the explicit-target restoration (scan-root .semgrepignore only, Git subproject).
-    case("nested-tests.forged-path-newline", "matrix", {**NESTED, ".semgrepignore": "docs/\n/src/hidden_test.go\n", "src/decoy\nsrc/hidden_test.go": EVAL, "src/hidden_test.go": "export const ok = 1;\n"},
-         git_subdir="packages/app", rule="generic", expect="identical", must_scan=["src/decoy\nsrc/hidden_test.go"], must_skip=["src/hidden_test.go"],
+    case("workaround.forged-path-newline", "matrix", {**NESTED, ".semgrepignore": "docs/\n/src/hidden_test.go\n", "src/decoy\nsrc/hidden_test.go": EVAL, "src/hidden_test.go": "export const ok = 1;\n"},
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical", must_scan=["src/decoy\nsrc/hidden_test.go"], must_skip=["src/hidden_test.go"],
          note="a file named `src/decoy<LF>src/hidden_test.go` is one path: the ignored clean file it imitates stays excluded and the vulnerable file is scanned"),
-    case("nested-tests.parent-reference-in-name", "matrix", {**NESTED, "src/x\n../outside_test.go": EVAL}, git_subdir="packages/app", rule="generic", expect="identical",
+    case("workaround.parent-reference-in-name", "matrix", {**NESTED, "src/x\n../outside_test.go": EVAL}, git_subdir="packages/app", workaround=True, rule="generic", expect="identical",
          must_scan=["src/x\n../outside_test.go"], note="a name containing `<LF>../` is a single file name inside the scan root; nothing outside is added"),
-    case("nested-tests.control-characters", "matrix", {**NESTED, "src/u\u0085y/tests/l.ts": EVAL, "src/u\u2028x/tests/k.ts": EVAL, "src/u\u2029p/tests/k2.ts": EVAL,
+    case("workaround.control-characters", "matrix", {**NESTED, "src/u\u0085y/tests/l.ts": EVAL, "src/u\u2028x/tests/k.ts": EVAL, "src/u\u2029p/tests/k2.ts": EVAL,
                                                        "src/tab\tz/tests/t.ts": EVAL, "src/esc\x1bz/tests/e.ts": EVAL, "src/nl\nz/tests/n.ts": EVAL, "src/vt\x0bz/tests/v.ts": EVAL},
-         git_subdir="packages/app", rule="generic", expect="identical",
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical",
          must_scan=["src/u\u0085y/tests/l.ts", "src/u\u2028x/tests/k.ts", "src/u\u2029p/tests/k2.ts", "src/tab\tz/tests/t.ts", "src/esc\x1bz/tests/e.ts", "src/nl\nz/tests/n.ts", "src/vt\x0bz/tests/v.ts"],
          note="TAB, ESC, VT, LF, U+0085, U+2028 and U+2029 in directory names are one path each and are scanned"),
-    case("nested-tests.carriage-return-name", "matrix", {**NESTED, "src/cr\r/tests/m.ts": EVAL}, git_subdir="packages/app", rule="generic", expect="more scanned",
-         must_scan=["src/cr\r/tests/m.ts"], note="1.23.0 drops any path containing a carriage return from the scan (a quirk); the candidate scans it, the safe direction"),
-    case("nested-tests.quotes-spaces-globs-dashes", "matrix", {**NESTED, "src/a b \"q\" 's'/tests/h.ts": EVAL, "src/a*b[1]?/tests/j.ts": EVAL, "src/{x,y}/tests/k.ts": EVAL, "src/--x/tests/g.ts": EVAL,
+    case("workaround.carriage-return-name", "matrix", {**NESTED, "src/cr\r/tests/m.ts": EVAL}, git_subdir="packages/app", workaround=True, rule="generic", expect="approved-expansion",
+         label_check="approved-expansion", expansion_paths=["src/cr\r/tests/m.ts"], must_scan=["src/cr\r/tests/m.ts"],
+         note="owner-approved expansion: 1.23.0 drops any path containing a carriage return from the scan (a quirk); 2.1.0 scans it"),
+    case("approved.carriage-return-name", "matrix", {"src/cr\r/a.ts": EVAL, "src/ok.ts": "export const ok = 1;\n"}, git=True, expect="approved-expansion", label_check="approved-expansion",
+         expansion_paths=["src/cr\r/a.ts"], must_scan=["src/cr\r/a.ts"],
+         note="owner-approved expansion, measured in a Git work tree: a vulnerable file whose directory name holds a carriage return was invisible to 1.23.0 (exit 0) and is reported by 2.1.0 (exit 1)"),
+    case("approved.carriage-return-name-in-file", "matrix", {"src/a\rb.ts": EVAL, "src/ok.ts": "export const ok = 1;\n"}, git=True, expect="approved-expansion", label_check="approved-expansion",
+         expansion_paths=["src/a\rb.ts"], must_scan=["src/a\rb.ts"], note="owner-approved expansion: the same for a carriage return inside a file name"),
+    case("carriage-return-name-outside-git", "matrix", {"src/cr\r/a.ts": EVAL, "src/a\rb.ts": EVAL, "src/ok.ts": "export const ok = 1;\n"}, expect="identical", must_scan=["src/cr\r/a.ts", "src/a\rb.ts"],
+         note="outside a Git work tree both engines scan paths with a carriage return; only 1.23.0's Git file listing dropped them"),
+    case("workaround.quotes-spaces-globs-dashes", "matrix", {**NESTED, "src/a b \"q\" 's'/tests/h.ts": EVAL, "src/a*b[1]?/tests/j.ts": EVAL, "src/{x,y}/tests/k.ts": EVAL, "src/--x/tests/g.ts": EVAL,
                                                                 "src/-t/tests/f.ts": EVAL, "src/$(id)/tests/d.ts": EVAL, "src/`x`/tests/b.ts": EVAL, "src/!neg/tests/n.ts": EVAL, "src/#hash/tests/h2.ts": EVAL},
-         git_subdir="packages/app", rule="generic", expect="identical",
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical",
          must_scan=["src/a b \"q\" 's'/tests/h.ts", "src/a*b[1]?/tests/j.ts", "src/{x,y}/tests/k.ts", "src/--x/tests/g.ts", "src/-t/tests/f.ts", "src/$(id)/tests/d.ts", "src/`x`/tests/b.ts", "src/!neg/tests/n.ts", "src/#hash/tests/h2.ts"],
          note="quotes, spaces, glob and shell metacharacters and leading dashes are passed as ./-prefixed literal targets"),
-    case("nested-tests.directory-named-test-go", "matrix", {"src/foo_test.go/a.ts": EVAL, "src/ok.ts": "export const ok = 1;\n", ".semgrepignore": ""}, git_subdir="packages/app", expect="identical",
+    case("workaround.directory-named-test-go", "matrix", {"src/foo_test.go/a.ts": EVAL, "src/ok.ts": "export const ok = 1;\n", ".semgrepignore": ""}, git_subdir="packages/app", workaround=True, expect="identical",
          must_scan=["src/foo_test.go/a.ts"], note="a directory named like the *_test.go built-in is hidden natively and is restored (empty subproject .semgrepignore)"),
-    case("nested-tests.directory-named-test-go-deep", "matrix", {**NESTED, "src/foo_test.go/inner_test.go/a.ts": EVAL, "src/foo_test.go/x_test.go": EVAL, "lib/b_test.go/tests/c.ts": EVAL},
-         git_subdir="packages/app", rule="generic", expect="identical", unique_findings=True,
+    case("workaround.directory-named-test-go-deep", "matrix", {**NESTED, "src/foo_test.go/inner_test.go/a.ts": EVAL, "src/foo_test.go/x_test.go": EVAL, "lib/b_test.go/tests/c.ts": EVAL},
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical", unique_findings=True,
          must_scan=["src/foo_test.go/inner_test.go/a.ts", "src/foo_test.go/x_test.go", "lib/b_test.go/tests/c.ts"],
          note="directories matching *_test.go, nested inside each other and holding test files and test directories, are scanned once"),
-    case("nested-tests.case-variants", "matrix", {**NESTED, "src/Tests/a.ts": EVAL, "src/TEST/b.ts": EVAL, "src/TestSuite/c.ts": EVAL, "src/a_TEST.go": EVAL, "src/b_test.GO": EVAL},
-         git_subdir="packages/app", rule="generic", expect="identical", must_scan=["src/Tests/a.ts", "src/TEST/b.ts", "src/TestSuite/c.ts", "src/a_TEST.go", "src/b_test.GO"],
+    case("workaround.case-variants", "matrix", {**NESTED, "src/Tests/a.ts": EVAL, "src/TEST/b.ts": EVAL, "src/TestSuite/c.ts": EVAL, "src/a_TEST.go": EVAL, "src/b_test.GO": EVAL},
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical", must_scan=["src/Tests/a.ts", "src/TEST/b.ts", "src/TestSuite/c.ts", "src/a_TEST.go", "src/b_test.GO"],
          note="Opengrep's built-ins are case-sensitive: other spellings are never hidden and never restored"),
-    case("nested-tests.symlinked-test-directory", "matrix", {**NESTED}, git_subdir="packages/app", rule="generic", expect="identical", outside_links=["src/tests/linked", "src/test2/tests"],
+    case("workaround.symlinked-test-directory", "matrix", {**NESTED}, git_subdir="packages/app", workaround=True, rule="generic", expect="identical", outside_links=["src/tests/linked", "src/test2/tests"],
          must_skip=["src/tests/linked/o.ts", "src/test2/tests/o.ts"], note="a symlinked directory is never followed out of the scan root, and a symlink named tests is not a target"),
-    case("nested-tests.ignore-depths", "matrix", {**NESTED, ".semgrepignore": "docs/\nig/\n/src/b/tests/private/\n", "src/a/tests/x.ts": EVAL, "src/gi/tests/g.ts": EVAL, "src/ig/b/tests/i.ts": EVAL,
+    case("workaround.ignore-depths", "matrix", {**NESTED, ".semgrepignore": "docs/\nig/\n/src/b/tests/private/\n", "src/a/tests/x.ts": EVAL, "src/gi/tests/g.ts": EVAL, "src/ig/b/tests/i.ts": EVAL,
                                                    "src/b/tests/private/p.ts": EVAL, "src/b/tests/public/q.ts": EVAL, "src/c/d/e/tests/ok.ts": EVAL, "src/c/d/gi/tests/g2.ts": EVAL,
                                                    "../../.gitignore": "gi/\n"},
-         git_subdir="packages/app", rule="generic", expect="identical", must_scan=["src/a/tests/x.ts", "src/b/tests/public/q.ts", "src/c/d/e/tests/ok.ts"],
+         git_subdir="packages/app", workaround=True, rule="generic", expect="identical", must_scan=["src/a/tests/x.ts", "src/b/tests/public/q.ts", "src/c/d/e/tests/ok.ts"],
          must_skip=["src/gi/tests/g.ts", "src/ig/b/tests/i.ts", "src/b/tests/private/p.ts", "src/c/d/gi/tests/g2.ts"],
          note="test directories ignored by .gitignore or the project .semgrepignore at different depths, inside or around a test directory, stay excluded"),
-    case("nested-tests.baseline-at-depths", "matrix", {**NESTED, "src/vendor/tests/v.ts": EVAL, "src/a/node_modules/tests/n.ts": EVAL, "src/b/dist/tests/d.ts": EVAL, "src/c/tests/vendor/tests/w.ts": EVAL,
+    case("workaround.baseline-at-depths", "matrix", {**NESTED, "src/vendor/tests/v.ts": EVAL, "src/a/node_modules/tests/n.ts": EVAL, "src/b/dist/tests/d.ts": EVAL, "src/c/tests/vendor/tests/w.ts": EVAL,
                                                        "src/d/x.min.js": EVAL},
-         git_subdir="packages/app", rule="generic", expect="approved-reduction", approved_paths=["src/vendor/tests/v.ts", "src/c/tests/vendor/tests/w.ts", "src/d/x.min.js"],
+         git_subdir="packages/app", workaround=True, rule="generic", expect="approved-reduction", approved_paths=["src/vendor/tests/v.ts", "src/c/tests/vendor/tests/w.ts", "src/d/x.min.js"],
          must_skip=["src/vendor/tests/v.ts", "src/a/node_modules/tests/n.ts", "src/b/dist/tests/d.ts", "src/c/tests/vendor/tests/w.ts", "src/d/x.min.js"],
          note="baseline entries (vendor, node_modules, dist, minified files) exclude test directories at any depth around or inside them"),
-    case("nested-tests.long-path", "matrix", {**NESTED, "src/" + "/".join(["segment-with-a-long-name-%02d" % i for i in range(1, 12)]) + "/tests/deep.ts": EVAL}, git_subdir="packages/app", rule="generic",
+    case("workaround.long-path", "matrix", {**NESTED, "src/" + "/".join(["segment-with-a-long-name-%02d" % i for i in range(1, 12)]) + "/tests/deep.ts": EVAL}, git_subdir="packages/app", workaround=True, rule="generic",
          expect="identical", must_scan=["src/" + "/".join(["segment-with-a-long-name-%02d" % i for i in range(1, 12)]) + "/tests/deep.ts"], note="a path of about 350 characters is restored"),
     case("nested-tests.outside-git", "matrix", {**NESTED}, rule="generic", expect="identical", must_scan=["src/tests/t.ts"],
          note="outside Git --project-root already replaces the defaults: no restoration needed"),
@@ -348,11 +383,11 @@ def without(report, paths):
     return kept
 
 
-def classify(old, new, approved=()):
+def classify(old, new, approved=(), label="approved-reduction"):
     if old == new:  # compares every field above, including messages, severities and diagnostics
         return "identical"
     if approved and without(old, set(approved)) == new:
-        return "approved-reduction"
+        return label
     a, b = set(old["scanned"]), set(new["scanned"])
     if old["exit"] != new["exit"] and old["exit"] == 2:
         return "different"
@@ -378,7 +413,19 @@ def check_both_fail(old, new, spec):
     return old["exit"] != 0 and new["exit"] not in (0, "rejected") and bool(new["errors"])
 
 
-LABEL_CHECKS = {"approved-tolerance": check_tolerance, "approved-rejection": check_rejection, "both-fail": check_both_fail}
+def check_expansion(old, new, spec):
+    """2.1.0 reports exactly the listed extra paths (a path 1.23.0 drops) and nothing else differs."""
+    extra = set(spec.get("expansion_paths", ()))
+    if not extra or set(new["scanned"]) - set(old["scanned"]) != extra or set(old["scanned"]) - set(new["scanned"]):
+        return False
+    new_without = {**new, "scanned": [p for p in new["scanned"] if p not in extra], "findings": [f for f in new["findings"] if f[1] not in extra],
+                   "errors": [e for e in new["errors"] if e[3] not in extra]}
+    if new["exit"] in (0, 1):
+        new_without["exit"] = 1 if new_without["findings"] else 0
+    return new_without == old
+
+
+LABEL_CHECKS = {"approved-tolerance": check_tolerance, "approved-rejection": check_rejection, "both-fail": check_both_fail, "approved-expansion": check_expansion}
 
 
 def self_test():
@@ -415,6 +462,10 @@ def self_test():
     assert not check_tolerance({**base_report, "exit": 2}, {**base_report, "exit": 1, "errors": [["SemgrepError", "error", "m", ""]]}, {}), "tolerance must not hide a scan error"
     assert not check_rejection({**base_report, "scanned": ["a.ts", "src/a.ts"]}, {**base_report, "exit": "rejected", "errors": [["rejected", "error", "Unsupported exclusion", ""]]}, {}), "rejection needs the old all-excluded behavior"
     assert not check_both_fail({**base_report, "exit": 2}, {**base_report, "exit": 0}, {}), "both-fail needs the candidate to fail"
+    extra_report = {**base_report, "scanned": ["a.ts", "b.ts"], "findings": [["r", "b.ts", 1, 1, "m", "ERROR"]]}
+    assert check_expansion({**base_report, "exit": 0, "findings": []}, extra_report, {"expansion_paths": ["b.ts"]}), "the approved expansion itself must be recognized"
+    assert not check_expansion({**base_report, "exit": 0, "findings": []}, {**extra_report, "scanned": ["a.ts", "b.ts", "c.ts"]}, {"expansion_paths": ["b.ts"]}), "expansion must not allow other new files"
+    assert not check_expansion({**base_report, "exit": 0, "findings": []}, {**extra_report, "findings": extra_report["findings"] + [["r", "a.ts", 1, 1, "m", "ERROR"]]}, {"expansion_paths": ["b.ts"]}), "expansion must not allow other findings"
     assert not check_both_fail({**base_report, "exit": 2}, {**base_report, "exit": 1, "errors": []}, {}), "both-fail needs a reported error"
     # Without an approved path nothing is forgiven.
     assert classify(old, good) != "approved-reduction"
@@ -429,7 +480,7 @@ if args.self_test:
 def candidate_args(helper, scan, spec, temporary):
     out = temporary / "args.json"
     env = {**os.environ, "OXGUARD_COMPARE_ROOT": str(scan), "OXGUARD_COMPARE_ARGS": str(out),
-           "OXGUARD_COMPARE_EXCLUDE": json.dumps(spec.get("exclude", [])), "OXGUARD_COMPARE_ENGINE": str(engines[1][1])}
+           "OXGUARD_COMPARE_EXCLUDE": json.dumps(spec.get("exclude", []))}
     started = time.perf_counter()
     subprocess.run([str(helper), "-test.run=^TestSecurityScopeComparisonHelper$"], check=True, capture_output=True, env=env)
     elapsed = (time.perf_counter() - started) * 1000
@@ -500,7 +551,7 @@ with tempfile.TemporaryDirectory(prefix="oxguard-opengrep-comparison-", dir=temp
                 new_process, _ = run_engine(engines[1][1], scan, new_args, [])
                 new = summarize(new_process)
             old = summarize(old_process)
-            measured = classify(old, new, spec.get("approved_paths", ()))
+            measured = classify(old, new, spec.get("approved_paths", ()), spec.get("approved_label", "approved-reduction"))
             if spec.get("label_check") and LABEL_CHECKS[spec["label_check"]](old, new, spec):
                 measured = spec["label_check"]
             row = {"case": spec["id"], "group": spec["group"], "baseline": old, "candidate": new, "classification": measured,
@@ -567,6 +618,19 @@ with tempfile.TemporaryDirectory(prefix="oxguard-opengrep-comparison-", dir=temp
         if not large["parity"]:
             failures.append(f"large tree differs: {large}")
 
+def display(text):
+    """Escape control and line-separator characters so the generated block is plain text (\\r, \\n, \\x1b, \\u2028 ...)."""
+    out = []
+    for ch in str(text):
+        if ch in "\r\n\t":
+            out.append({"\r": "\\r", "\n": "\\n", "\t": "\\t"}[ch])
+        elif unicodedata.category(ch) in ("Cc", "Cf", "Zl", "Zp"):
+            out.append("\\x%02x" % ord(ch) if ord(ch) < 0x100 else "\\u%04x" % ord(ch))
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def matrix_markdown(rows):
     """The compatibility matrix exactly as measured; docs/opengrep-2.1-migration.md embeds it between the matrix markers."""
     counts = {}
@@ -580,10 +644,11 @@ def matrix_markdown(rows):
         only_old, only_new = sorted(set(old["scanned"]) - set(new["scanned"])), sorted(set(new["scanned"]) - set(old["scanned"]))
         delta = []
         if only_old:
-            delta.append("only 1.23.0: " + ", ".join(f"`{p}`" for p in only_old))
+            delta.append("only 1.23.0: " + ", ".join(f"`{display(p)}`" for p in only_old))
         if only_new:
-            delta.append("only 2.1.0: " + ", ".join(f"`{p}`" for p in only_new))
+            delta.append("only 2.1.0: " + ", ".join(f"`{display(p)}`" for p in only_new))
         scenario = (row["note"] + (" " if row["note"] and delta else "") + ("(" + "; ".join(delta) + ")" if delta else "")).replace("|", "\\|")
+        scenario = display(scenario)
         lines.append(f"| `{row['case']}` | {scenario} | {len(old['scanned'])} | {len(new['scanned'])} | {old['exit']} / {new['exit']} | {row['classification']} |")
     return "\n".join(lines)
 
@@ -592,7 +657,10 @@ if args.update_doc:
     START, END = "<!-- matrix:start (generated by scripts/compare-opengrep.py --update-doc; do not edit by hand) -->", "<!-- matrix:end -->"
     text = args.update_doc.read_text()
     begin, finish = text.index("<!-- matrix:start"), text.index(END)
-    args.update_doc.write_text(text[:begin] + START + "\n" + matrix_markdown(results) + "\n" + text[finish:])
+    block = START + "\n" + matrix_markdown(results) + "\n"
+    args.update_doc.write_text(text[:begin] + block + text[finish:])
+    written = args.update_doc.read_text()
+    assert block in written and not any(unicodedata.category(c) in ("Cc", "Zl", "Zp") and c != "\n" for c in written), "the generated matrix must be byte-for-byte present and free of control characters"
 
 if args.markdown:
     print("| Case | 1.23.0 selected | 2.1.0 selected | Exit 1.23.0 / 2.1.0 | Result |")

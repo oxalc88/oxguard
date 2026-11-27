@@ -144,5 +144,6 @@ func TestRealStandaloneOpengrepSetup(t *testing.T) {
 	if err != nil || strings.TrimSpace(string(output)) != strings.TrimPrefix(opengrepVersion, "v") {
 		t.Fatalf("standalone executable failed: %v: %s", err, output)
 	}
+	t.Run("scope shim", func(t *testing.T) { realScopeShim(t, opengrepBinaryPath("")) })
 
 }

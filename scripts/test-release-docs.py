@@ -1,6 +1,7 @@
 """Exercise release documentation generation and pre-publication rejection."""
 import importlib.util
 import tempfile
+import unicodedata
 import unittest
 from pathlib import Path
 
@@ -41,6 +42,16 @@ class ReleaseDocumentationTest(unittest.TestCase):
                 smoke.check_documentation(output, "v0.9.1", "guides/example.md")
             package.package_docs("v0.9.1", output, source)
             smoke.check_documentation(output, "v0.9.1", "guides/example.md")
+
+    def test_migration_report_matrix_is_plain_text(self):
+        # scripts/compare-opengrep.py --update-doc escapes hostile file names; the committed report must not hold a raw control or line-separator character.
+        text = (Path(__file__).resolve().parent.parent / "docs/opengrep-2.1-migration.md").read_text()
+        self.assertEqual([c for c in text if unicodedata.category(c) in ("Cc", "Zl", "Zp") and c != "\n"], [])
+        begin, end = text.index("<!-- matrix:start"), text.index("<!-- matrix:end -->")
+        self.assertLess(begin, end)
+        rows = [line for line in text[begin:end].splitlines() if line.startswith("| `")]
+        self.assertGreater(len(rows), 50)
+        self.assertTrue(all(line.endswith(" |") and line.count("|") >= 7 for line in rows))
 
     def test_invalid_tag_cannot_create_payload(self):
         with tempfile.TemporaryDirectory() as temp:
