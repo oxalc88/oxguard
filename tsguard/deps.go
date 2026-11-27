@@ -2,9 +2,6 @@ package main
 
 import (
 	"bufio"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,7 +36,6 @@ var requiredNpmDevDeps = []string{
 // Opengrep is pinned by upstream asset hash and stored in a user-owned cache
 // outside the project being scanned; project files cannot replace its bytes.
 const (
-	opengrepVersion  = "v1.23.0"
 	opengrepCacheDir = "node_modules/.cache/oxguard"
 	opengrepBinary   = "opengrep"
 )
@@ -51,65 +47,14 @@ func opengrepBinaryPath(root string) string {
 		return os.Getenv("TSGUARD_OPENGREP")
 	}
 	name := opengrepBinary
-	if runtime.GOOS == "windows" { name += ".exe" }
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	cache, err := os.UserCacheDir()
-	if err != nil { return "" }
+	if err != nil {
+		return ""
+	}
 	return filepath.Join(cache, "oxguard", "opengrep", opengrepVersion, runtime.GOOS+"-"+runtime.GOARCH, name)
-}
-
-// Digests are the same pinned values used by npm/native-tools.json for v1.23.0.
-var opengrepDigests = map[string]string{
-	"linux/amd64":   "1f06548af379ab6080698a609612890ffad2d92dc2172f1e97d38d48096d5ef8",
-	"linux/arm64":   "ddf4935b138a2e825e6860529df1fb031524f7a2da8933ab7b2a16e5939c5178",
-	"darwin/amd64":  "2fa99169e34e9f233fd7412d5cdc167114ba752a2510da3ce322b272c15ab755",
-	"darwin/arm64":  "945739e56fec4aab28da296811f3473a0ff733af3dc2371d150b071430265c5f",
-	"windows/amd64": "7cbe02d9cc3fb812adce8720fc46515bb6a954a4ceeb3856d3a099d783749aae",
-}
-
-func verifyOpengrepBinary(path string) error {
-	if path == "" { return errors.New("user cache directory unavailable") }
-	info, err := os.Lstat(path)
-	if err != nil { return err }
-	if !info.Mode().IsRegular() { return errors.New("Opengrep cache entry is not a regular file") }
-	want, ok := opengrepDigests[runtime.GOOS+"/"+runtime.GOARCH]
-	if !ok { return errors.New("platform has no pinned Opengrep digest") }
-	f, err := os.Open(path)
-	if err != nil { return err }
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil { return err }
-	if hex.EncodeToString(h.Sum(nil)) != want {
-		return errors.New("Opengrep SHA-256 mismatch")
-	}
-	return nil
-}
-
-// opengrepAssetName returns the Opengrep release asset filename for this platform.
-// Asset naming: opengrep_<os>_<arch>[.exe]
-// Linux: manylinux (glibc, standard distros) for amd64; musllinux for containers.
-// Returns ("", false) for unsupported platforms.
-func opengrepAssetName() (string, bool) {
-	switch runtime.GOOS {
-	case "linux":
-		switch runtime.GOARCH {
-		case "amd64":
-			return "opengrep_manylinux_x86", true
-		case "arm64":
-			return "opengrep_manylinux_aarch64", true
-		}
-	case "darwin":
-		switch runtime.GOARCH {
-		case "amd64":
-			return "opengrep_osx_x86", true
-		case "arm64":
-			return "opengrep_osx_arm64", true
-		}
-	case "windows":
-		if runtime.GOARCH == "amd64" {
-			return "opengrep_windows_x86.exe", true
-		}
-	}
-	return "", false
 }
 
 // ensureOpengrep downloads only pinned assets to a private user cache.
@@ -128,7 +73,8 @@ func ensureOpengrep(root string, cfg config) bool {
 		fmt.Printf("  [FAIL] opengrep — unsupported platform %s/%s\n", runtime.GOOS, runtime.GOARCH)
 		return false
 	}
-	if !confirmYesNo("  Download verified Opengrep SAST engine (~50 MB)?", true, cfg.assumeYes) {
+	asset, _ := currentOpengrepAsset()
+	if !confirmYesNo(fmt.Sprintf("  Download verified Opengrep %s SAST engine (%d MB download)?", opengrepVersion, (asset.Size+999999)/1000000), true, cfg.assumeYes) {
 		fmt.Println("  [SKIP] opengrep — required SAST engine is not installed")
 		return false
 	}
@@ -143,7 +89,10 @@ func ensureOpengrep(root string, cfg config) bool {
 		return false
 	}
 	tmp, err := os.CreateTemp(cacheDir, "opengrep-download-*")
-	if err != nil { fmt.Printf("  [FAIL] opengrep — cache creation: %v\n", err); return false }
+	if err != nil {
+		fmt.Printf("  [FAIL] opengrep — cache creation: %v\n", err)
+		return false
+	}
 	tmpPath := tmp.Name()
 	_ = tmp.Close()
 	defer os.Remove(tmpPath)
@@ -152,16 +101,8 @@ func ensureOpengrep(root string, cfg config) bool {
 		fmt.Printf("  [FAIL] opengrep — download: %v\n", err)
 		return false
 	}
-	if err := verifyOpengrepBinary(tmpPath); err != nil {
-		fmt.Printf("  [FAIL] opengrep — checksum: %v\n", err)
-		return false
-	}
-	if err := os.Chmod(tmpPath, 0o700); err != nil {
-		fmt.Printf("  [FAIL] opengrep — chmod: %v\n", err)
-		return false
-	}
-	if err := os.Rename(tmpPath, binaryPath); err != nil {
-		fmt.Printf("  [FAIL] opengrep — install: %v\n", err)
+	if err := installOpengrepAsset(tmpPath, cacheDir); err != nil {
+		fmt.Printf("  [FAIL] opengrep — verified install: %v\n", err)
 		return false
 	}
 	fmt.Printf("  [OK]   opengrep %s installed (SHA-256 verified)\n", opengrepVersion)
@@ -184,7 +125,10 @@ func downloadFile(destPath, url string) error {
 		return err
 	}
 	defer f.Close()
-	_, err = io.Copy(f, resp.Body)
+	n, err := io.Copy(f, io.LimitReader(resp.Body, maxOpengrepBytes+1))
+	if n > maxOpengrepBytes {
+		return fmt.Errorf("oversized Opengrep download")
+	}
 	return err
 }
 

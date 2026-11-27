@@ -26,13 +26,12 @@ try {
 }
 
 const nativeRoot = path.dirname(path.dirname(binary));
-const musl = process.platform === 'linux' && !process.report.getReport().header.glibcVersionRuntime;
 const child = spawn(binary, process.argv.slice(2), {
   stdio: 'inherit',
   env: { ...process.env,
     TSGUARD_RUNTIME: path.resolve(__dirname, '..'),
     TSGUARD_NODE: process.execPath,
-    TSGUARD_OPENGREP: path.join(nativeRoot, 'bin', `opengrep${musl ? '-musl' : ''}${process.platform === 'win32' ? '.exe' : ''}`),
+    TSGUARD_OPENGREP: path.join(nativeRoot, 'bin', `opengrep${process.platform === 'win32' ? '.exe' : ''}`),
   },
 });
 const handlers = new Map();

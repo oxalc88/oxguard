@@ -10,6 +10,7 @@ const { once } = require('node:events');
 const { createRequire } = require('node:module');
 const { prepare, platforms } = require('./prepare.cjs');
 const { fetchNative } = require('./fetch-native.cjs');
+require('./native-tools.test.cjs');
 
 const root = path.resolve(__dirname, '..');
 const host = `${process.platform}-${process.arch}`;
@@ -74,7 +75,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   const engines = path.join(root, 'dist/binaries');
   await fetchNative(engines, host);
   for (const file of fs.readdirSync(path.join(engines, host))) {
-    if (file.startsWith('opengrep') || file === 'licenses') fs.cpSync(path.join(engines, host, file), path.join(binaries, host, file), { recursive: true });
+    if (file.startsWith('opengrep') || file.endsWith('.dll') || file === 'licenses') fs.cpSync(path.join(engines, host, file), path.join(binaries, host, file), { recursive: true });
   }
   prepare(`v${version}`, binaries, packages, [host]);
   assert.throws(() => prepare('v01.2.3', binaries, packages), /Invalid release version/);
@@ -88,7 +89,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
     fs.copyFileSync(nativeBinary, path.join(binaries, platform, platform.startsWith('win32') ? 'tsguard.exe' : 'tsguard'));
     if (platform !== host) {
       fs.copyFileSync(path.join(binaries, host, process.platform === 'win32' ? 'opengrep.exe' : 'opengrep'), path.join(binaries, platform, platform.startsWith('win32') ? 'opengrep.exe' : 'opengrep'));
-      if (platform.startsWith('linux')) fs.copyFileSync(nativeBinary, path.join(binaries, platform, 'opengrep-musl'));
+      for (const name of Object.keys(require('./native-tools.json').platforms[platform].files).filter(name => name.endsWith('.dll'))) fs.writeFileSync(path.join(binaries, platform, name), 'platform fixture');
       fs.cpSync(path.join(binaries, host, 'licenses'), path.join(binaries, platform, 'licenses'), { recursive: true });
     }
   }
@@ -104,6 +105,7 @@ test(`${manager} packed distribution runs the Go CLI and forwards native process
   for (const version of Object.values(manifest.dependencies)) assert.match(version, /^\d+\.\d+\.\d+$/);
   for (const platform of platforms) {
     const native = JSON.parse(fs.readFileSync(path.join(packages, `tsguard-${platform}/package.json`)));
+    for (const name of Object.keys(require('./native-tools.json').platforms[platform].files)) assert.ok(fs.statSync(path.join(packages, `tsguard-${platform}`, 'bin', name)).isFile());
     assert.equal(native.version, manifest.version);
     assert.equal(manifest.optionalDependencies[native.name], native.version);
     assert.deepEqual(native.os, [platform.split('-')[0]]);

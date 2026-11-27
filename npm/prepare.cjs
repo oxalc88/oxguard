@@ -75,7 +75,7 @@ function prepare(tag, binaries, output, selected = platforms) {
     fs.mkdirSync(path.join(directory, 'bin'), { recursive: true });
     fs.copyFileSync(path.join(binaries, platform, bin), path.join(directory, 'bin', bin));
     fs.chmodSync(path.join(directory, 'bin', bin), 0o755);
-    for (const engine of [os === 'win32' ? 'opengrep.exe' : 'opengrep', ...(os === 'linux' ? ['opengrep-musl'] : [])]) {
+    for (const engine of Object.keys(require('./native-tools.json').platforms[platform].files)) {
       fs.copyFileSync(path.join(binaries, platform, engine), path.join(directory, 'bin', engine));
       fs.chmodSync(path.join(directory, 'bin', engine), 0o755);
     }

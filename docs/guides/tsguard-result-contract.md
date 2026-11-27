@@ -92,7 +92,7 @@ Structured modes automatically save full stdout and stderr separately under `nod
 | FTA | Native JSON on success; native first score-cap stderr record on failure; score/threshold finding and measurement |
 | Packaged Biome/Ultracite | Biome JSON diagnostics with all diagnostics enabled, rule/category, severity, file and position |
 | Criticality | TypeScript compiler emits resolved function/method nodes and caller → callee edges; Go deduplicates, ranks and reports |
-| Opengrep | Native JSON results/errors; preserve rule IDs and positions; `--error` continues to make every match blocking |
+| Opengrep 2.1.0 | Native JSON results/errors; preserve rule IDs and positions; `--error` continues to make every match blocking |
 | Coverage | Native Istanbul JSON summary from Vitest/Jest/c8/nyc; global existing thresholds and per-file measurements; Vitest/Jest JSON test failures |
 | Secretlint | Native JSON rule IDs and positions; normalized evidence excludes secret values |
 | Dependency audit | Native npm/pnpm JSON and Yarn classic event advisory IDs as informational findings; native audit-ci policy decision as a separate blocker |
@@ -186,3 +186,17 @@ policy failure is advisory only when every reported advisory is covered by a
 matching review. Ambiguous or indirect-only audit paths stay blocking. Existing
 audit-ci thresholds are unchanged; this review file does not create a general
 allowlist or suppress the full package-manager audit.
+
+Opengrep 2.1.0 retains the normalized `check_id`, path, start line/column, message, severity and errors contract. `engine_kind` changes upstream from `OSS` to `Opengrep`; it is not part of the normalized result. Security policy, rule sources and blocking exits are unchanged.
+
+### Security scan scope
+
+The security gate scans the root entries of the project (never `node_modules` or `.git`) and selects files in three layers:
+
+| Layer | Source | Project `.semgrepignore` can change it? |
+|---|---|---|
+| Baseline | Version-control metadata (`.git`, `.svn`, `.hg`, `_darcs`, `CVS`), `build/`, `vendor/`, `dist/`, `*.min.js`, `.env/`, `.tox/`, `node_modules/`, `.npm/`, `.yarn/`, `.venv/`, `_opam/`, `_build/`, `_cargo/` (the Opengrep 1.23.0 default list without its test paths) | No; it can only add exclusions |
+| OxGuard exclusions | Built-in directories (`node_modules`, `dist`, `.next`, `build`, `coverage`, agent directories), `oxguard.toml` `exclude` and `--exclude` | No |
+| Test defaults | `test/`, `tests/`, `testsuite/`, `*_test.go` | Yes: a `.semgrepignore` at the scan root or the Git root, even an empty one, replaces them |
+
+A project `.semgrepignore` remains supported and follows Opengrep 2.1.0 (gitignore-like) semantics, including nested files. OxGuard does not parse or write ignore files and passes `--project-root .` only outside Git (inside Git, Opengrep keeps its native Git root and `.gitignore` handling). The test defaults are replaced when a `.semgrepignore` exists at the scan root or at the Git root. In a Git subproject whose scan directory alone has the file, the root entries (for example `tests/`) are scanned as under 1.23.0, but Opengrep 2.1.0's built-in test paths still skip nested test directories (`src/tests`, directories named `*_test.go`) and nested `*_test.go` files; this limit is deferred to a follow-up (branch `feat/opengrep-nested-test-restoration`), and an empty `.semgrepignore` at the Git root removes it. Minified files (`*.min.js`) are never scanned, root-level files included; this owner-approved reduction removes an explicit root minified file that 1.23.0 scanned, and a project whose root holds only minified files gets a clean, complete result without an Opengrep run. Other root-level files remain scan targets whatever the exclusions say. OxGuard exclusions keep their shipped meaning: each entry matches at any depth (a leading or trailing `/` does not anchor), and repeated slashes collapse, and an `oxguard.toml` entry that is empty or only slashes is rejected as invalid configuration (owner-approved hardening: under 1.23.0 it excluded every file below the root entries; `--exclude foo,` was already rejected by the CLI). An unreadable directory that is excluded does not abort the scan (owner-approved difference: 1.23.0 exited 2); an unreadable directory that is not excluded still fails; an unreadable included path is reported by Opengrep as a scan error (`analyzer_failure`). See the [migration report](../opengrep-2.1-migration.md#target-scope-and-semgrepignore) for the measured compatibility matrix.

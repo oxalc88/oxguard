@@ -176,9 +176,21 @@ jobs:
         if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm' && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && runner.os != 'Windows')
         run: go test ./...
         working-directory: tsguard
+      # Linux and macOS run every Go test above; Windows skips them, so run the security-scope unit tests there.
+      - name: Security scope unit tests (Windows)
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'npm' && matrix.manager.name == 'npm' && runner.os == 'Windows'
+        run: go test -run '^(TestSecurityDefaultLayers|TestOpengrepExcludePattern|TestSecurityScope|TestSecurityScan|TestSecurityRootTargets|TestRecordEmptySecurityScan)' -v
+        working-directory: tsguard
+      - name: Verified standalone Opengrep setup smoke
+        if: needs.scope.outputs.docs_only != 'true' && needs.scope.outputs.reused_component != 'npm' && matrix.manager.name == 'npm'
+        # Also runs the engine-backed scope shim check (scan-root and Git-root .semgrepignore) on every OS, Windows included.
+        run: go test -run '^TestRealStandaloneOpengrepSetup$' -v
+        working-directory: tsguard
+        env:
+          OXGUARD_TEST_REAL_OPENGREP: '1'
       - name: Eval harness regression tests
         if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && (steps.reuse.outputs.hit != 'true' && matrix.manager.name == 'npm' && matrix.os == 'ubuntu-latest')
-        run: node --test scripts/verification-evidence.test.cjs scripts/component-verification.test.cjs evals/evals.test.cjs evals/platform-smoke.test.cjs evals/python/evals.test.cjs evals/python/maintainability.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
+        run: node --test npm/native-tools.test.cjs scripts/verification-evidence.test.cjs scripts/component-verification.test.cjs evals/evals.test.cjs evals/platform-smoke.test.cjs evals/python/evals.test.cjs evals/python/maintainability.test.cjs evals/agent-actions.test.cjs evals/record-agent-command.test.cjs evals/maintainability-parity.test.cjs tsguard/analysis/change-metrics.test.cjs
       - name: Fresh distribution verification (unlocked npm transitive dependencies)
         if: needs.scope.outputs.docs_only != 'true' && (matrix.manager.version != '10.34.5' || inputs.tag || inputs.release-compatibility) && needs.scope.outputs.reused_component != 'npm'
         run: |

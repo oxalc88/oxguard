@@ -50,15 +50,7 @@ recommended Secretlint preset; coverage uses bundled Vitest/V8 and still require
 tests. Generated configs live under node_modules/.cache/oxguard/defaults, not at
 the project root. npm mode setup does not add implementation devDependencies.
 
-Opengrep v1.23.0 is copied into the native packages at build time. Asset and license
-SHA-256 digests are pinned in npm/native-tools.json and npm/fetch-native.cjs. A
-checksum mismatch fails packaging. Linux packages include glibc and musl engines.
-LGPL license/source notices ship alongside them. Missing packaged SAST fails
-instead of reporting a successful skip. The standalone missing-engine behavior
-is preserved. Default p/javascript and p/typescript rules are still retrieved
-from their registry when scanning; these remote rule sets are not version pins.
-Projects can supply their existing cached rule directory. CVE auditing likewise
-requires registry access. The CLI does not claim that security scans are offline.
+Opengrep v2.1.0 is copied into native packages at build time. `npm/native-tools.json` is the authoritative version, release-asset hash/size, executable hash/size and Windows DLL manifest; `node npm/sync-native.cjs` refreshes the generated copy embedded by Go, with a regression test enforcing equality. Every downloaded asset is verified before use. Windows ZIP extraction accepts only the seven exact pinned flat regular files, rejects paths, symlinks, duplicates and unexpected/missing entries, bounds compressed and expanded sizes, and verifies each extracted file. Linux uses the same statically linked upstream binary for glibc and musl. LGPL license/source notices ship alongside the engines. Both standalone and npm scans verify the executable and every Windows runtime DLL before execution; missing or modified files block SAST. Default p/javascript and p/typescript rules are still retrieved from their registry when scanning; these remote rule sets are not version pins. Projects can supply their existing cached rule directory. CVE auditing likewise requires registry access. See [compatibility, sizes and comparison](../opengrep-2.1-migration.md).
 
 ## Package structure
 
@@ -79,7 +71,7 @@ tsguard-win32-x64/               @oxguard/tsguard-win32-x64
   package.json                   os + cpu restrictions
   README.md
   bin/tsguard                     bin/tsguard.exe for Windows
-  bin/opengrep                    bin/opengrep.exe for Windows
+  bin/opengrep                    bin/opengrep.exe + six runtime DLLs for Windows
   licenses/                      upstream Opengrep license and source notices
 ```
 

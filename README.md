@@ -89,7 +89,7 @@ The current implementation provides three Tsguard levels: **code** (Ultracite/Bi
 | Types | tsc --noEmit | Type errors |
 | Compiler-aware lint | Oxlint/tsgolint, five semantic rules only | Unsafe assignments/assertions and promise misuse; unnecessary conditions are advisory; unsupported native configurations remain incomplete |
 | Coverage | vitest / jest / mocha+c8 / ava+c8 — 80% floor | Untested code paths |
-| Security — static | Opengrep (project-local binary, LGPL) | XSS, `eval()`, path traversal, weak crypto, injection, framework patterns — bandit-class coverage |
+| Security — static | Opengrep (verified engine, LGPL) | XSS, `eval()`, path traversal, weak crypto, injection, framework patterns — bandit-class coverage |
 | Security — CVEs | npm/pnpm/yarn audit + audit-ci | Known vulnerabilities in dependencies |
 | Security — secrets | secretlint | Credentials accidentally committed |
 
@@ -120,6 +120,7 @@ Key flags:
 tsguard check --dirs src,lib          # override scanned directories (default: . — project root)
 tsguard check --exclude docs,scripts  # exclude additional directories from all scans
                                       # node_modules, dist, .next, build, coverage are always excluded
+                                      # entries match at any depth; a leading / does not anchor
 tsguard check --max-fta-score 50      # tighten FTA complexity cap (default: 60)
 tsguard check --tail 30               # show only the last 30 lines of each tool's output
 ```
@@ -160,16 +161,14 @@ The security gate requires **no Python or global installs**. In npm installation
 tools are owned by `@oxguard/tsguard` and Opengrep ships in its native package.
 Tsguard's secrets and SAST gates scan the project root even when `--dirs` narrows
 other gates, so a restricted analysis scope cannot hide security findings.
+
+**SAST scope and `.semgrepignore`:** the Opengrep scan covers the project root except `node_modules`, `.git` and the directories tsguard always excludes. Opengrep 1.23.0's default ignore list applies as before: a baseline that always applies (version-control metadata, `build/`, `vendor/`, `dist/`, `*.min.js`, `.env/`, `.tox/` and package-manager/virtualenv directories) and the conventional test paths (`test/`, `tests/`, `testsuite/`, `*_test.go`). A project `.semgrepignore` remains supported and follows Opengrep 2.1.0 (gitignore-like) semantics, including nested files and `!` negation. A file at the scan root or the Git root replaces the test paths (a team that wants to scan tests adds one), and it can only add exclusions on top of the baseline. In a Git monorepo, a `.semgrepignore` at the scanned subproject or at the Git root replaces the test paths for the subproject's root entries (its `tests/` stays scanned). Known limit, deferred to a follow-up (`feat/opengrep-nested-test-restoration`): when the only file is in the subproject, Opengrep 2.1.0 still skips nested test directories (`src/tests`, `foo_test.go/`) and nested `*_test.go` files; add an empty `.semgrepignore` at the Git root to scan them. Minified files (`*.min.js`) are never scanned, including at the project root (an approved reduction from 1.23.0, which scanned an explicit root file). `--exclude` and `oxguard.toml` `exclude` entries are unchanged: each matches at any depth (`/src` excludes `src` and `lib/src`, `a//b` means `a/b`, as before) and root-level files cannot be excluded; an `oxguard.toml` entry that is empty or only slashes is rejected, because it used to exclude everything below the root entries. `.gitignore` is honored from the Git root. OxGuard does not write any file into the scanned project. See the [migration report](docs/opengrep-2.1-migration.md#target-scope-and-semgrepignore) for the differences from 1.23.0.
+
 Standalone `tsguard setup` installs project dependencies and a verified SAST engine:
 
 - **Secrets** (`secretlint`): added as a npm devDependency by `tsguard setup` → lives in `node_modules`.
 - **CVEs** (PM-native `audit` + `audit-ci`): also npm devDependencies.
-- **SAST** (Opengrep): `tsguard setup` downloads a self-contained binary
-  (~50 MB) into the OS user cache under `oxguard/opengrep/<version>/<os>-<arch>/`,
-  outside the scanned project, and verifies its pinned SHA-256 digest before execution.
-  The binary bundles its own runtime (Nuitka-compiled). A missing or untrusted engine
-  blocks security checks; run `tsguard setup` to install or repair it. npm installations
-  use their package-owned engine; reinstall with optional dependencies if it is missing.
+- **SAST** (Opengrep): `tsguard setup` downloads a self-contained binary (v2.1.0: 162–176 MB on Unix; Windows downloads a 44 MB ZIP with a 205 MB executable and six runtime DLLs) into the OS user cache under `oxguard/opengrep/<version>/<os>-<arch>/`, outside the scanned project, and verifies its pinned SHA-256 digest before execution. Linux uses static binaries for both glibc and musl; Windows keeps its six pinned runtime DLLs beside the executable. A missing or untrusted engine blocks security checks; run `tsguard setup` to install or repair it. npm installations use their package-owned engine; reinstall with optional dependencies if it is missing.
 
 **Failure-policy smells — advisory:** `pyguard structure` reports broad exception handlers that silently return a fallback or exit a loop, plus repeated handler bodies. These findings also run through `audit` and `diagnose`, remain outside `check`, and never change exit code or blocking outcome. Python reports fallback/exit only for bare/`Exception`/`BaseException` handlers (including tuples), ignores `pass` because Ruff S110 covers it, and considers every handler for repetition. Empty `()` and `{}` returns count as fallback; `set()` does not. Repeated-body fingerprints use Python tokens from the handler body only, preserve identifiers and literals, and require at least 12 tokens across three handlers. Parse failures are reported as incomplete structure evidence. See [maintainability rules](docs/maintainability.md) and [metrics](docs/metrics.md).
 
@@ -283,7 +282,7 @@ pyguard and tsguard enforce the same quality goals but reach them with different
   per-function). tsguard combines the first three into a single FTA score per file and adds
   its own native cognitive comparison. See [docs/metrics.md](docs/metrics.md) for what each measures.
 
-- **Security**: pyguard runs Bandit, pip-audit and detect-secrets. Python has no implemented Opengrep `--deep` command; strict flag validation rejects it. tsguard uses Opengrep as its blocking SAST engine through a project-local binary.
+- **Security**: pyguard runs Bandit, pip-audit and detect-secrets. Python has no implemented Opengrep `--deep` command; strict flag validation rejects it. tsguard uses Opengrep as its blocking SAST engine through a verified engine in its npm package or OS user cache.
 
 - **Dead code**: pyguard uses vulture (Python AST). tsguard uses knip (TypeScript-aware,
   also catches unused deps). tsguard additionally runs jscpd for copy-paste detection.

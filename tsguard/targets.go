@@ -326,12 +326,8 @@ func runNpmAudit(r *Runner) int {
 func runOpengrep(r *Runner) int {
 	binaryPath := opengrepBinaryPath(r.root)
 
-	if packagedRuntime() == "" {
-		if err := verifyOpengrepBinary(binaryPath); err != nil {
-			return r.executionFailure("security", "tool_missing", fmt.Sprintf("Trusted Opengrep is unavailable: %v; run tsguard setup", err))
-		}
-	} else if _, err := os.Stat(binaryPath); err != nil {
-		return r.executionFailure("security", "tool_missing", "Bundled Opengrep is missing; reinstall with optional dependencies.")
+	if err := verifyOpengrepBinary(binaryPath); err != nil {
+		return r.executionFailure("security", "tool_missing", fmt.Sprintf("Trusted Opengrep is unavailable: %v; run tsguard setup or reinstall with optional dependencies", err))
 	}
 
 	// Vendor rules from the project store; fall back to p/javascript + p/typescript.
@@ -349,21 +345,33 @@ func runOpengrep(r *Runner) int {
 	if r.machine() {
 		args = append(args, "--json")
 	}
-	for _, dir := range r.excludeDirs {
-		args = append(args, "--exclude", dir)
-	}
-	// Keep security scans root-wide without asking the scanner to enumerate
-	// node_modules first. Windows pnpm junctions can stall that enumeration
-	// before Opengrep applies its --exclude filters.
-	targets, err := securityRootTargets(r.root)
+	// Exclusions, project/default ignore scope and root targets; see security_scope.go.
+	scan, err := securityScanArgs(r.root, r.excludeDirs)
 	if err != nil {
 		return r.executionFailure("security", "invalid_configuration", err.Error())
 	}
-	args = append(args, targets...)
+	if scan.empty {
+		return r.recordEmptySecurityScan()
+	}
+	args = append(args, scan.args...)
 
 	res := r.RunTool(toolSpec{gate: "security", adapter: "opengrep"}, "opengrep SAST", args...)
 	if !res.ok {
 		return 1
+	}
+	return 0
+}
+
+// recordEmptySecurityScan reports a clean security SAST result when every root
+// entry was deliberately filtered (only minified root files, which are never
+// scanned). It matches the output contract of a scan that selects no file:
+// no findings, a passing, complete gate and exit 0. Opengrep is not started.
+func (r *Runner) recordEmptySecurityScan() int {
+	if r.result != nil {
+		r.result.RecordGate("security", true, true)
+	}
+	if !r.machine() {
+		fmt.Println("  [OK]   opengrep SAST — no scannable files (only minified files at the project root)")
 	}
 	return 0
 }
@@ -374,6 +382,7 @@ func securityRootTargets(root string) ([]string, error) {
 		return nil, fmt.Errorf("Cannot enumerate security scan root: %w", err)
 	}
 	var targets []string
+	filtered := false
 	for _, entry := range entries {
 		if entry.Name() == "node_modules" || entry.Name() == ".git" {
 			continue
@@ -381,10 +390,17 @@ func securityRootTargets(root string) ([]string, error) {
 		if entry.Type()&os.ModeSymlink != 0 {
 			continue
 		}
+		// Owner-approved scope reduction: minified files are never scanned, root
+		// included. Opengrep exempts explicit root-level files from every
+		// exclusion, so the baseline "*.min.js" entry cannot cover them.
+		if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".min.js") {
+			filtered = true
+			continue
+		}
 		// Prefix paths so a root entry named --option cannot become a flag.
 		targets = append(targets, "."+string(os.PathSeparator)+entry.Name())
 	}
-	if len(targets) == 0 {
+	if len(targets) == 0 && !filtered {
 		return nil, fmt.Errorf("No project files available outside dependency directories")
 	}
 	return targets, nil
