@@ -346,7 +346,7 @@ func runOpengrep(r *Runner) int {
 		args = append(args, "--json")
 	}
 	for _, dir := range r.excludeDirs {
-		args = append(args, "--exclude", dir)
+		args = append(args, "--exclude", "**/"+dir)
 	}
 	// Keep security scans root-wide without asking the scanner to enumerate
 	// node_modules first. Windows pnpm junctions can stall that enumeration
@@ -355,6 +355,12 @@ func runOpengrep(r *Runner) int {
 	if err != nil {
 		return r.executionFailure("security", "invalid_configuration", err.Error())
 	}
+	ignoreArgs, cleanup, err := securityIgnoreSnapshot(r.root)
+	if err != nil {
+		return r.executionFailure("security", "invalid_configuration", err.Error())
+	}
+	defer cleanup()
+	args = append(args, ignoreArgs...)
 	args = append(args, targets...)
 
 	res := r.RunTool(toolSpec{gate: "security", adapter: "opengrep"}, "opengrep SAST", args...)
