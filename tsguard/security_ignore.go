@@ -193,7 +193,7 @@ func securityIgnoreSnapshot(root string) (args []string, cleanup func(), err err
 	defer func() {
 		snapshot.Close()
 		if err != nil {
-			cleanup()
+			os.Remove(snapshot.Name())
 		}
 	}()
 	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {

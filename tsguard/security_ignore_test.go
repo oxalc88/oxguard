@@ -100,3 +100,21 @@ func TestSecurityIgnoreComparisonHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSecurityIgnoreSnapshotFailureCleansUp(t *testing.T) {
+	if os.PathSeparator != '/' {
+		t.Skip("newline filename is a Unix fixture")
+	}
+	root := t.TempDir()
+	os.Mkdir(filepath.Join(root, "tests"), 0700)
+	if err := os.WriteFile(filepath.Join(root, "tests", "bad\nname.ts"), []byte("eval('x')"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := securityIgnoreSnapshot(root); err == nil {
+		t.Fatal("expected unrepresentable ignore path to fail closed")
+	}
+	files, _ := filepath.Glob(filepath.Join(root, ".oxguard-security-ignore-*"))
+	if len(files) != 0 {
+		t.Fatalf("snapshot leak on error: %v", files)
+	}
+}
