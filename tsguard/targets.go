@@ -345,23 +345,12 @@ func runOpengrep(r *Runner) int {
 	if r.machine() {
 		args = append(args, "--json")
 	}
-	for _, dir := range r.excludeDirs {
-		args = append(args, "--exclude", "**/"+dir)
-	}
-	// Keep security scans root-wide without asking the scanner to enumerate
-	// node_modules first. Windows pnpm junctions can stall that enumeration
-	// before Opengrep applies its --exclude filters.
-	targets, err := securityRootTargets(r.root)
+	// Exclusions, project/default ignore scope and root targets; see security_scope.go.
+	scan, err := securityScanArgs(r.root, r.excludeDirs)
 	if err != nil {
 		return r.executionFailure("security", "invalid_configuration", err.Error())
 	}
-	ignoreArgs, cleanup, err := securityIgnoreSnapshot(r.root)
-	if err != nil {
-		return r.executionFailure("security", "invalid_configuration", err.Error())
-	}
-	defer cleanup()
-	args = append(args, ignoreArgs...)
-	args = append(args, targets...)
+	args = append(args, scan...)
 
 	res := r.RunTool(toolSpec{gate: "security", adapter: "opengrep"}, "opengrep SAST", args...)
 	if !res.ok {

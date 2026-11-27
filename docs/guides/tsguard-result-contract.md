@@ -187,4 +187,16 @@ matching review. Ambiguous or indirect-only audit paths stay blocking. Existing
 audit-ci thresholds are unchanged; this review file does not create a general
 allowlist or suppress the full package-manager audit.
 
-Opengrep 2.1.0 retains the existing scan arguments and normalized `check_id`, path, start line/column, message, severity and errors contract. `engine_kind` changes upstream from `OSS` to `Opengrep`; it is not part of the normalized result. Security policy, rule sources and blocking exits are unchanged. See the [migration comparison](../opengrep-2.1-migration.md) for fixture findings and compatibility limits.
+Opengrep 2.1.0 retains the normalized `check_id`, path, start line/column, message, severity and errors contract. `engine_kind` changes upstream from `OSS` to `Opengrep`; it is not part of the normalized result. Security policy, rule sources and blocking exits are unchanged.
+
+### Security scan scope
+
+The security gate scans the root entries of the project (never `node_modules` or `.git`) and selects files in three layers:
+
+| Layer | Source | Project `.semgrepignore` can change it? |
+|---|---|---|
+| Baseline | Version-control metadata (`.git`, `.svn`, `.hg`, `_darcs`, `CVS`), `build/`, `vendor/`, `dist/`, `*.min.js`, `.env/`, `.tox/`, `node_modules/`, `.npm/`, `.yarn/`, `.venv/`, `_opam/`, `_build/`, `_cargo/` (the Opengrep 1.23.0 default list without its test paths) | No; it can only add exclusions |
+| OxGuard exclusions | Built-in directories (`node_modules`, `dist`, `.next`, `build`, `coverage`, agent directories), `oxguard.toml` `exclude` and `--exclude` | No |
+| Test defaults | `test/`, `tests/`, `testsuite/`, `*_test.go` | Yes: any project-root `.semgrepignore`, even an empty one, replaces them |
+
+A project `.semgrepignore` remains supported and follows Opengrep 2.1.0 (gitignore-like) semantics, including nested files. OxGuard does not parse or write ignore files and passes `--project-root .` only outside Git. OxGuard exclusions starting with `/` are anchored at the scan root; other entries match at any depth; negation (`!`) is rejected as invalid configuration. An unreadable excluded directory does not abort the scan; an unreadable included path is reported by Opengrep as a scan error (`analyzer_failure`). See the [migration report](../opengrep-2.1-migration.md#target-scope-and-semgrepignore) for the measured compatibility matrix.

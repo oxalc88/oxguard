@@ -120,6 +120,7 @@ Key flags:
 tsguard check --dirs src,lib          # override scanned directories (default: . — project root)
 tsguard check --exclude docs,scripts  # exclude additional directories from all scans
                                       # node_modules, dist, .next, build, coverage are always excluded
+                                      # a leading / anchors an entry at the scan root (/src, not lib/src)
 tsguard check --max-fta-score 50      # tighten FTA complexity cap (default: 60)
 tsguard check --tail 30               # show only the last 30 lines of each tool's output
 ```
@@ -160,6 +161,9 @@ The security gate requires **no Python or global installs**. In npm installation
 tools are owned by `@oxguard/tsguard` and Opengrep ships in its native package.
 Tsguard's secrets and SAST gates scan the project root even when `--dirs` narrows
 other gates, so a restricted analysis scope cannot hide security findings.
+
+**SAST scope and `.semgrepignore`:** the Opengrep scan covers the project root except `node_modules`, `.git` and the directories tsguard always excludes. Opengrep 1.23.0's default ignore list applies as before: a baseline that always applies (version-control metadata, `build/`, `vendor/`, `dist/`, `*.min.js`, `.env/`, `.tox/` and package-manager/virtualenv directories) and the conventional test paths (`test/`, `tests/`, `testsuite/`, `*_test.go`). A project `.semgrepignore` remains supported and follows Opengrep 2.1.0 (gitignore-like) semantics, including nested files and `!` negation. It replaces the test paths, so a team that wants to scan tests can add a root file, and it can only add exclusions on top of the baseline. `--exclude` and `oxguard.toml` `exclude` entries starting with `/` are anchored at the scan root; others match at any depth. OxGuard does not write any file into the scanned project. See the [migration report](docs/opengrep-2.1-migration.md#target-scope-and-semgrepignore) for the differences from 1.23.0.
+
 Standalone `tsguard setup` installs project dependencies and a verified SAST engine:
 
 - **Secrets** (`secretlint`): added as a npm devDependency by `tsguard setup` → lives in `node_modules`.
