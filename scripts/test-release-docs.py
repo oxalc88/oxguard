@@ -45,7 +45,7 @@ class ReleaseDocumentationTest(unittest.TestCase):
 
     def test_migration_report_matrix_is_plain_text(self):
         # scripts/compare-opengrep.py --update-doc escapes hostile file names; the committed report must not hold a raw control or line-separator character.
-        text = (Path(__file__).resolve().parent.parent / "docs/opengrep-2.1-migration.md").read_text()
+        text = (Path(__file__).resolve().parent.parent / "docs/opengrep-2.1-migration.md").read_text(encoding="utf-8")
         self.assertEqual([c for c in text if unicodedata.category(c) in ("Cc", "Zl", "Zp") and c != "\n"], [])
         begin, end = text.index("<!-- matrix:start"), text.index("<!-- matrix:end -->")
         self.assertLess(begin, end)
