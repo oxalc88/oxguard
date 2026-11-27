@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -91,30 +94,35 @@ func detectGitProject(root string) (gitProject, bool) {
 	return gitProject{top: filepath.FromSlash(top)}, true
 }
 
+var repeatedSlashes = regexp.MustCompile(`/{2,}`)
+
 // opengrepExcludePattern converts one OxGuard exclusion (built-in, oxguard.toml
 // or --exclude) into an Opengrep 2.1.0 --exclude pattern with exactly the
 // effective meaning the shipped version had under 1.23.0.
 //
 // 1.23.0 turned every entry E into the wcmatch patterns "**/E" and "**/E/**",
-// so leading and trailing slashes never anchored anything: "/src" excluded
-// "src" and "lib/src", "/a.ts" excluded "src/a.ts", "a/b/" matched "x/a/b" and
-// "/a/b" the same way. The mapping strips leading and trailing slashes and
-// matches at any depth ("**/E"), and the harness verifies it against both
-// engines for each form. Other characters keep their meaning, including a
-// leading "!" or "#" (a literal in 1.23.0, escaped-by-position in a "**/" pattern
-// here) and a "./" prefix (a literal that never matched). Root-level files are
-// explicit targets and were never excludable in 1.23.0 either.
+// so slashes never anchored anything: "/src" excluded "src" and "lib/src",
+// "/a.ts" excluded "src/a.ts", "a/b", "/a/b" and "a/b/" were the same, and
+// repeated separators collapsed ("a//b", "a///b" and "/a//b/" meant "a/b").
+// The mapping strips leading and trailing slashes, collapses repeated ones and
+// matches at any depth ("**/E"); scripts/compare-opengrep.py verifies each form
+// against both engines. Other characters keep their meaning, including a
+// leading "!" or "#" and "." segments ("./x" and "a/./b" were literals that
+// matched nothing). Root-level files are explicit targets and were never
+// excludable in 1.23.0 either.
 //
-// An entry that is empty after stripping slashes excluded every file under
-// 1.23.0 (a trailing comma in --exclude was enough); that silently disabled the
-// gate, so it is rejected instead.
+// An entry that is empty after stripping slashes ("", "/", "//") made 1.23.0
+// exclude every file below the root entries (explicit root-level files were
+// still scanned), which silently disabled the gate. The --exclude flag already
+// rejects an empty element ("foo,"); oxguard.toml entries were not validated,
+// so empty and slash-only entries are now rejected as invalid configuration.
 func opengrepExcludePattern(entry string) (string, error) {
 	if runtime.GOOS == "windows" {
 		entry = strings.ReplaceAll(entry, `\`, "/")
 	}
-	trimmed := strings.Trim(entry, "/")
+	trimmed := strings.Trim(repeatedSlashes.ReplaceAllString(entry, "/"), "/")
 	if trimmed == "" {
-		return "", &scopeConfigError{fmt.Sprintf("Unsupported exclusion %q: it would exclude every file; name a path", entry)}
+		return "", &scopeConfigError{fmt.Sprintf("Unsupported exclusion %q in oxguard.toml or --exclude: it would exclude every file below the project root entries; name a path, for example \"dist\" or \"packages/generated\"", entry)}
 	}
 	if strings.HasPrefix(trimmed, "**/") {
 		return trimmed, nil
@@ -208,10 +216,19 @@ func sameDir(a, b string) bool {
 // platform, so behavior does not differ by OS.
 const securityExtraTargetBytes = 16000
 
-// listSelectedFiles asks Opengrep which files it selects for args. It is a
-// variable so tests can replace the engine.
+// securityListPattern is a generic-language pattern no file is expected to
+// contain. The listing scan reads only paths.scanned; matches are ignored.
+const securityListPattern = "OXGUARD_TARGET_LISTING_NEVER_MATCHES_2f9c1d"
+
+// listSelectedFiles asks Opengrep which files it selects for args. The answer
+// is the JSON "paths.scanned" array of a scan with a language-agnostic pattern,
+// not the newline-separated --x-ls output: JSON strings are an unambiguous
+// serialization, so file names holding newlines, carriage returns, U+0085,
+// U+2028, quotes or spaces round-trip exactly and cannot forge another path. It
+// is a variable so tests can replace the engine.
 var listSelectedFiles = func(engine, root string, args []string) ([]string, error) {
-	cmd := exec.Command(engine, append([]string{"scan", "--x-ls", "--quiet"}, args...)...) //nolint:gosec
+	query := append([]string{"scan", "--json", "--quiet", "--lang", "generic", "--pattern", securityListPattern}, args...)
+	cmd := exec.Command(engine, query...) //nolint:gosec
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "OPENGREP_ENABLE_VERSION_CHECK=false")
 	var stdout, stderr bytes.Buffer
@@ -219,17 +236,28 @@ var listSelectedFiles = func(engine, root string, args []string) ([]string, erro
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("Opengrep could not list scan targets: %v: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	var files []string
-	for _, line := range strings.Split(stdout.String(), "\n") {
-		if line = strings.TrimRight(line, "\r"); line != "" {
-			files = append(files, filepath.ToSlash(line))
-		}
+	var report struct {
+		Paths struct {
+			Scanned []string `json:"scanned"`
+		} `json:"paths"`
+		Errors []json.RawMessage `json:"errors"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		return nil, fmt.Errorf("Opengrep target listing was not valid JSON: %v", err)
+	}
+	if len(report.Errors) > 0 {
+		return nil, fmt.Errorf("Opengrep reported %d error(s) while listing scan targets; the listing may be incomplete: %s", len(report.Errors), report.Errors[0])
+	}
+	files := make([]string, 0, len(report.Paths.Scanned))
+	for _, file := range report.Paths.Scanned {
+		files = append(files, filepath.ToSlash(file))
 	}
 	return files, nil
 }
 
 // gitIgnoredPaths returns the subset of paths that .gitignore rules exclude.
 // check-ignore reports no tracked file, matching Opengrep's own Git handling.
+// Paths travel NUL-separated both ways, so any file name is safe.
 var gitIgnoredPaths = func(root string, paths []string) (map[string]bool, error) {
 	ignored := map[string]bool{}
 	if len(paths) == 0 {
@@ -251,6 +279,83 @@ var gitIgnoredPaths = func(root string, paths []string) (map[string]bool, error)
 	return ignored, nil
 }
 
+// builtinTestPath is one entry of Opengrep 2.1.0's built-in "Common test paths"
+// (src/targeting/Semgrepignore.ml, default_semgrepignore_for_semgrep_scan):
+// test/, tests/, testsuite/ and *_test.go. A trailing slash makes an entry
+// directory-only; without it the entry matches files and directories alike, so
+// "*_test.go" also hides a directory named foo_test.go. Names are compared
+// case-sensitively, as Opengrep does (a directory "Tests" or "TEST" is not
+// hidden natively and is not restored). The list is securityReplaceableDefaults
+// itself, which the harness compares with the pinned engine's embedded copy.
+type builtinTestPath struct {
+	glob    string
+	dirOnly bool
+}
+
+func builtinTestPaths() []builtinTestPath {
+	var patterns []builtinTestPath
+	for _, entry := range securityReplaceableDefaults {
+		patterns = append(patterns, builtinTestPath{glob: strings.TrimSuffix(entry, "/"), dirOnly: strings.HasSuffix(entry, "/")})
+	}
+	return patterns
+}
+
+// hiddenByBuiltins reports whether a path segment matches a built-in test path.
+// path.Match is a single-segment glob with the same "*" meaning as gitignore.
+func hiddenByBuiltins(name string, isDir bool) bool {
+	for _, pattern := range builtinTestPaths() {
+		if pattern.dirOnly && !isDir {
+			continue
+		}
+		if ok, err := path.Match(pattern.glob, name); err == nil && ok {
+			return true
+		}
+	}
+	return false
+}
+
+// nestedTarget validates one derived target against the scan root before it can
+// be passed to Opengrep: a clean relative path with no "." or ".." segment, no
+// NUL, no absolute or volume form, that exists below the root with the
+// expected type, is not a symlink and does not reach outside the root through
+// a symlinked ancestor. A failure is fatal; nothing is guessed.
+func nestedTarget(root, rel string, wantDir bool) (string, error) {
+	fail := func(reason string) (string, error) {
+		return "", &scopeToolError{fmt.Errorf("Refusing nested test target %q: %s", rel, reason)}
+	}
+	if rel == "" || strings.ContainsRune(rel, 0) {
+		return fail("empty or NUL-containing path")
+	}
+	if strings.HasPrefix(rel, "/") || filepath.IsAbs(filepath.FromSlash(rel)) || filepath.VolumeName(filepath.FromSlash(rel)) != "" {
+		return fail("absolute path")
+	}
+	for _, segment := range strings.Split(rel, "/") {
+		if segment == "" || segment == "." || segment == ".." {
+			return fail("path is not a clean relative path")
+		}
+	}
+	local := filepath.FromSlash(rel)
+	info, err := os.Lstat(filepath.Join(root, local))
+	if err != nil {
+		return fail("the listed path no longer exists")
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fail("it is a symbolic link")
+	}
+	if wantDir != info.IsDir() || (!wantDir && !info.Mode().IsRegular()) {
+		return fail("unexpected file type")
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return fail("the scan root cannot be resolved")
+	}
+	realParent, err := filepath.EvalSymlinks(filepath.Dir(filepath.Join(root, local)))
+	if err != nil || (realParent != realRoot && !strings.HasPrefix(realParent, realRoot+string(os.PathSeparator))) {
+		return fail("it resolves outside the scan root")
+	}
+	return "." + string(os.PathSeparator) + local, nil
+}
+
 // nestedTestTargets lists explicit targets that restore 1.23.0 behavior for
 // nested test paths when a Git subproject's own .semgrepignore replaced the
 // defaults. Opengrep decides what is selected: it lists the files it would scan
@@ -258,19 +363,22 @@ var gitIgnoredPaths = func(root string, paths []string) (map[string]bool, error)
 // the scan-root file replaces them) honoring every .semgrepignore and every
 // exclusion; OxGuard only reads the paths.
 //
-//   - A directory named test, tests or testsuite below a root entry becomes an
+//   - A directory below a root entry whose name matches a built-in test path
+//     (test, tests, testsuite, and any name matching *_test.go) becomes an
 //     explicit directory target. Opengrep does not apply its built-ins to the
 //     target itself, still applies .gitignore, project ignore files and every
-//     exclusion inside it, and skips test directories nested in it natively, so
-//     targets never overlap and nothing is reported twice.
-//   - A nested *_test.go file becomes an explicit file target, which bypasses
-//     all filters, so Git first drops files .gitignore excludes (the listing
-//     already applied .semgrepignore and the exclusions).
+//     exclusion inside it, and skips matching directories nested in it
+//     natively, so targets never overlap and nothing is reported twice.
+//   - A nested file matching *_test.go becomes an explicit file target, which
+//     bypasses all filters, so Git first drops files .gitignore excludes (the
+//     listing already applied .semgrepignore and the exclusions).
 //
-// node_modules is never listed: the listing covers only the root targets, and
-// excluded paths are pruned by Opengrep. Symlinked directories are not
-// followed. The result is bounded by securityExtraTargetBytes; a larger set
-// fails closed with a pointer to the workaround.
+// Every target is validated by nestedTarget and is a listed path or a
+// directory prefix of one. node_modules is never listed: the listing covers
+// only the root targets, and excluded paths are pruned by Opengrep. Symlinked
+// directories are not followed. The result is bounded by
+// securityExtraTargetBytes; a larger set fails closed with a pointer to the
+// workaround.
 func nestedTestTargets(engine, root string, scopeArgs, rootTargets []string) ([]string, error) {
 	query := append([]string{"--project-root", "."}, scopeArgs...)
 	listed, err := listSelectedFiles(engine, root, append(query, rootTargets...))
@@ -278,16 +386,18 @@ func nestedTestTargets(engine, root string, scopeArgs, rootTargets []string) ([]
 		return nil, &scopeToolError{err}
 	}
 	dirs, files := map[string]bool{}, map[string]bool{}
-	for _, path := range listed {
-		segments := strings.Split(path, "/")
+	for _, listedPath := range listed {
+		if strings.ContainsRune(listedPath, 0) {
+			return nil, &scopeToolError{fmt.Errorf("Opengrep listed a path with a NUL byte, which no file name can hold: %q", listedPath)}
+		}
+		segments := strings.Split(listedPath, "/")
 		for i := 1; i < len(segments)-1; i++ {
-			switch segments[i] {
-			case "test", "tests", "testsuite":
+			if hiddenByBuiltins(segments[i], true) {
 				dirs[strings.Join(segments[:i+1], "/")] = true
 			}
 		}
-		if len(segments) >= 2 && strings.HasSuffix(segments[len(segments)-1], "_test.go") {
-			files[path] = true
+		if len(segments) >= 2 && hiddenByBuiltins(segments[len(segments)-1], false) {
+			files[listedPath] = true
 		}
 	}
 	candidates := sortedKeys(files)
@@ -297,12 +407,21 @@ func nestedTestTargets(engine, root string, scopeArgs, rootTargets []string) ([]
 	}
 	var targets []string
 	for _, dir := range sortedKeys(dirs) {
-		targets = append(targets, "."+string(os.PathSeparator)+filepath.FromSlash(dir))
+		target, err := nestedTarget(root, dir, true)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, target)
 	}
 	for _, file := range candidates {
-		if !ignored[file] {
-			targets = append(targets, "."+string(os.PathSeparator)+filepath.FromSlash(file))
+		if ignored[file] {
+			continue
 		}
+		target, err := nestedTarget(root, file, false)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, target)
 	}
 	size := 0
 	for _, target := range targets {

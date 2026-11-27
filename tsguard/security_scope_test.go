@@ -84,6 +84,12 @@ func TestOpengrepExcludePattern(t *testing.T) {
 		"!keep":         "**/!keep",
 		"#note":         "**/#note",
 		"/a b/ü":        "**/a b/ü",
+		"a//b":          "**/a/b",
+		"/a//b/":        "**/a/b",
+		"a///b":         "**/a/b",
+		"a//b//":        "**/a/b",
+		"//a//b":        "**/a/b",
+		"a/./b":         "**/a/./b",
 	}
 	for entry, want := range cases {
 		got, err := opengrepExcludePattern(entry)
@@ -371,38 +377,59 @@ func TestRecordEmptySecurityScanIsCleanAndComplete(t *testing.T) {
 	}
 }
 
+func stubNestedEngine(t *testing.T, listed []string, ignored map[string]bool) *[]string {
+	t.Helper()
+	oldList, oldIgnored := listSelectedFiles, gitIgnoredPaths
+	t.Cleanup(func() { listSelectedFiles, gitIgnoredPaths = oldList, oldIgnored })
+	query := new([]string)
+	listSelectedFiles = func(engine, root string, args []string) ([]string, error) {
+		*query = args
+		return listed, nil
+	}
+	gitIgnoredPaths = func(root string, paths []string) (map[string]bool, error) { return ignored, nil }
+	return query
+}
+
+// makeFiles creates each slash-separated path (file names may hold any byte but / and NUL).
+func makeFiles(t *testing.T, root string, paths ...string) {
+	t.Helper()
+	for _, rel := range paths {
+		full := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte("eval('x')"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func nestedPath(rel string) string { return "." + string(os.PathSeparator) + filepath.FromSlash(rel) }
+
 // nestedTestTargets: Opengrep lists the selected files, OxGuard derives targets.
 func TestNestedTestTargets(t *testing.T) {
-	defer func(l func(string, string, []string) ([]string, error), g func(string, []string) (map[string]bool, error)) {
-		listSelectedFiles, gitIgnoredPaths = l, g
-	}(listSelectedFiles, gitIgnoredPaths)
-	var query []string
-	listSelectedFiles = func(engine, root string, args []string) ([]string, error) {
-		query = args
-		return []string{
-			"a_test.go",   // root-level file: already an explicit target
-			"tests/t0.ts", // root entry itself: already a target
-			"src/a.ts",
-			"src/tests/t.ts",
-			"src/tests/deep/tests/n.ts", // nested inside a nested test directory
-			"src/tests/c_test.go",
-			"src/a_test.go",
-			"src/ignored_test.go",
-			"lib/pkg/testsuite/s.ts",
-			"lib/pkg/test/u.ts",
-			"src/tests/b/c.ts",
-			"src/contest/x.ts", // not a test directory name
-		}, nil
+	root := t.TempDir()
+	listed := []string{
+		"a_test.go",   // root-level file: already an explicit target
+		"tests/t0.ts", // root entry itself: already a target
+		"src/a.ts", "src/tests/t.ts",
+		"src/tests/deep/tests/n.ts", // nested inside a nested test directory
+		"src/tests/c_test.go", "src/a_test.go", "src/ignored_test.go",
+		"lib/pkg/testsuite/s.ts", "lib/pkg/test/u.ts", "src/tests/b/c.ts",
+		"src/contest/x.ts",                                           // not a test directory name
+		"src/foo_test.go/a.ts", "src/foo_test.go/inner_test.go/b.ts", // directories matching *_test.go
+		"src/Tests/c.ts", "src/TEST/d.ts", "src/tests2/e.ts", // other case or name: not built-in test paths
 	}
-	gitIgnoredPaths = func(root string, paths []string) (map[string]bool, error) {
-		return map[string]bool{"src/ignored_test.go": true}, nil
-	}
-	targets, err := nestedTestTargets("engine", t.TempDir(), []string{"--exclude", "**/dist"}, []string{"./src", "./lib", "./tests"})
+	makeFiles(t, root, listed...)
+	query := stubNestedEngine(t, listed, map[string]bool{"src/ignored_test.go": true})
+	targets, err := nestedTestTargets("engine", root, []string{"--exclude", "**/dist"}, []string{"./src", "./lib", "./tests"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := func(s string) string { return "." + string(os.PathSeparator) + filepath.FromSlash(s) }
-	want := []string{p("lib/pkg/test"), p("lib/pkg/testsuite"), p("src/tests"), p("src/tests/deep/tests"), p("src/a_test.go"), p("src/tests/c_test.go")}
+	var want []string
+	for _, rel := range []string{"lib/pkg/test", "lib/pkg/testsuite", "src/foo_test.go", "src/foo_test.go/inner_test.go", "src/tests", "src/tests/deep/tests", "src/a_test.go", "src/tests/c_test.go"} {
+		want = append(want, nestedPath(rel))
+	}
 	if !reflect.DeepEqual(targets, want) {
 		t.Fatalf("targets = %q, want %q", targets, want)
 	}
@@ -414,32 +441,147 @@ func TestNestedTestTargets(t *testing.T) {
 		seen[target] = true
 	}
 	// The query makes the scan root the project, passes the exclusions and lists only root entries.
-	wantQuery := []string{"--project-root", ".", "--exclude", "**/dist", "./src", "./lib", "./tests"}
-	if !reflect.DeepEqual(query, wantQuery) {
-		t.Fatalf("query = %q, want %q", query, wantQuery)
+	if wantQuery := []string{"--project-root", ".", "--exclude", "**/dist", "./src", "./lib", "./tests"}; !reflect.DeepEqual(*query, wantQuery) {
+		t.Fatalf("query = %q, want %q", *query, wantQuery)
+	}
+}
+
+// The derivation uses exactly the built-in list: directories named like *_test.go
+// are included, other case variants and near names are not.
+func TestBuiltinTestPathMatching(t *testing.T) {
+	cases := []struct {
+		name  string
+		isDir bool
+		want  bool
+	}{
+		{"test", true, true}, {"tests", true, true}, {"testsuite", true, true}, {"foo_test.go", true, true}, {"_test.go", true, true},
+		{"a_test.go", false, true}, {"test", false, false}, {"tests", false, false}, {"testsuite", false, false},
+		{"Tests", true, false}, {"TEST", true, false}, {"tests2", true, false}, {"contest", true, false}, {"a_test.go.bak", false, false}, {"a_test.GO", false, false},
+		{"foo_test.go", true, true},
+	}
+	for _, c := range cases {
+		if got := hiddenByBuiltins(c.name, c.isDir); got != c.want {
+			t.Errorf("hiddenByBuiltins(%q, dir=%v) = %v, want %v", c.name, c.isDir, got, c.want)
+		}
+	}
+}
+
+// Hostile file names: a newline, carriage return, U+0085 or U+2028 inside a name is one path, never two
+// (JSON serialization), and each such target is passed intact. Names starting with "-" get a "./" prefix.
+func TestNestedTestTargetsAdversarialNames(t *testing.T) {
+	if os.PathSeparator != '/' {
+		t.Skip("control characters are not valid in Windows file names")
+	}
+	root := t.TempDir()
+	names := []string{
+		"src/decoy\nsrc/hidden_test.go", // forged second path inside one name
+		"src/cr\r/tests/m.ts", "src/u\u0085y/tests/l.ts", "src/u\u2028x/tests/k.ts",
+		"src/-tests/f.ts", "src/--x/tests/g.ts", "src/a b \"q\" 's'/tests/h.ts", "src/a*b[1]/tests/j.ts",
+		"src/x\n../outside_test.go", // a name that merely looks like a parent reference
+		"src/hidden_test.go",        // the clean, ignored file the forged path imitates is not in the listing
+	}
+	makeFiles(t, root, names[:len(names)-1]...)
+	listed := names[:len(names)-1]
+	stubNestedEngine(t, listed, map[string]bool{})
+	targets, err := nestedTestTargets("engine", root, nil, []string{"./src"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range targets {
+		if target == nestedPath("src/hidden_test.go") || strings.HasPrefix(target, ".."+string(os.PathSeparator)) || !strings.HasPrefix(target, "./") {
+			t.Fatalf("unsafe or forged target %q", target)
+		}
+		if _, err := os.Lstat(filepath.Join(root, target)); err != nil {
+			t.Fatalf("target %q does not exist: %v", target, err)
+		}
+	}
+	want := map[string]bool{}
+	for _, rel := range []string{"src/decoy\nsrc/hidden_test.go", "src/x\n../outside_test.go", "src/cr\r/tests", "src/u\u0085y/tests", "src/u\u2028x/tests",
+		"src/--x/tests", "src/a b \"q\" 's'/tests", "src/a*b[1]/tests"} {
+		want[nestedPath(rel)] = true
+	}
+	if len(targets) != len(want) {
+		t.Fatalf("targets = %q", targets)
+	}
+	for _, target := range targets {
+		if !want[target] {
+			t.Fatalf("unexpected target %q in %q", target, targets)
+		}
+	}
+}
+
+// Containment: a derived target must be a clean relative path to a real file or
+// directory below the scan root. Nothing is guessed and the path is quoted in the error.
+func TestNestedTargetContainment(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	makeFiles(t, root, "src/tests/t.ts", "src/a_test.go")
+	makeFiles(t, outside, "o/tests/x.ts", "z_test.go")
+	if os.Symlink(outside, filepath.Join(root, "src", "link")) == nil {
+		// A symlinked directory in a listing (Opengrep never emits one) must not be followed out of the root.
+		if _, err := nestedTarget(root, "src/link/o/tests", true); err == nil {
+			t.Error("symlinked ancestor escaped the scan root")
+		}
+		if _, err := nestedTarget(root, "src/link", true); err == nil {
+			t.Error("symlinked directory accepted as a target")
+		}
+	}
+	if os.Symlink(filepath.Join(outside, "z_test.go"), filepath.Join(root, "src", "evil_test.go")) == nil {
+		if _, err := nestedTarget(root, "src/evil_test.go", false); err == nil {
+			t.Error("symlinked file accepted as a target")
+		}
+	}
+	for _, rel := range []string{"", "../outside/tests", "src/../../x", "/etc/tests", "src//tests", "src/./tests", "src/nope/tests", "src/tests\x00", "C:/tests"} {
+		if _, err := nestedTarget(root, rel, true); err == nil {
+			t.Errorf("%q accepted", rel)
+		}
+	}
+	if _, err := nestedTarget(root, "src/a_test.go", true); err == nil {
+		t.Error("a file accepted as a directory target")
+	}
+	if _, err := nestedTarget(root, "src/tests", false); err == nil {
+		t.Error("a directory accepted as a file target")
+	}
+	var tool *scopeToolError
+	_, err := nestedTarget(root, "src/bad\n../x", true)
+	if !errors.As(err, &tool) || strings.Contains(err.Error(), "\n") {
+		t.Errorf("error must be a quoted tool error: %v", err)
+	}
+	if got, err := nestedTarget(root, "src/tests", true); err != nil || got != nestedPath("src/tests") {
+		t.Errorf("valid target = %q, %v", got, err)
 	}
 }
 
 func TestNestedTestTargetsFailClosed(t *testing.T) {
-	defer func(l func(string, string, []string) ([]string, error), g func(string, []string) (map[string]bool, error)) {
-		listSelectedFiles, gitIgnoredPaths = l, g
-	}(listSelectedFiles, gitIgnoredPaths)
+	root := t.TempDir()
+	oldList, oldIgnored := listSelectedFiles, gitIgnoredPaths
+	defer func() { listSelectedFiles, gitIgnoredPaths = oldList, oldIgnored }()
 	gitIgnoredPaths = func(string, []string) (map[string]bool, error) { return map[string]bool{}, nil }
 	listSelectedFiles = func(string, string, []string) ([]string, error) { return nil, errors.New("engine failed") }
-	_, err := nestedTestTargets("engine", t.TempDir(), nil, []string{"./src"})
 	var tool *scopeToolError
-	if !errors.As(err, &tool) {
+	if _, err := nestedTestTargets("engine", root, nil, []string{"./src"}); !errors.As(err, &tool) {
 		t.Fatalf("listing failure must be a tool error: %v", err)
 	}
-	// Too many targets for a bounded argv.
-	listSelectedFiles = func(string, string, []string) ([]string, error) {
-		var files []string
-		for i := 0; i < 1500; i++ {
-			files = append(files, fmt.Sprintf("src/package-%04d/tests/a.ts", i))
+	// A listed path that does not exist (or tries to escape) fails the whole scan.
+	for _, bad := range []string{"src/tests/missing.ts", "../x/tests/a.ts", "/abs/tests/a.ts"} {
+		listSelectedFiles = func(string, string, []string) ([]string, error) { return []string{"src/ok.ts", bad}, nil }
+		if _, err := nestedTestTargets("engine", root, nil, []string{"./src"}); err == nil && !strings.Contains(bad, "missing") {
+			t.Errorf("%q accepted", bad)
 		}
-		return files, nil
 	}
-	_, err = nestedTestTargets("engine", t.TempDir(), nil, []string{"./src"})
+	// A NUL byte in a listed path cannot be a file name.
+	listSelectedFiles = func(string, string, []string) ([]string, error) { return []string{"src/tests\x00/a.ts"}, nil }
+	if _, err := nestedTestTargets("engine", root, nil, []string{"./src"}); err == nil {
+		t.Error("NUL in a listed path accepted")
+	}
+	// Too many targets for a bounded argv.
+	var many []string
+	for i := 0; i < 1500; i++ {
+		many = append(many, fmt.Sprintf("src/package-%04d/tests/a.ts", i))
+	}
+	makeFiles(t, root, many...)
+	listSelectedFiles = func(string, string, []string) ([]string, error) { return many, nil }
+	_, err := nestedTestTargets("engine", root, nil, []string{"./src"})
 	var config *scopeConfigError
 	if !errors.As(err, &config) || !strings.Contains(err.Error(), "empty .semgrepignore at the Git root") {
 		t.Fatalf("an oversized target list must fail closed with the workaround: %v", err)
@@ -481,10 +623,13 @@ func TestSecurityScopeComparisonHelper(t *testing.T) {
 		excludes = append(excludes, more...)
 	}
 	scan, err := securityScanArgs(root, excludes, os.Getenv("OXGUARD_COMPARE_ENGINE"))
+	result := map[string]any{"args": scan.args, "empty": scan.empty,
+		"layers": map[string]any{"baseline": securityBaselineExcludes, "replaceable": securityReplaceableDefaults}}
 	if err != nil {
-		t.Fatal(err)
+		// A rejected configuration or a fail-closed scope is part of the measured behavior, not a test failure.
+		result["error"] = err.Error()
 	}
-	data, _ := json.Marshal(map[string]any{"args": scan.args, "empty": scan.empty})
+	data, _ := json.Marshal(result)
 	if err := os.WriteFile(os.Getenv("OXGUARD_COMPARE_ARGS"), data, 0o600); err != nil {
 		t.Fatal(err)
 	}

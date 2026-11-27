@@ -58,7 +58,7 @@ ARTIFACTS = {"src/x.min.js": EVAL, "vendor/v.ts": EVAL, "build/b.ts": EVAL, "src
              ".tox/t.ts": EVAL, ".env/e.ts": EVAL, "_build/b.ts": EVAL, "node_modules/m/i.ts": EVAL, "dist/d.ts": EVAL}
 
 EXCLUDE_TREE = {name: EVAL for name in ["a.ts", "x.ts", "src/a.ts", "src/x.ts", "lib/src/y.ts", "lib/a.ts", "x/f.ts", "src/x/f.ts", "a/b/c.ts", "src/a/b/c.ts",
-                                        "lib/a/b/c.ts", "xx/f.ts", "src/xx/f.ts", "deep/er/x/g.ts", "x2/x/h.ts", "keep/s.snap.ts"]}
+                                        "lib/a/b/c.ts", "xx/f.ts", "src/xx/f.ts", "deep/er/x/g.ts", "x2/x/h.ts", "keep/s.snap.ts", "src/a/b/b.ts", "a/c/b.ts", "b/a.ts"]}
 
 # Scan root of a monorepo subproject whose only ignore file is its own: nested test paths must be restored.
 NESTED = {name: EVAL for name in ["src/a.ts", "tests/t0.ts", "src/tests/t.ts", "src/tests/deep/tests/n.ts", "src/test/u.ts", "src/testsuite/s.ts", "lib/pkg/testsuite/s.ts",
@@ -116,7 +116,12 @@ CASES = [
     *[case("exclude.map." + name, "parity", dict(EXCLUDE_TREE), exclude=[entry], note=f"`{entry}` excludes the same files in both engines")
       for name, entry in [("x", "x"), ("slash-x", "/x"), ("x-slash", "x/"), ("slash-x-slash", "/x/"), ("a-b", "a/b"), ("slash-a-b", "/a/b"), ("slash-a-b-slash", "/a/b/"),
                           ("slash-src", "/src"), ("src-a-ts", "src/a.ts"), ("slash-a-ts", "/a.ts"), ("slash-lib-src", "/lib/src"), ("glob", "*.snap.ts"),
-                          ("slash-glob", "/*.ts"), ("bang", "!a.ts"), ("dot-slash", "./x"), ("double-star", "**/x"), ("children", "x/*")]],
+                          ("slash-glob", "/*.ts"), ("bang", "!a.ts"), ("dot-slash", "./x"), ("double-star", "**/x"), ("children", "x/*"),
+                          ("double-slash", "a//b"), ("slash-double-slash", "/a//b/"), ("triple-slash", "a///b"), ("dot-a", "./a"), ("a-dot-b", "a/./b"),
+                          ("trailing-double", "a//b//"), ("leading-double", "//a//b")]],
+    *[case("approved.empty-exclusion." + name, "matrix", dict(EXCLUDE_TREE), exclude=[entry], expect="approved-rejection", label_check="approved-rejection",
+          note=f"owner-approved hardening: `{entry}` in oxguard.toml excluded every file below the root entries under 1.23.0 (explicit root files stayed scanned); it is rejected with an actionable error")
+      for name, entry in [("empty", ""), ("slash", "/"), ("double-slash", "//")]],
     case("exclude.map.git-subproject-slash-src", "parity", dict(EXCLUDE_TREE), exclude=["/src", "/x"], git_subdir="packages/app",
          note="the same mapping below a Git root: no Git-relative translation"),
     case("exclude.map.root-file-not-excludable", "parity", dict(EXCLUDE_TREE), exclude=["/a.ts", "a.ts"], must_scan=["a.ts"],
@@ -134,8 +139,16 @@ CASES = [
          must_skip=["vendor/v.ts", "src/x.min.js"], must_scan=["tests/a.ts"],
          note="negations cannot re-include the baseline layer"),
     # Deliberate differences outside .semgrepignore.
-    case("exclude.unreadable-excluded-dir", "matrix", tree({"secret/inner/s.ts": EVAL}), exclude=["/secret"], unreadable=["secret"],
-         expect="different", note="1.23.0 refuses to start on an unreadable root entry; 2.1.0 skips the excluded directory"),
+    # OWNER-APPROVED difference: an unreadable EXCLUDED directory. 1.23.0 refuses to start (exit 2) because the root entry cannot be read, even
+    # when it is excluded; 2.1.0 skips it. An unreadable INCLUDED directory must keep failing in both engines (rows below).
+    case("approved.unreadable-excluded-dir", "matrix", tree({"secret/inner/s.ts": EVAL}), exclude=["/secret"], unreadable=["secret"], label_check="approved-tolerance",
+         expect="approved-tolerance", must_skip=["secret/inner/s.ts"], note="owner-approved: 1.23.0 refuses to start on an unreadable root entry even when excluded (exit 2); 2.1.0 skips the excluded directory and scans the rest"),
+    case("unreadable.included-root-entry", "matrix", tree({"secret/inner/s.ts": EVAL}), unreadable=["secret"], label_check="both-fail", expect="both-fail",
+         note="an unreadable root entry that is NOT excluded keeps failing: 1.23.0 exits 2, 2.1.0 reports a scan error (OxGuard: analyzer_failure)"),
+    case("unreadable.included-nested-dir", "matrix", tree({"src/locked/l.ts": EVAL}), unreadable=["src/locked"], expect="identical", must_skip=["src/locked/l.ts"],
+         note="unchanged: an unreadable directory below a root entry has never failed either engine (it is skipped silently in both); only an unreadable root entry fails"),
+    case("unreadable.excluded-nested-dir", "matrix", tree({"src/locked/l.ts": EVAL}), exclude=["locked"], unreadable=["src/locked"], expect="identical",
+         must_skip=["src/locked/l.ts"], note="an unreadable directory below a root entry that IS excluded does not fail either engine"),
     # a. a root .semgrepignore replaces the defaults (both engines).
     case("ignore.root-replaces-defaults", "matrix", tree({".semgrepignore": "scripts/\n"}), expect="identical", must_scan=["tests/a.ts"],
          note="the test defaults are replaced by the project file in both engines"),
@@ -178,6 +191,48 @@ CASES = [
     case("nested-tests.no-duplicate-reports", "matrix", {**NESTED, "src/tests/tests/inner.ts": EVAL, "src/tests/tests/inner_test.go": EVAL}, git_subdir="packages/app", rule="generic",
          expect="identical", must_scan=["src/tests/tests/inner.ts", "src/tests/tests/inner_test.go"], unique_findings=True,
          note="overlapping candidates are reported exactly once: Opengrep skips test directories nested in a target"),
+    # Adversarial names and hostile layouts for the explicit-target restoration (scan-root .semgrepignore only, Git subproject).
+    case("nested-tests.forged-path-newline", "matrix", {**NESTED, ".semgrepignore": "docs/\n/src/hidden_test.go\n", "src/decoy\nsrc/hidden_test.go": EVAL, "src/hidden_test.go": "export const ok = 1;\n"},
+         git_subdir="packages/app", rule="generic", expect="identical", must_scan=["src/decoy\nsrc/hidden_test.go"], must_skip=["src/hidden_test.go"],
+         note="a file named `src/decoy<LF>src/hidden_test.go` is one path: the ignored clean file it imitates stays excluded and the vulnerable file is scanned"),
+    case("nested-tests.parent-reference-in-name", "matrix", {**NESTED, "src/x\n../outside_test.go": EVAL}, git_subdir="packages/app", rule="generic", expect="identical",
+         must_scan=["src/x\n../outside_test.go"], note="a name containing `<LF>../` is a single file name inside the scan root; nothing outside is added"),
+    case("nested-tests.control-characters", "matrix", {**NESTED, "src/u\u0085y/tests/l.ts": EVAL, "src/u\u2028x/tests/k.ts": EVAL, "src/u\u2029p/tests/k2.ts": EVAL,
+                                                       "src/tab\tz/tests/t.ts": EVAL, "src/esc\x1bz/tests/e.ts": EVAL, "src/nl\nz/tests/n.ts": EVAL, "src/vt\x0bz/tests/v.ts": EVAL},
+         git_subdir="packages/app", rule="generic", expect="identical",
+         must_scan=["src/u\u0085y/tests/l.ts", "src/u\u2028x/tests/k.ts", "src/u\u2029p/tests/k2.ts", "src/tab\tz/tests/t.ts", "src/esc\x1bz/tests/e.ts", "src/nl\nz/tests/n.ts", "src/vt\x0bz/tests/v.ts"],
+         note="TAB, ESC, VT, LF, U+0085, U+2028 and U+2029 in directory names are one path each and are scanned"),
+    case("nested-tests.carriage-return-name", "matrix", {**NESTED, "src/cr\r/tests/m.ts": EVAL}, git_subdir="packages/app", rule="generic", expect="more scanned",
+         must_scan=["src/cr\r/tests/m.ts"], note="1.23.0 drops any path containing a carriage return from the scan (a quirk); the candidate scans it, the safe direction"),
+    case("nested-tests.quotes-spaces-globs-dashes", "matrix", {**NESTED, "src/a b \"q\" 's'/tests/h.ts": EVAL, "src/a*b[1]?/tests/j.ts": EVAL, "src/{x,y}/tests/k.ts": EVAL, "src/--x/tests/g.ts": EVAL,
+                                                                "src/-t/tests/f.ts": EVAL, "src/$(id)/tests/d.ts": EVAL, "src/`x`/tests/b.ts": EVAL, "src/!neg/tests/n.ts": EVAL, "src/#hash/tests/h2.ts": EVAL},
+         git_subdir="packages/app", rule="generic", expect="identical",
+         must_scan=["src/a b \"q\" 's'/tests/h.ts", "src/a*b[1]?/tests/j.ts", "src/{x,y}/tests/k.ts", "src/--x/tests/g.ts", "src/-t/tests/f.ts", "src/$(id)/tests/d.ts", "src/`x`/tests/b.ts", "src/!neg/tests/n.ts", "src/#hash/tests/h2.ts"],
+         note="quotes, spaces, glob and shell metacharacters and leading dashes are passed as ./-prefixed literal targets"),
+    case("nested-tests.directory-named-test-go", "matrix", {"src/foo_test.go/a.ts": EVAL, "src/ok.ts": "export const ok = 1;\n", ".semgrepignore": ""}, git_subdir="packages/app", expect="identical",
+         must_scan=["src/foo_test.go/a.ts"], note="a directory named like the *_test.go built-in is hidden natively and is restored (empty subproject .semgrepignore)"),
+    case("nested-tests.directory-named-test-go-deep", "matrix", {**NESTED, "src/foo_test.go/inner_test.go/a.ts": EVAL, "src/foo_test.go/x_test.go": EVAL, "lib/b_test.go/tests/c.ts": EVAL},
+         git_subdir="packages/app", rule="generic", expect="identical", unique_findings=True,
+         must_scan=["src/foo_test.go/inner_test.go/a.ts", "src/foo_test.go/x_test.go", "lib/b_test.go/tests/c.ts"],
+         note="directories matching *_test.go, nested inside each other and holding test files and test directories, are scanned once"),
+    case("nested-tests.case-variants", "matrix", {**NESTED, "src/Tests/a.ts": EVAL, "src/TEST/b.ts": EVAL, "src/TestSuite/c.ts": EVAL, "src/a_TEST.go": EVAL, "src/b_test.GO": EVAL},
+         git_subdir="packages/app", rule="generic", expect="identical", must_scan=["src/Tests/a.ts", "src/TEST/b.ts", "src/TestSuite/c.ts", "src/a_TEST.go", "src/b_test.GO"],
+         note="Opengrep's built-ins are case-sensitive: other spellings are never hidden and never restored"),
+    case("nested-tests.symlinked-test-directory", "matrix", {**NESTED}, git_subdir="packages/app", rule="generic", expect="identical", outside_links=["src/tests/linked", "src/test2/tests"],
+         must_skip=["src/tests/linked/o.ts", "src/test2/tests/o.ts"], note="a symlinked directory is never followed out of the scan root, and a symlink named tests is not a target"),
+    case("nested-tests.ignore-depths", "matrix", {**NESTED, ".semgrepignore": "docs/\nig/\n/src/b/tests/private/\n", "src/a/tests/x.ts": EVAL, "src/gi/tests/g.ts": EVAL, "src/ig/b/tests/i.ts": EVAL,
+                                                   "src/b/tests/private/p.ts": EVAL, "src/b/tests/public/q.ts": EVAL, "src/c/d/e/tests/ok.ts": EVAL, "src/c/d/gi/tests/g2.ts": EVAL,
+                                                   "../../.gitignore": "gi/\n"},
+         git_subdir="packages/app", rule="generic", expect="identical", must_scan=["src/a/tests/x.ts", "src/b/tests/public/q.ts", "src/c/d/e/tests/ok.ts"],
+         must_skip=["src/gi/tests/g.ts", "src/ig/b/tests/i.ts", "src/b/tests/private/p.ts", "src/c/d/gi/tests/g2.ts"],
+         note="test directories ignored by .gitignore or the project .semgrepignore at different depths, inside or around a test directory, stay excluded"),
+    case("nested-tests.baseline-at-depths", "matrix", {**NESTED, "src/vendor/tests/v.ts": EVAL, "src/a/node_modules/tests/n.ts": EVAL, "src/b/dist/tests/d.ts": EVAL, "src/c/tests/vendor/tests/w.ts": EVAL,
+                                                       "src/d/x.min.js": EVAL},
+         git_subdir="packages/app", rule="generic", expect="approved-reduction", approved_paths=["src/vendor/tests/v.ts", "src/c/tests/vendor/tests/w.ts", "src/d/x.min.js"],
+         must_skip=["src/vendor/tests/v.ts", "src/a/node_modules/tests/n.ts", "src/b/dist/tests/d.ts", "src/c/tests/vendor/tests/w.ts", "src/d/x.min.js"],
+         note="baseline entries (vendor, node_modules, dist, minified files) exclude test directories at any depth around or inside them"),
+    case("nested-tests.long-path", "matrix", {**NESTED, "src/" + "/".join(["segment-with-a-long-name-%02d" % i for i in range(1, 12)]) + "/tests/deep.ts": EVAL}, git_subdir="packages/app", rule="generic",
+         expect="identical", must_scan=["src/" + "/".join(["segment-with-a-long-name-%02d" % i for i in range(1, 12)]) + "/tests/deep.ts"], note="a path of about 350 characters is restored"),
     case("nested-tests.outside-git", "matrix", {**NESTED}, rule="generic", expect="identical", must_scan=["src/tests/t.ts"],
          note="outside Git --project-root already replaces the defaults: no restoration needed"),
     # b. :include
@@ -244,6 +299,12 @@ def build_project(base, spec):
         subprocess.run(["git", "init", "-q"], cwd=project, check=True)
         if spec.get("track"):
             subprocess.run(["git", "add", "-f", *spec["track"]], cwd=scan, check=True)
+    for link in spec.get("outside_links", []):
+        outside = base / (spec["id"] + "-outside-" + link.replace("/", "_"))
+        outside.mkdir()
+        (outside / "o.ts").write_text(EVAL)
+        (scan / link).parent.mkdir(parents=True, exist_ok=True)
+        os.symlink(outside, scan / link)
     if spec.get("symlinks"):
         outside = base / (spec["id"] + "-outside")
         outside.mkdir()
@@ -304,6 +365,22 @@ def classify(old, new, approved=()):
     return "different"
 
 
+def check_tolerance(old, new, spec):
+    return old["exit"] == 2 and new["exit"] in (0, 1) and not new["errors"] and not any(p in new["scanned"] for p in spec.get("must_skip", []))
+
+
+def check_rejection(old, new, spec):
+    return (new["exit"] == "rejected" and "Unsupported exclusion" in new["errors"][0][2] and old["exit"] == 1
+            and bool(old["scanned"]) and all("/" not in p for p in old["scanned"]))
+
+
+def check_both_fail(old, new, spec):
+    return old["exit"] != 0 and new["exit"] not in (0, "rejected") and bool(new["errors"])
+
+
+LABEL_CHECKS = {"approved-tolerance": check_tolerance, "approved-rejection": check_rejection, "both-fail": check_both_fail}
+
+
 def self_test():
     """The approved-reduction check must fail on drift in any contract field, not only on the selected files."""
     rule = "rules.eval"
@@ -332,6 +409,13 @@ def self_test():
     for name, candidate in drift.items():
         label = classify(old, candidate, ["x.min.js"])
         assert label not in ("approved-reduction", "identical"), f"self-test: drift in {name} was classified {label}"
+    # Label checks fail when the specific behavior they approve is absent.
+    base_report = {"exit": 1, "scanned": ["a.ts"], "findings": [], "errors": []}
+    assert not check_tolerance({**base_report, "exit": 1}, {**base_report, "exit": 1}, {}), "tolerance needs the baseline to refuse to start"
+    assert not check_tolerance({**base_report, "exit": 2}, {**base_report, "exit": 1, "errors": [["SemgrepError", "error", "m", ""]]}, {}), "tolerance must not hide a scan error"
+    assert not check_rejection({**base_report, "scanned": ["a.ts", "src/a.ts"]}, {**base_report, "exit": "rejected", "errors": [["rejected", "error", "Unsupported exclusion", ""]]}, {}), "rejection needs the old all-excluded behavior"
+    assert not check_both_fail({**base_report, "exit": 2}, {**base_report, "exit": 0}, {}), "both-fail needs the candidate to fail"
+    assert not check_both_fail({**base_report, "exit": 2}, {**base_report, "exit": 1, "errors": []}, {}), "both-fail needs a reported error"
     # Without an approved path nothing is forgiven.
     assert classify(old, good) != "approved-reduction"
 
@@ -356,6 +440,37 @@ def baseline_args(spec):
     return [item for d in DEFAULT_EXCLUDES + spec.get("exclude", []) for item in ("--exclude", d)]
 
 
+def embedded_template(data, start):
+    """The default ignore list embedded in an engine binary: the text from `start` to the last built-in entry."""
+    begin = data.find(start)
+    if begin < 0:
+        return None
+    end = data.index(b"*_test.go\n", begin) + len(b"*_test.go\n")
+    return [line.strip() for line in data[begin:end].decode().splitlines() if line.strip() and not line.startswith("#")]
+
+
+LAYER_CHECK = {"done": False}
+
+
+def check_layers(layers):
+    """The code's two layers must reproduce the default list embedded in each pinned engine, entry for entry (2.1.0: Semgrepignore.ml
+    default_semgrepignore_for_semgrep_scan; 1.23.0: templates/.semgrepignore). Run once; fails the whole comparison on drift."""
+    if LAYER_CHECK["done"]:
+        return
+    LAYER_CHECK["done"] = True
+    ours = layers["baseline"] + layers["replaceable"]
+    checked = 0
+    for (version, engine, _), marker in zip(engines, (b"# Git administrative folder or file", b"# Administrative folder or file used by popular version control systems")):
+        listed = embedded_template(engine.read_bytes(), marker)
+        if listed is None:
+            continue  # the baseline engine may not embed a readable copy
+        checked += 1
+        if listed != ours:
+            raise SystemExit(f"The built-in default list of Opengrep {version} differs from the OxGuard layers:\n  engine {listed}\n  OxGuard {ours}")
+    if not checked:
+        raise SystemExit("Could not read an embedded default ignore list from either engine")
+
+
 results, failures = [], []
 temporary_root = args.tmpdir
 if temporary_root:
@@ -372,16 +487,23 @@ with tempfile.TemporaryDirectory(prefix="oxguard-opengrep-comparison-", dir=temp
         try:
             plan, enumeration_ms = candidate_args(helper, scan, spec, temporary)
             new_args = plan["args"]
+            check_layers(plan["layers"])
             old_args = baseline_args(spec) + baseline_targets(scan)
             old_process, _ = run_engine(engines[0][1], scan, [], old_args)
-            if plan["empty"]:
+            if plan.get("error"):
+                # The production scope refused the configuration: Opengrep is not started and the gate reports invalid_configuration.
+                new = {"exit": "rejected", "scanned": [], "findings": [], "errors": [["rejected", "error", plan["error"], ""]]}
+            elif plan["empty"]:
                 # Production code does not start Opengrep when nothing is selected: a clean, complete result with exit 0.
                 new = {"exit": 0, "scanned": [], "findings": [], "errors": []}
             else:
                 new_process, _ = run_engine(engines[1][1], scan, new_args, [])
                 new = summarize(new_process)
             old = summarize(old_process)
-            row = {"case": spec["id"], "group": spec["group"], "baseline": old, "candidate": new, "classification": classify(old, new, spec.get("approved_paths", ())),
+            measured = classify(old, new, spec.get("approved_paths", ()))
+            if spec.get("label_check") and LABEL_CHECKS[spec["label_check"]](old, new, spec):
+                measured = spec["label_check"]
+            row = {"case": spec["id"], "group": spec["group"], "baseline": old, "candidate": new, "classification": measured,
                    "expected": spec["expect"], "note": spec["note"]}
             if spec.get("timed"):
                 runs = {name_: [] for name_, *_ in engines}
