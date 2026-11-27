@@ -37,15 +37,23 @@ var securityBaselineExcludes = []string{
 
 // securityReplaceableDefaults are the 1.23.0 conventional test paths. A project
 // .semgrepignore takes over these choices (some teams intentionally scan their
-// tests), so OxGuard supplies them only when the project root has no such file.
+// tests), so OxGuard supplies them only when no such file exists (see
+// securityScopeArgs for which directories count).
 var securityReplaceableDefaults = []string{
 	"test/", "tests/", "testsuite/", "*_test.go",
 }
 
 // securityIgnoreFile is the ignore file name Opengrep 2.1.0 reads natively.
-// OxGuard never parses it; it only checks whether a project-root copy exists,
-// because that decides whether the default set above applies.
+// OxGuard never parses it; it only checks whether a scan-root or project-root copy exists,
+// because that decides whether the test defaults apply.
 const securityIgnoreFile = ".semgrepignore"
+
+// hasSecurityIgnoreFile reports whether dir holds a readable .semgrepignore.
+// A directory or an unreadable entry holds no patterns and does not count.
+func hasSecurityIgnoreFile(dir string) bool {
+	_, err := os.ReadFile(filepath.Join(dir, securityIgnoreFile))
+	return err == nil
+}
 
 // gitProject describes the Git work tree that contains the scan root.
 type gitProject struct {
@@ -122,16 +130,24 @@ func opengrepExcludePattern(entry, gitPrefix string) (string, bool, error) {
 //     Opengrep otherwise treats each root target as its own project.
 //   - Inside Git, Opengrep keeps its native Git discovery, .gitignore handling
 //     and project root (the Git root).
-//   - --force-exclude makes every exclusion apply to root-level files too.
-//     Root entries are explicit targets, which Opengrep otherwise exempts from
-//     --exclude; without the flag a root minified bundle or a root file named
-//     by an OxGuard exclusion would still be scanned.
+//   - Root-level files are explicit targets, which Opengrep exempts from
+//     --exclude and from ignore files, exactly as 1.23.0 did. OxGuard does not
+//     pass --force-exclude: it would also drop root files whose names merely
+//     equal a directory entry ("build", "skills", ".claude", "CVS"). The one
+//     approved exception, minified root files, is handled in
+//     securityRootTargets.
 //   - OxGuard exclusions and securityBaselineExcludes are always passed.
 //     Command-line exclusions outrank every ignore file, so a project
 //     .semgrepignore can add exclusions but never bring these paths back.
-//   - securityReplaceableDefaults are passed only when the project root has no
-//     .semgrepignore, the same condition under which Opengrep applies its own
-//     built-in set. A project file, even an empty one, replaces them.
+//   - securityReplaceableDefaults are passed only when no .semgrepignore
+//     exists at the scan root or at the project root (the Git root inside a Git
+//     work tree). A project file, even an empty one, replaces them. 1.23.0
+//     looked only at the scan root and Opengrep 2.1.0 only at the project
+//     root; the union keeps both setups working. Opengrep still applies its own
+//     built-in list below root entries when only the scan root has a file, and
+//     no flag can turn that off without losing Git handling (--project-root
+//     disables .gitignore), so such a project should add an empty .semgrepignore
+//     at the Git root.
 func securityScopeArgs(root string, excludes []string) ([]string, error) {
 	var args []string
 	projectRoot, prefix := root, ""
@@ -140,7 +156,6 @@ func securityScopeArgs(root string, excludes []string) ([]string, error) {
 	} else {
 		args = append(args, "--project-root", ".")
 	}
-	args = append(args, "--force-exclude")
 	seen := map[string]bool{}
 	add := func(pattern string) {
 		if !seen[pattern] {
@@ -160,7 +175,7 @@ func securityScopeArgs(root string, excludes []string) ([]string, error) {
 	for _, pattern := range securityBaselineExcludes {
 		add(pattern)
 	}
-	if _, err := os.ReadFile(filepath.Join(projectRoot, securityIgnoreFile)); err != nil {
+	if !hasSecurityIgnoreFile(projectRoot) && !hasSecurityIgnoreFile(root) {
 		for _, pattern := range securityReplaceableDefaults {
 			add(pattern)
 		}

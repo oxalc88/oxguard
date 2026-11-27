@@ -114,8 +114,8 @@ func TestSecurityScopeOutsideGitPinsProjectAndAddsDefaults(t *testing.T) {
 	if !reflect.DeepEqual(args[:2], []string{"--project-root", "."}) {
 		t.Fatalf("non-git scan must pin the project root first: %q", args)
 	}
-	if !contains(args, "--force-exclude") {
-		t.Fatalf("exclusions must also apply to root-level files: %q", args)
+	if contains(args, "--force-exclude") {
+		t.Fatalf("--force-exclude would drop root files named like directory entries: %q", args)
 	}
 	excludes := excludesOf(args)
 	for _, want := range []string{"**/dist", "/src", "tests/", "vendor/", "*.min.js", "build/", "test/", "node_modules/"} {
@@ -190,29 +190,84 @@ func TestSecurityScopeInGitUsesNativeProjectAndAnchorsAtGitRoot(t *testing.T) {
 	if !contains(excludesOf(args), "/src") || !contains(excludesOf(args), "tests/") {
 		t.Fatalf("unexpected excludes %q", excludesOf(args))
 	}
-
-	// A scan root below the Git root anchors at the Git root, and the
-	// default-replacing ignore file is the one at the Git root.
+	// A scan root below the Git root anchors at the Git root.
 	sub := filepath.Join(root, "packages", "app")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(sub, ".semgrepignore"), []byte("x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	args, err = securityScopeArgs(sub, []string{"/src"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !contains(excludesOf(args), "/packages/app/src") || !contains(excludesOf(args), "tests/") {
-		t.Fatalf("subproject scope = %q", excludesOf(args))
+	if !contains(excludesOf(args), "/packages/app/src") || contains(args, "--project-root") {
+		t.Fatalf("subproject scope = %q", args)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".semgrepignore"), nil, 0o644); err != nil {
+}
+
+// Monorepo subproject: a .semgrepignore at the scan root replaces the test
+// defaults, as in 1.23.0, and so does one at the Git root, as in 2.1.0. The
+// baseline layer applies in every case.
+func TestSecurityScopeSubprojectIgnoreFileReplacesTestDefaults(t *testing.T) {
+	requireGit(t)
+	write := func(path string) {
+		if err := os.WriteFile(path, []byte("docs/\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cases := []struct {
+		name             string
+		gitRootFile, sub bool
+		wantTestDefaults bool
+	}{
+		{"no files: defaults apply", false, false, true},
+		{"scan-root file only", false, true, false},
+		{"git-root file only", true, false, false},
+		{"both files", true, true, false},
+	}
+	for _, c := range cases {
+		top := t.TempDir()
+		gitInit(t, top)
+		sub := filepath.Join(top, "packages", "app")
+		if err := os.MkdirAll(sub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if c.gitRootFile {
+			write(filepath.Join(top, ".semgrepignore"))
+		}
+		if c.sub {
+			write(filepath.Join(sub, ".semgrepignore"))
+		}
+		args, err := securityScopeArgs(sub, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		excludes := excludesOf(args)
+		if got := contains(excludes, "tests/"); got != c.wantTestDefaults {
+			t.Errorf("%s: test defaults present = %v, want %v (%q)", c.name, got, c.wantTestDefaults, excludes)
+		}
+		if !contains(excludes, "vendor/") || !contains(excludes, "*.min.js") {
+			t.Errorf("%s: baseline layer missing: %q", c.name, excludes)
+		}
+		if contains(args, "--project-root") {
+			t.Errorf("%s: subproject scans must keep the Git root for .gitignore: %q", c.name, args)
+		}
+	}
+}
+
+// When the scan root is the Git root nothing changes: one file, one location.
+func TestSecurityScopeScanRootEqualToGitRoot(t *testing.T) {
+	top := t.TempDir()
+	gitInit(t, top)
+	args, _ := securityScopeArgs(top, nil)
+	if !contains(excludesOf(args), "tests/") {
+		t.Fatalf("defaults missing at the Git root: %q", excludesOf(args))
+	}
+	if err := os.WriteFile(filepath.Join(top, ".semgrepignore"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	args, _ = securityScopeArgs(sub, nil)
+	args, _ = securityScopeArgs(top, nil)
 	if contains(excludesOf(args), "tests/") || !contains(excludesOf(args), "vendor/") {
-		t.Fatalf("Git-root ignore file must replace only the test defaults: %q", excludesOf(args))
+		t.Fatalf("root file must replace only the test defaults: %q", excludesOf(args))
 	}
 }
 

@@ -372,6 +372,12 @@ func securityRootTargets(root string) ([]string, error) {
 		if entry.Type()&os.ModeSymlink != 0 {
 			continue
 		}
+		// Owner-approved scope reduction: minified files are never scanned, root
+		// included. Opengrep exempts explicit root-level files from every
+		// exclusion, so the baseline "*.min.js" entry cannot cover them.
+		if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".min.js") {
+			continue
+		}
 		// Prefix paths so a root entry named --option cannot become a flag.
 		targets = append(targets, "."+string(os.PathSeparator)+entry.Name())
 	}

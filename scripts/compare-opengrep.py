@@ -5,8 +5,10 @@ Candidate: 2.1.0 with the production argument builder (tsguard/security_scope.go
 
 Cases in group "parity" must select the same files and report the same findings, diagnostics and exit code.
 Cases in group "matrix" describe projects that use .semgrepignore or other deliberate differences. They are not forced to
-match; each records the expected classification (identical / more scanned / less scanned / different) and the script fails
-if the pinned engines stop behaving that way, so the documented compatibility matrix is executable evidence.
+match; each records the expected classification (identical / more scanned / less scanned / different / approved-reduction) and
+the script fails if the pinned engines stop behaving that way, so the documented compatibility matrix is executable evidence.
+"approved-reduction" is the owner-approved exception (minified files, root included, are never scanned): the candidate must equal
+the baseline minus the listed paths, and nothing else.
 
   python3 scripts/compare-opengrep.py /abs/v1.23.0/opengrep /abs/v2.1.0/opengrep [--markdown] [--large 50000]
 """
@@ -72,12 +74,27 @@ CASES = [
     case("default.git-gitignored-tracked", "parity", tree({".gitignore": "src/gen/\n"}), git=True, track=["src/gen/g.ts"]),
     case("default.custom-exclude-any-depth", "parity", tree(), exclude=["cache/private", "generated", "*.snap.ts"]),
     case("default.symlinks", "parity", tree(), symlinks=True),
-    # Root entries are explicit targets: 1.23.0 exempted root-level files from every exclusion; OxGuard applies them.
-    case("exclude.root-level-files", "matrix", tree({"x.min.js": EVAL}), expect="less scanned", must_skip=["x.min.js"],
-         note="a root-level minified file is no longer scanned (1.23.0 scanned explicit root files regardless of exclusions)"),
-    case("exclude.anchored-root-file", "matrix", tree(), exclude=["/a.ts"], expect="different", must_skip=["a.ts"], must_scan=["src/a.ts"],
-         note="`/a.ts` excludes the root file only; 1.23.0 excluded src/a.ts and still scanned the explicit root file"),
-    case("exclude.root-level-files-with-ignore", "matrix", tree({"x.min.js": EVAL, ".semgrepignore": "docs/\n"}), expect="less scanned", must_skip=["x.min.js"]),
+    # Root-level files are explicit targets: Opengrep exempts them from exclusions and ignore files in both engines, so OxGuard does not
+    # pass --force-exclude (it would also drop root files named build, skills, .claude, CVS, ...). The one exception is APPROVED BY THE
+    # OWNER (round-3 review P1): minified files are never scanned, root included, so root *.min.js files are not targets. The label
+    # "approved-reduction" is distinct from "less scanned" and drift in either direction fails the run.
+    case("approved.root-minified", "matrix", tree({"x.min.js": EVAL}), expect="approved-reduction", approved_paths=["x.min.js"], must_skip=["x.min.js"],
+         note="owner-approved: 1.23.0 scanned an explicit root x.min.js; minified files are never scanned"),
+    case("approved.root-minified-only-finding", "matrix", {"x.min.js": EVAL, "src/ok.ts": "export const a = 1;\n"}, expect="approved-reduction",
+         approved_paths=["x.min.js"], must_skip=["x.min.js"], note="1.23.0 exits 1 on the minified file alone; the candidate exits 0"),
+    case("approved.root-minified-with-ignore", "matrix", tree({"x.min.js": EVAL, ".semgrepignore": "docs/\n"}), expect="approved-reduction",
+         approved_paths=["x.min.js", "src/x.min.js", "vendor/v.ts", ".venv/v.ts"], must_skip=["x.min.js"]),
+    # No .semgrepignore: every root-level entry type, enumerated with a language-agnostic rule so extension-less files are analyzed.
+    case("default.root-level-entries", "matrix", {name: EVAL for name in ["build", "dist", "vendor", "CVS", ".env", "skills", "testsuite", "test", "tests", "coverage", ".next",
+                                                                          "foo_test.go", "x.min.js", "a.min.js", "README.md", "Makefile", "a.ts", ".hg", ".svn", "_darcs", ".venv",
+                                                                          ".tox", ".npm", ".yarn", "_opam", "_build", "_cargo", ".agents", ".claude", ".opencode", ".kiro"]},
+         rule="generic", expect="approved-reduction", approved_paths=["x.min.js", "a.min.js"], must_scan=["build", "dist", "skills", "CVS", ".claude", "foo_test.go", "a.ts"],
+         must_skip=["x.min.js", "a.min.js"],
+         note="root files named like directory entries stay scanned exactly as in 1.23.0; only minified files differ"),
+    case("default.root-level-entries-user-exclude", "matrix", {"a.ts": EVAL, "generated.ts": EVAL, "src/b.ts": EVAL}, exclude=["generated.ts", "/a.ts"], expect="identical",
+         must_scan=["a.ts", "generated.ts"], note="explicit root files ignore exclusions in both engines (root files cannot be excluded)"),
+    case("exclude.anchored-root-file", "matrix", tree(), exclude=["/a.ts"], expect="more scanned", must_scan=["a.ts", "src/a.ts"],
+         note="`/a.ts` no longer hides src/a.ts (1.23.0 excluded it); the root file stays scanned in both engines"),
     # Layering: a project file replaces the test defaults only; the baseline artifacts stay excluded.
     case("layer.docs-only-ignore", "matrix", tree({".semgrepignore": "docs/\n", **ARTIFACTS}), expect="less scanned",
          must_scan=["tests/a.ts", "test/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "src/x.min.js", "vendor/v.ts", "src/vendor/v.ts", ".venv/v.ts", "node_modules/m/i.ts"],
@@ -103,10 +120,21 @@ CASES = [
     case("ignore.root-empty", "matrix", tree({".semgrepignore": ""}), expect="identical", note="an empty root file also replaces the defaults"),
     case("ignore.root-comments-only", "matrix", tree({".semgrepignore": "# nothing\n\n   \n"}), expect="identical"),
     case("ignore.root-git", "matrix", tree({".semgrepignore": "scripts/\n"}), git=True, expect="identical"),
-    case("ignore.git-subproject-root-file-at-git-root", "matrix", tree({"../../.semgrepignore": "scripts/\n"}), git_subdir="packages/app",
-         expect="different", note="2.1.0 reads the default-replacing file at the Git root; 1.23.0 read the scan directory"),
-    case("ignore.git-subproject-file-in-scan-dir", "matrix", tree({".semgrepignore": "scripts/\n"}), git_subdir="packages/app",
-         expect="less scanned", note="same cause: the scan-directory file no longer replaces the defaults"),
+    # Monorepo: scan root packages/app below the Git root. .gitignore is honored from the Git root and from the scan directory in both engines.
+    case("monorepo.no-ignore-files", "matrix", tree({".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}), git_subdir="packages/app", expect="identical",
+         must_skip=["tests/a.ts", "src/gen/g.ts", "lib/l.ts"], note="defaults apply; Git-root and scan-directory .gitignore honored"),
+    case("monorepo.scan-root-file", "matrix", tree({".semgrepignore": "docs/\n", ".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}), git_subdir="packages/app",
+         expect="less scanned", must_scan=["tests/a.ts", "test/a.ts"], must_skip=["docs/d.ts", "src/gen/g.ts", "lib/l.ts"],
+         note="OxGuard shim: the scan-root file replaces the test defaults for root entries (tests/ scanned as in 1.23.0); nested test dirs (src/tests) stay skipped by Opengrep's native built-ins"),
+    case("monorepo.scan-root-file-and-empty-git-root-file", "matrix", tree({".semgrepignore": "docs/\n", "../../.semgrepignore": "", ".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}),
+         git_subdir="packages/app", expect="identical", must_scan=["tests/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "src/gen/g.ts", "lib/l.ts"],
+         note="workaround for the nested-test-dir limit: add an empty .semgrepignore at the Git root"),
+    case("monorepo.git-root-file", "matrix", tree({"../../.semgrepignore": "scripts/\n"}), git_subdir="packages/app", expect="different", must_scan=["tests/a.ts"],
+         must_skip=["scripts/s.ts"], note="the Git-root file is honored (1.23.0 ignored it) and replaces the test defaults"),
+    case("monorepo.both-files", "matrix", tree({".semgrepignore": "docs/\n", "../../.semgrepignore": "scripts/\n"}), git_subdir="packages/app", expect="less scanned",
+         must_scan=["tests/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "scripts/s.ts"], note="patterns of both files apply (1.23.0 read only the scan-root file); both replace the defaults"),
+    case("monorepo.git-root-equals-scan-root", "matrix", tree({".semgrepignore": "docs/\n", ".gitignore": "lib/\n"}), git=True, expect="identical", must_scan=["tests/a.ts"],
+         must_skip=["docs/d.ts", "lib/l.ts"], note="unchanged when the scan root is the Git root"),
     # b. :include
     case("include.gitignore", "matrix", tree({".semgrepignore": ":include .gitignore\n", ".gitignore": "scripts/\ndocs/\n"}), expect="identical"),
     case("include.gitignore-git", "matrix", tree({".semgrepignore": ":include .gitignore\n", ".gitignore": "scripts/\ndocs/\n"}), git=True, expect="identical"),
@@ -163,7 +191,10 @@ def build_project(base, spec):
     rules = scan / "node_modules/.cache/oxguard/rules"
     rules.mkdir(parents=True)
     rule_source = root / "evals/fixtures/security-contract/rule.yaml"
-    shutil.copyfile(rule_source, rules / "rule.yaml")
+    if spec.get("rule") == "generic":
+        (rules / "rule.yaml").write_text('rules:\n  - id: generic-eval\n    languages: [generic]\n    message: eval\n    severity: ERROR\n    pattern: eval("x")\n')
+    else:
+        shutil.copyfile(rule_source, rules / "rule.yaml")
     if spec.get("git") or spec.get("git_subdir"):
         subprocess.run(["git", "init", "-q"], cwd=project, check=True)
         if spec.get("track"):
@@ -199,9 +230,19 @@ def summarize(process):
             "errors": sorted((e.get("type") or e.get("message", ""))[:80] for e in report["errors"])}
 
 
-def classify(old, new):
+def without(report, paths):
+    """The baseline report as if the approved paths were never selected (exit recomputed from the remaining findings)."""
+    kept = {**report, "scanned": [p for p in report["scanned"] if p not in paths], "findings": [f for f in report["findings"] if f[1] not in paths]}
+    if report["exit"] in (0, 1):
+        kept["exit"] = 1 if kept["findings"] else 0
+    return kept
+
+
+def classify(old, new, approved=()):
     if old == new:
         return "identical"
+    if approved and without(old, set(approved)) == new:
+        return "approved-reduction"
     a, b = set(old["scanned"]), set(new["scanned"])
     if old["exit"] != new["exit"] and old["exit"] == 2:
         return "different"
@@ -247,7 +288,7 @@ with tempfile.TemporaryDirectory(prefix="oxguard-opengrep-comparison-", dir=temp
             old_process, _ = run_engine(engines[0][1], scan, [], old_args)
             new_process, _ = run_engine(engines[1][1], scan, new_args, [])
             old, new = summarize(old_process), summarize(new_process)
-            row = {"case": spec["id"], "group": spec["group"], "baseline": old, "candidate": new, "classification": classify(old, new),
+            row = {"case": spec["id"], "group": spec["group"], "baseline": old, "candidate": new, "classification": classify(old, new, spec.get("approved_paths", ())),
                    "expected": spec["expect"], "note": spec["note"]}
             if spec.get("timed"):
                 runs = {name_: [] for name_, *_ in engines}
