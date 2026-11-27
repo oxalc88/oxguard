@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -346,15 +347,37 @@ func runOpengrep(r *Runner) int {
 		args = append(args, "--json")
 	}
 	// Exclusions, project/default ignore scope and root targets; see security_scope.go.
-	scan, err := securityScanArgs(r.root, r.excludeDirs)
+	scan, err := securityScanArgs(r.root, r.excludeDirs, binaryPath)
 	if err != nil {
-		return r.executionFailure("security", "invalid_configuration", err.Error())
+		category := "invalid_configuration"
+		var tool *scopeToolError
+		if errors.As(err, &tool) {
+			category = "analyzer_failure"
+		}
+		return r.executionFailure("security", category, err.Error())
 	}
-	args = append(args, scan...)
+	if scan.empty {
+		return r.recordEmptySecurityScan()
+	}
+	args = append(args, scan.args...)
 
 	res := r.RunTool(toolSpec{gate: "security", adapter: "opengrep"}, "opengrep SAST", args...)
 	if !res.ok {
 		return 1
+	}
+	return 0
+}
+
+// recordEmptySecurityScan reports a clean security SAST result when every root
+// entry was deliberately filtered (only minified root files, which are never
+// scanned). It matches the output contract of a scan that selects no file:
+// no findings, a passing, complete gate and exit 0. Opengrep is not started.
+func (r *Runner) recordEmptySecurityScan() int {
+	if r.result != nil {
+		r.result.RecordGate("security", true, true)
+	}
+	if !r.machine() {
+		fmt.Println("  [OK]   opengrep SAST — no scannable files (only minified files at the project root)")
 	}
 	return 0
 }
@@ -365,6 +388,7 @@ func securityRootTargets(root string) ([]string, error) {
 		return nil, fmt.Errorf("Cannot enumerate security scan root: %w", err)
 	}
 	var targets []string
+	filtered := false
 	for _, entry := range entries {
 		if entry.Name() == "node_modules" || entry.Name() == ".git" {
 			continue
@@ -376,12 +400,13 @@ func securityRootTargets(root string) ([]string, error) {
 		// included. Opengrep exempts explicit root-level files from every
 		// exclusion, so the baseline "*.min.js" entry cannot cover them.
 		if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".min.js") {
+			filtered = true
 			continue
 		}
 		// Prefix paths so a root entry named --option cannot become a flag.
 		targets = append(targets, "."+string(os.PathSeparator)+entry.Name())
 	}
-	if len(targets) == 0 {
+	if len(targets) == 0 && !filtered {
 		return nil, fmt.Errorf("No project files available outside dependency directories")
 	}
 	return targets, nil

@@ -24,21 +24,27 @@ import tempfile
 import time
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument("baseline", type=Path, help="verified v1.23.0 Linux x64 asset")
-parser.add_argument("candidate", type=Path, help="verified v2.1.0 Linux x64 asset")
+parser.add_argument("baseline", type=Path, nargs="?", help="verified v1.23.0 Linux x64 asset")
+parser.add_argument("candidate", type=Path, nargs="?", help="verified v2.1.0 Linux x64 asset")
+parser.add_argument("--self-test", action="store_true", help="only run the classifier self-test (no engines needed)")
+parser.add_argument("--update-doc", type=Path, metavar="MARKDOWN", help="rewrite the generated matrix block between the matrix markers of this file")
 parser.add_argument("--markdown", action="store_true", help="print the compatibility matrix as Markdown")
 parser.add_argument("--large", type=int, default=0, metavar="FILES", help="also time a generated tree of this many files")
 parser.add_argument("--runs", type=int, default=5, help="timed runs per engine and timing case")
 parser.add_argument("--tmpdir", type=Path, default=None, help="disk-backed directory for generated projects")
 args = parser.parse_args()
 root = Path(__file__).resolve().parent.parent
+if not args.self_test and not (args.baseline and args.candidate):
+    parser.error("the baseline and candidate engines are required unless --self-test is given")
 manifest = json.loads((root / "npm/native-tools.json").read_text())
 BASELINE_SHA256 = "1f06548af379ab6080698a609612890ffad2d92dc2172f1e97d38d48096d5ef8"
-engines = [("1.23.0", args.baseline.resolve(), BASELINE_SHA256),
-           (manifest["version"].removeprefix("v"), args.candidate.resolve(), manifest["platforms"]["linux-x64"]["sha256"])]
-for _, engine, digest in engines:
-    if hashlib.sha256(engine.read_bytes()).hexdigest() != digest:
-        raise SystemExit(f"Untrusted engine: {engine}")
+engines = []
+if not args.self_test:
+    engines = [("1.23.0", args.baseline.resolve(), BASELINE_SHA256),
+               (manifest["version"].removeprefix("v"), args.candidate.resolve(), manifest["platforms"]["linux-x64"]["sha256"])]
+    for _, engine, digest in engines:
+        if hashlib.sha256(engine.read_bytes()).hexdigest() != digest:
+            raise SystemExit(f"Untrusted engine: {engine}")
 corpus = {c["id"]: c for c in json.loads((root / "evals/cases.json").read_text())["cases"]}
 DEFAULT_EXCLUDES = ["node_modules", ".git", "dist", ".next", "build", "coverage", ".agents", ".claude", ".opencode", ".kiro", "skills"]
 ENV = {**os.environ, "OPENGREP_ENABLE_VERSION_CHECK": "false"}
@@ -50,6 +56,16 @@ TREE = ["a.ts", "src/a.ts", "src/b.ts", "src/deep/c.ts", "src/a.test.ts", "src/f
 # Non-source artifacts from the 1.23.0 default list: OxGuard's baseline layer excludes them whatever the project ignore file says.
 ARTIFACTS = {"src/x.min.js": EVAL, "vendor/v.ts": EVAL, "build/b.ts": EVAL, "src/vendor/v.ts": EVAL, ".venv/v.ts": EVAL,
              ".tox/t.ts": EVAL, ".env/e.ts": EVAL, "_build/b.ts": EVAL, "node_modules/m/i.ts": EVAL, "dist/d.ts": EVAL}
+
+EXCLUDE_TREE = {name: EVAL for name in ["a.ts", "x.ts", "src/a.ts", "src/x.ts", "lib/src/y.ts", "lib/a.ts", "x/f.ts", "src/x/f.ts", "a/b/c.ts", "src/a/b/c.ts",
+                                        "lib/a/b/c.ts", "xx/f.ts", "src/xx/f.ts", "deep/er/x/g.ts", "x2/x/h.ts", "keep/s.snap.ts"]}
+
+# Scan root of a monorepo subproject whose only ignore file is its own: nested test paths must be restored.
+NESTED = {name: EVAL for name in ["src/a.ts", "tests/t0.ts", "src/tests/t.ts", "src/tests/deep/tests/n.ts", "src/test/u.ts", "src/testsuite/s.ts", "lib/pkg/testsuite/s.ts",
+                                  "lib/pkg/test/u.ts", "src/a_test.go", "src/tests/c_test.go", "lib/pkg/b_test.go", "root_test.go", "docs/d.ts", "src/contest/x.ts"]}
+NESTED[".semgrepignore"] = "docs/\n"
+NESTED_CHECKS = {"must_scan": ["src/tests/t.ts", "src/tests/deep/tests/n.ts", "src/test/u.ts", "src/testsuite/s.ts", "lib/pkg/testsuite/s.ts", "src/a_test.go", "src/tests/c_test.go",
+                               "lib/pkg/b_test.go", "root_test.go", "src/contest/x.ts"], "must_skip": ["docs/d.ts"]}
 
 
 def tree(extra=None, drop=()):
@@ -93,8 +109,18 @@ CASES = [
          note="root files named like directory entries stay scanned exactly as in 1.23.0; only minified files differ"),
     case("default.root-level-entries-user-exclude", "matrix", {"a.ts": EVAL, "generated.ts": EVAL, "src/b.ts": EVAL}, exclude=["generated.ts", "/a.ts"], expect="identical",
          must_scan=["a.ts", "generated.ts"], note="explicit root files ignore exclusions in both engines (root files cannot be excluded)"),
-    case("exclude.anchored-root-file", "matrix", tree(), exclude=["/a.ts"], expect="more scanned", must_scan=["a.ts", "src/a.ts"],
-         note="`/a.ts` no longer hides src/a.ts (1.23.0 excluded it); the root file stays scanned in both engines"),
+    case("approved.root-minified-alone", "matrix", {"x.min.js": EVAL}, expect="approved-reduction", approved_paths=["x.min.js"],
+         note="only a root minified file: no Opengrep run, a clean complete result (1.23.0 exits 1)"),
+    # tsguard exclusions: the effective file set of main + 1.23.0 for every form. 1.23.0 turned each entry into "**/E"; leading and
+    # trailing slashes never anchored anything and root-level files were never excludable.
+    *[case("exclude.map." + name, "parity", dict(EXCLUDE_TREE), exclude=[entry], note=f"`{entry}` excludes the same files in both engines")
+      for name, entry in [("x", "x"), ("slash-x", "/x"), ("x-slash", "x/"), ("slash-x-slash", "/x/"), ("a-b", "a/b"), ("slash-a-b", "/a/b"), ("slash-a-b-slash", "/a/b/"),
+                          ("slash-src", "/src"), ("src-a-ts", "src/a.ts"), ("slash-a-ts", "/a.ts"), ("slash-lib-src", "/lib/src"), ("glob", "*.snap.ts"),
+                          ("slash-glob", "/*.ts"), ("bang", "!a.ts"), ("dot-slash", "./x"), ("double-star", "**/x"), ("children", "x/*")]],
+    case("exclude.map.git-subproject-slash-src", "parity", dict(EXCLUDE_TREE), exclude=["/src", "/x"], git_subdir="packages/app",
+         note="the same mapping below a Git root: no Git-relative translation"),
+    case("exclude.map.root-file-not-excludable", "parity", dict(EXCLUDE_TREE), exclude=["/a.ts", "a.ts"], must_scan=["a.ts"],
+         note="root-level explicit files were never excludable in 1.23.0 and still are not"),
     # Layering: a project file replaces the test defaults only; the baseline artifacts stay excluded.
     case("layer.docs-only-ignore", "matrix", tree({".semgrepignore": "docs/\n", **ARTIFACTS}), expect="less scanned",
          must_scan=["tests/a.ts", "test/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "src/x.min.js", "vendor/v.ts", "src/vendor/v.ts", ".venv/v.ts", "node_modules/m/i.ts"],
@@ -108,10 +134,6 @@ CASES = [
          must_skip=["vendor/v.ts", "src/x.min.js"], must_scan=["tests/a.ts"],
          note="negations cannot re-include the baseline layer"),
     # Deliberate differences outside .semgrepignore.
-    case("exclude.anchored-root", "matrix", tree(), exclude=["/src"], expect="more scanned", must_skip=["src/a.ts"], must_scan=["lib/src/y.ts"],
-         note="`/src` excludes only the scan root's src; 1.23.0 also excluded lib/src"),
-    case("exclude.anchored-root-git-subproject", "matrix", tree(), exclude=["/src"], expect="more scanned", git_subdir="packages/app", must_skip=["src/a.ts"], must_scan=["lib/src/y.ts"],
-         note="anchored entries are translated to the Git-relative path"),
     case("exclude.unreadable-excluded-dir", "matrix", tree({"secret/inner/s.ts": EVAL}), exclude=["/secret"], unreadable=["secret"],
          expect="different", note="1.23.0 refuses to start on an unreadable root entry; 2.1.0 skips the excluded directory"),
     # a. a root .semgrepignore replaces the defaults (both engines).
@@ -124,17 +146,40 @@ CASES = [
     case("monorepo.no-ignore-files", "matrix", tree({".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}), git_subdir="packages/app", expect="identical",
          must_skip=["tests/a.ts", "src/gen/g.ts", "lib/l.ts"], note="defaults apply; Git-root and scan-directory .gitignore honored"),
     case("monorepo.scan-root-file", "matrix", tree({".semgrepignore": "docs/\n", ".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}), git_subdir="packages/app",
-         expect="less scanned", must_scan=["tests/a.ts", "test/a.ts"], must_skip=["docs/d.ts", "src/gen/g.ts", "lib/l.ts"],
-         note="OxGuard shim: the scan-root file replaces the test defaults for root entries (tests/ scanned as in 1.23.0); nested test dirs (src/tests) stay skipped by Opengrep's native built-ins"),
+         expect="identical", must_scan=["tests/a.ts", "test/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "src/gen/g.ts", "lib/l.ts"],
+         note="OxGuard restores the test paths Opengrep's built-ins would hide: root entries and nested directories (src/tests)"),
     case("monorepo.scan-root-file-and-empty-git-root-file", "matrix", tree({".semgrepignore": "docs/\n", "../../.semgrepignore": "", ".gitignore": "lib/\n", "../../.gitignore": "gen/\n"}),
          git_subdir="packages/app", expect="identical", must_scan=["tests/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "src/gen/g.ts", "lib/l.ts"],
-         note="workaround for the nested-test-dir limit: add an empty .semgrepignore at the Git root"),
+         note="an empty .semgrepignore at the Git root: native replacement, no restoration needed"),
     case("monorepo.git-root-file", "matrix", tree({"../../.semgrepignore": "scripts/\n"}), git_subdir="packages/app", expect="different", must_scan=["tests/a.ts"],
          must_skip=["scripts/s.ts"], note="the Git-root file is honored (1.23.0 ignored it) and replaces the test defaults"),
     case("monorepo.both-files", "matrix", tree({".semgrepignore": "docs/\n", "../../.semgrepignore": "scripts/\n"}), git_subdir="packages/app", expect="less scanned",
          must_scan=["tests/a.ts", "src/tests/t.ts"], must_skip=["docs/d.ts", "scripts/s.ts"], note="patterns of both files apply (1.23.0 read only the scan-root file); both replace the defaults"),
     case("monorepo.git-root-equals-scan-root", "matrix", tree({".semgrepignore": "docs/\n", ".gitignore": "lib/\n"}), git=True, expect="identical", must_scan=["tests/a.ts"],
          must_skip=["docs/d.ts", "lib/l.ts"], note="unchanged when the scan root is the Git root"),
+    # Nested test paths with a scan-root .semgrepignore only (language-agnostic rule so *_test.go files are analyzed).
+    case("nested-tests.basic", "matrix", NESTED, git_subdir="packages/app", rule="generic", expect="identical", **NESTED_CHECKS,
+         note="nested test, tests, testsuite directories and nested *_test.go files are scanned as in 1.23.0"),
+    case("nested-tests.project-ignored-stays-excluded", "matrix", {**NESTED, ".semgrepignore": "docs/\nig/\n", "src/ig/tests/i.ts": EVAL, "src/ig/z_test.go": EVAL},
+         git_subdir="packages/app", rule="generic", expect="identical", must_skip=["src/ig/tests/i.ts", "src/ig/z_test.go"], must_scan=["src/tests/t.ts"],
+         note="a nested test directory and a *_test.go file the project .semgrepignore excludes stay excluded"),
+    case("nested-tests.gitignored-stays-excluded", "matrix", {**NESTED, "../../.gitignore": "gi/\ngi_file_test.go\n", ".gitignore": "ni_test.go\nni/\n", "src/gi/tests/g.ts": EVAL,
+                                                               "src/gi_file_test.go": EVAL, "src/ni/tests/n.ts": EVAL, "src/ni_test.go": EVAL},
+         git_subdir="packages/app", rule="generic", expect="identical", must_skip=["src/gi/tests/g.ts", "src/gi_file_test.go", "src/ni/tests/n.ts", "src/ni_test.go"],
+         must_scan=["src/tests/t.ts"], note="nested test paths ignored by the Git-root or the scan-directory .gitignore stay excluded"),
+    case("nested-tests.deep", "matrix", {**NESTED, "src/a/b/c/d/tests/e/f/tests/g.ts": EVAL, "src/a/b/c/d/tests/e/f/h_test.go": EVAL, "lib/x/y/z/testsuite/q.ts": EVAL},
+         git_subdir="packages/app", rule="generic", expect="identical", must_scan=["src/a/b/c/d/tests/e/f/tests/g.ts", "src/a/b/c/d/tests/e/f/h_test.go", "lib/x/y/z/testsuite/q.ts"],
+         note="deeply nested directories, test directories inside test directories, nested *_test.go inside them"),
+    case("nested-tests.baseline-inside-stays-excluded", "matrix", {**NESTED, "src/tests/vendor/v.ts": EVAL, "src/tests/x.min.js": EVAL, "src/tests/dist/d.ts": EVAL,
+                                                                    "src/tests/node_modules/n.ts": EVAL, "src/tests/build/b.ts": EVAL},
+         git_subdir="packages/app", rule="generic", expect="approved-reduction", approved_paths=["src/tests/vendor/v.ts", "src/tests/x.min.js", "src/tests/build/b.ts"],
+         must_skip=["src/tests/vendor/v.ts", "src/tests/x.min.js", "src/tests/dist/d.ts", "src/tests/node_modules/n.ts", "src/tests/build/b.ts"], must_scan=["src/tests/t.ts"],
+         note="the baseline layer applies inside nested tests (1.23.0 scanned vendor, build and minified files once a project file existed)"),
+    case("nested-tests.no-duplicate-reports", "matrix", {**NESTED, "src/tests/tests/inner.ts": EVAL, "src/tests/tests/inner_test.go": EVAL}, git_subdir="packages/app", rule="generic",
+         expect="identical", must_scan=["src/tests/tests/inner.ts", "src/tests/tests/inner_test.go"], unique_findings=True,
+         note="overlapping candidates are reported exactly once: Opengrep skips test directories nested in a target"),
+    case("nested-tests.outside-git", "matrix", {**NESTED}, rule="generic", expect="identical", must_scan=["src/tests/t.ts"],
+         note="outside Git --project-root already replaces the defaults: no restoration needed"),
     # b. :include
     case("include.gitignore", "matrix", tree({".semgrepignore": ":include .gitignore\n", ".gitignore": "scripts/\ndocs/\n"}), expect="identical"),
     case("include.gitignore-git", "matrix", tree({".semgrepignore": ":include .gitignore\n", ".gitignore": "scripts/\ndocs/\n"}), git=True, expect="identical"),
@@ -221,25 +266,29 @@ def run_engine(engine, scan, extra, targets):
 
 
 def summarize(process):
+    """Every field of the result contract OxGuard consumes: rule, path, line/column, message, severity, diagnostics and exit."""
     try:
         report = json.loads(process.stdout)
     except ValueError:
-        return {"exit": process.returncode, "scanned": [], "findings": [], "errors": ["unparseable output: " + process.stderr.decode(errors="replace").strip()[:120]]}
+        return {"exit": process.returncode, "scanned": [], "findings": [],
+                "errors": [["unparseable", "", "output: " + process.stderr.decode(errors="replace").strip()[:120], ""]]}
     return {"exit": process.returncode, "scanned": sorted(report["paths"]["scanned"]),
-            "findings": [[f["check_id"], f["path"], f["start"]["line"], f["start"]["col"]] for f in report["results"]],
-            "errors": sorted((e.get("type") or e.get("message", ""))[:80] for e in report["errors"])}
+            "findings": [[f["check_id"], f["path"], f["start"]["line"], f["start"]["col"], f["extra"]["message"], f["extra"]["severity"]] for f in report["results"]],
+            "errors": sorted([e.get("type", ""), e.get("level", ""), e.get("message", ""), str(e.get("path", ""))] for e in report["errors"])}
 
 
 def without(report, paths):
-    """The baseline report as if the approved paths were never selected (exit recomputed from the remaining findings)."""
-    kept = {**report, "scanned": [p for p in report["scanned"] if p not in paths], "findings": [f for f in report["findings"] if f[1] not in paths]}
+    """The baseline report as if the approved paths were never selected: scanned files, findings and diagnostics about
+    those paths are removed and the exit is recomputed from what remains. Everything else must still match exactly."""
+    kept = {**report, "scanned": [p for p in report["scanned"] if p not in paths], "findings": [f for f in report["findings"] if f[1] not in paths],
+            "errors": [e for e in report["errors"] if e[3] not in paths]}
     if report["exit"] in (0, 1):
         kept["exit"] = 1 if kept["findings"] else 0
     return kept
 
 
 def classify(old, new, approved=()):
-    if old == new:
+    if old == new:  # compares every field above, including messages, severities and diagnostics
         return "identical"
     if approved and without(old, set(approved)) == new:
         return "approved-reduction"
@@ -255,10 +304,48 @@ def classify(old, new, approved=()):
     return "different"
 
 
+def self_test():
+    """The approved-reduction check must fail on drift in any contract field, not only on the selected files."""
+    rule = "rules.eval"
+    old = {"exit": 1, "scanned": ["a.ts", "x.min.js"], "errors": [["ParseError", "warn", "cannot parse", "a.ts"], ["ParseError", "warn", "cannot parse", "x.min.js"]],
+           "findings": [[rule, "a.ts", 1, 1, "Avoid eval", "ERROR"], [rule, "x.min.js", 1, 1, "Avoid eval", "ERROR"]]}
+    good = {"exit": 1, "scanned": ["a.ts"], "errors": [["ParseError", "warn", "cannot parse", "a.ts"]], "findings": [[rule, "a.ts", 1, 1, "Avoid eval", "ERROR"]]}
+    assert classify(old, good, ["x.min.js"]) == "approved-reduction", "the approved reduction itself must be recognized"
+    assert classify(old, old, ["x.min.js"]) == "identical"
+    drift = {
+        "diagnostic message": {**good, "errors": [["ParseError", "warn", "changed message", "a.ts"]]},
+        "diagnostic path": {**good, "errors": [["ParseError", "warn", "cannot parse", "other.ts"]]},
+        "diagnostic type": {**good, "errors": [["SemgrepError", "warn", "cannot parse", "a.ts"]]},
+        "diagnostic level": {**good, "errors": [["ParseError", "error", "cannot parse", "a.ts"]]},
+        "extra diagnostic": {**good, "errors": good["errors"] + [["ParseError", "warn", "again", "a.ts"]]},
+        "missing diagnostic": {**good, "errors": []},
+        "finding message": {**good, "findings": [[rule, "a.ts", 1, 1, "Changed", "ERROR"]]},
+        "finding severity": {**good, "findings": [[rule, "a.ts", 1, 1, "Avoid eval", "WARNING"]]},
+        "finding rule": {**good, "findings": [["rules.other", "a.ts", 1, 1, "Avoid eval", "ERROR"]]},
+        "finding line": {**good, "findings": [[rule, "a.ts", 2, 1, "Avoid eval", "ERROR"]]},
+        "finding column": {**good, "findings": [[rule, "a.ts", 1, 2, "Avoid eval", "ERROR"]]},
+        "finding path": {**good, "findings": [[rule, "b.ts", 1, 1, "Avoid eval", "ERROR"]]},
+        "duplicate finding": {**good, "findings": good["findings"] * 2},
+        "exit code": {**good, "exit": 2},
+        "extra scanned file": {**good, "scanned": ["a.ts", "b.ts"]},
+    }
+    for name, candidate in drift.items():
+        label = classify(old, candidate, ["x.min.js"])
+        assert label not in ("approved-reduction", "identical"), f"self-test: drift in {name} was classified {label}"
+    # Without an approved path nothing is forgiven.
+    assert classify(old, good) != "approved-reduction"
+
+
+self_test()
+if args.self_test:
+    print("self-test passed")
+    raise SystemExit(0)
+
+
 def candidate_args(helper, scan, spec, temporary):
     out = temporary / "args.json"
     env = {**os.environ, "OXGUARD_COMPARE_ROOT": str(scan), "OXGUARD_COMPARE_ARGS": str(out),
-           "OXGUARD_COMPARE_EXCLUDE": json.dumps(spec.get("exclude", []))}
+           "OXGUARD_COMPARE_EXCLUDE": json.dumps(spec.get("exclude", [])), "OXGUARD_COMPARE_ENGINE": str(engines[1][1])}
     started = time.perf_counter()
     subprocess.run([str(helper), "-test.run=^TestSecurityScopeComparisonHelper$"], check=True, capture_output=True, env=env)
     elapsed = (time.perf_counter() - started) * 1000
@@ -283,11 +370,17 @@ with tempfile.TemporaryDirectory(prefix="oxguard-opengrep-comparison-", dir=temp
         for path in locked:
             path.chmod(0)
         try:
-            new_args, enumeration_ms = candidate_args(helper, scan, spec, temporary)
+            plan, enumeration_ms = candidate_args(helper, scan, spec, temporary)
+            new_args = plan["args"]
             old_args = baseline_args(spec) + baseline_targets(scan)
             old_process, _ = run_engine(engines[0][1], scan, [], old_args)
-            new_process, _ = run_engine(engines[1][1], scan, new_args, [])
-            old, new = summarize(old_process), summarize(new_process)
+            if plan["empty"]:
+                # Production code does not start Opengrep when nothing is selected: a clean, complete result with exit 0.
+                new = {"exit": 0, "scanned": [], "findings": [], "errors": []}
+            else:
+                new_process, _ = run_engine(engines[1][1], scan, new_args, [])
+                new = summarize(new_process)
+            old = summarize(old_process)
             row = {"case": spec["id"], "group": spec["group"], "baseline": old, "candidate": new, "classification": classify(old, new, spec.get("approved_paths", ())),
                    "expected": spec["expect"], "note": spec["note"]}
             if spec.get("timed"):
@@ -308,6 +401,8 @@ with tempfile.TemporaryDirectory(prefix="oxguard-opengrep-comparison-", dir=temp
             for path in spec.get("must_skip", []):
                 if path in new["scanned"]:
                     failures.append(f"{spec['id']}: {path} must be skipped by 2.1.0 but was scanned")
+            if spec.get("unique_findings") and len({tuple(f[:4]) for f in new["findings"]}) != len(new["findings"]):
+                failures.append(f"{spec['id']}: duplicate findings in the 2.1.0 report")
             if row["classification"] != spec["expect"]:
                 failures.append(f"{spec['id']}: expected {spec['expect']}, measured {row['classification']}\n  1.23.0 {old}\n  2.1.0  {new}")
             if spec["group"] == "parity" and old != new:
@@ -334,7 +429,8 @@ with tempfile.TemporaryDirectory(prefix="oxguard-opengrep-comparison-", dir=temp
         runs = {name_: [] for name_, *_ in engines}
         summaries = {}
         for iteration in range(max(3, args.runs // 2) + 1):
-            new_args, helper_ms = candidate_args(helper, base, spec, temporary)
+            plan, helper_ms = candidate_args(helper, base, spec, temporary)
+            new_args = plan["args"]
             old_process, old_ms = run_engine(engines[0][1], base, [], baseline_args(spec) + baseline_targets(base))
             new_process, new_ms = run_engine(engines[1][1], base, new_args, [])
             summaries = {engines[0][0]: summarize(old_process), engines[1][0]: summarize(new_process)}
@@ -348,6 +444,33 @@ with tempfile.TemporaryDirectory(prefix="oxguard-opengrep-comparison-", dir=temp
                  "parity": old["scanned"] == new["scanned"] and old["findings"] == new["findings"] and old["exit"] == new["exit"]}
         if not large["parity"]:
             failures.append(f"large tree differs: {large}")
+
+def matrix_markdown(rows):
+    """The compatibility matrix exactly as measured; docs/opengrep-2.1-migration.md embeds it between the matrix markers."""
+    counts = {}
+    for row in rows:
+        counts[row["classification"]] = counts.get(row["classification"], 0) + 1
+    summary = ", ".join(f"{n} {label}" for label, n in sorted(counts.items()))
+    lines = [f"{len(rows)} cases measured with both engines: {summary}.", "",
+             "| Case | Scenario | 1.23.0 files | 2.1.0 files | Exit 1.23.0 / 2.1.0 | Result |", "|---|---|---:|---:|---|---|"]
+    for row in rows:
+        old, new = row["baseline"], row["candidate"]
+        only_old, only_new = sorted(set(old["scanned"]) - set(new["scanned"])), sorted(set(new["scanned"]) - set(old["scanned"]))
+        delta = []
+        if only_old:
+            delta.append("only 1.23.0: " + ", ".join(f"`{p}`" for p in only_old))
+        if only_new:
+            delta.append("only 2.1.0: " + ", ".join(f"`{p}`" for p in only_new))
+        scenario = (row["note"] + (" " if row["note"] and delta else "") + ("(" + "; ".join(delta) + ")" if delta else "")).replace("|", "\\|")
+        lines.append(f"| `{row['case']}` | {scenario} | {len(old['scanned'])} | {len(new['scanned'])} | {old['exit']} / {new['exit']} | {row['classification']} |")
+    return "\n".join(lines)
+
+
+if args.update_doc:
+    START, END = "<!-- matrix:start (generated by scripts/compare-opengrep.py --update-doc; do not edit by hand) -->", "<!-- matrix:end -->"
+    text = args.update_doc.read_text()
+    begin, finish = text.index("<!-- matrix:start"), text.index(END)
+    args.update_doc.write_text(text[:begin] + START + "\n" + matrix_markdown(results) + "\n" + text[finish:])
 
 if args.markdown:
     print("| Case | 1.23.0 selected | 2.1.0 selected | Exit 1.23.0 / 2.1.0 | Result |")

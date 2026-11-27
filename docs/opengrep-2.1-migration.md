@@ -1,6 +1,6 @@
 # Opengrep 2.1.0 migration evidence
 
-Measured 2026-11-27 on Linux x64, WSL2 kernel 6.6.87.2, Node 24.18.0, npm 11.16.0 and Go toolchain 1.26.11. Implementation provenance: rounds 0–2 were Codex (OpenAI through the Codex harness) gpt-6.1-sol at effort medium and high (a round-2 xhigh attempt was cancelled without a push) and attempted to reimplement 1.23.0 ignore semantics in Go; each review found new parity gaps. This redesign round (OxGuard-owned scope arguments with native Opengrep 2.1.0 `.semgrepignore` support) was implemented by Claude Sonnet 5.5 through Claude Code, chosen by the owner after repeated review failures on the same issue. The orchestrator supplies an independent reviewer session; this report is implementation evidence, not approval.
+Measured 2026-11-27 on Linux x64, WSL2 kernel 6.6.87.2, Node 24.18.0, npm 11.16.0 and Go toolchain 1.26.11. Implementation provenance: rounds 0–2 were Codex (OpenAI through the Codex harness) gpt-6.1-sol at effort medium and high (a round-2 xhigh attempt was cancelled without a push) and attempted to reimplement 1.23.0 ignore semantics in Go; each review found new parity gaps. The redesign (OxGuard-owned scope arguments with native Opengrep 2.1.0 `.semgrepignore` support) and its rounds 3 to 5 (approved minified exception, monorepo shim, unchanged exclusion semantics, nested test restoration) were implemented by Claude Sonnet 5.5 through Claude Code, chosen by the owner after repeated review failures on the same issue. The orchestrator supplies an independent reviewer session; this report is implementation evidence, not approval.
 
 ## Sources and integrity
 
@@ -26,16 +26,16 @@ A controlled Linux x64 native npm package comparison holds the Go binary, metada
 
 ## Equivalent-rule detection and timing
 
-`python3 scripts/compare-opengrep.py /absolute/v1.23.0/opengrep /absolute/v2.1.0/opengrep` verifies the Linux x64 hashes before executing either engine. It creates each existing security-contract fixture with the unchanged `evals/cases.json` overrides and local `rule.yaml`, copies the rule to `node_modules/.cache/oxguard/rules`, and uses `scan --config node_modules/.cache/oxguard/rules --error --quiet --json` with the same root targets and default directory exclusions; the candidate uses the production Go scope builder (`tsguard/security_scope.go`) through a compiled test helper. The harness asserts equality of `paths.scanned`, findings, errors and native exits for every default-scope case. Network version checks are disabled in both environments. One warmup is discarded, then five wall-clock runs are measured per engine/case in the same project. The 2.1.0 time includes OxGuard's own scope construction (a separate `git rev-parse`, directory listing and ignore-file check, measured as a whole compiled test-helper process per run, 8.3 ms in the last large-tree run, an upper bound because it includes helper start-up). Runs include process startup and ran with no other load on the host; they characterize this host, not production throughput. The direct engine comparison isolates SAST; the installed eval separately checks dependency failure and full security orchestration.
+`python3 scripts/compare-opengrep.py /absolute/v1.23.0/opengrep /absolute/v2.1.0/opengrep` verifies the Linux x64 hashes before executing either engine. It creates each existing security-contract fixture with the unchanged `evals/cases.json` overrides and local `rule.yaml`, copies the rule to `node_modules/.cache/oxguard/rules`, and uses `scan --config node_modules/.cache/oxguard/rules --error --quiet --json` with the same root targets and default directory exclusions; the candidate uses the production Go scope builder (`tsguard/security_scope.go`) through a compiled test helper. The harness asserts equality of `paths.scanned`, findings, errors and native exits for every default-scope case. Network version checks are disabled in both environments. One warmup is discarded, then five wall-clock runs are measured per engine/case in the same project. The 2.1.0 time includes OxGuard's own scope construction (a separate `git rev-parse`, directory listing and ignore-file check, measured as a whole compiled test-helper process per run, 7.8 ms in the last large-tree run, an upper bound because it includes helper start-up). Runs include process startup and ran with no other load on the host; they characterize this host, not production throughput. The direct engine comparison isolates SAST; the installed eval separately checks dependency failure and full security orchestration.
 
 | Case | 1.23.0 median ms | 2.1.0 median ms (incl. OxGuard scope) | Native exits, both | Findings, both |
 |---|---:|---:|---|---:|
-| security.clean | 2,573.3 | 176.2 | 0 | 0 |
-| security.multiple | 2,591.7 | 183.6 | 1 | 2 |
-| security.dependency_failure_still_sast | 2,716.2 | 183.6 | 1 | 1 |
-| Generated tree, 50,000 `.ts` files in 500 directories plus an excluded `tests/` and `node_modules/` (3 timed runs) | 22,780.7 | 12,497.1 | 1 | 10 |
+| security.clean | 2,702.0 | 183.4 | 0 | 0 |
+| security.multiple | 2,721.2 | 193.1 | 1 | 2 |
+| security.dependency_failure_still_sast | 2,752.7 | 193.5 | 1 | 1 |
+| Generated tree, 50,000 `.ts` files in 500 directories plus an excluded `tests/` and `node_modules/` (3 timed runs) | 24,169.6 | 13,285.1 | 1 | 10 |
 
-The five measured milliseconds are: clean baseline `[2646.4, 2555.7, 2739.4, 2573.3, 2562.6]`, candidate `[199.5, 171.7, 170.1, 176.5, 176.2]`; multiple baseline `[2577.0, 2589.8, 2636.1, 2642.4, 2591.7]`, candidate `[181.5, 199.4, 182.6, 183.6, 183.6]`; dependency-failure baseline `[2716.2, 2878.7, 2721.7, 2569.5, 2590.8]`, candidate `[212.8, 198.0, 180.7, 183.6, 181.5]`; large tree baseline `[22657.8, 22916.9, 22780.7]`, candidate `[12035.4, 12497.1, 13899.6]`. All 57 comparison cases pass (security fixtures and default scope identical, every matrix row classified as documented). On the large tree both engines select the same 50,000 files and report the same 10 findings and exit code. No batching is involved: argv holds only the root entries and exclusion patterns, never a file list.
+The five measured milliseconds are: clean baseline `[2672.8, 2702.0, 2643.3, 2741.6, 2783.1]`, candidate `[185.8, 184.1, 182.1, 183.4, 182.6]`; multiple baseline `[2644.7, 2753.0, 2701.4, 2721.2, 2762.5]`, candidate `[190.3, 194.4, 193.1, 190.6, 239.2]`; dependency-failure baseline `[2752.7, 2691.4, 2833.9, 2699.1, 2911.9]`, candidate `[193.7, 190.1, 208.2, 193.5, 189.3]`; large tree baseline `[23661.6, 24169.6, 25044.8]`, candidate `[12815.3, 13285.1, 15709.7]`. All 81 comparison cases pass (security fixtures and default scope identical, every matrix row classified as documented). On the large tree both engines select the same 50,000 files and report the same 10 findings and exit code. No batching is involved: argv holds only the root entries and exclusion patterns, never a file list.
 
 | Case | Rule ID in both engines | File | Line | Column |
 |---|---|---|---:|---:|
@@ -47,25 +47,32 @@ Both engines return empty native errors arrays for these fixtures. An additional
 
 ## Target scope and `.semgrepignore`
 
-Owner-approved decision: `.semgrepignore` stays supported as a project configuration and follows Opengrep 2.1.0's native semantics; the default scope (no `.semgrepignore`) stays what 1.23.0 scanned. OxGuard does not parse ignore files, does not write anything into the scanned project and does not disable project ignore files.
+Owner-approved decisions: `.semgrepignore` stays supported as a project configuration and follows Opengrep 2.1.0's native semantics; the default scope (no `.semgrepignore`) stays what 1.23.0 scanned; tsguard exclusion semantics are unchanged from the shipped version; a Git subproject keeps 1.23.0's nested test paths; minified files are never scanned. OxGuard does not parse ignore files, does not write anything into the scanned project and does not disable project ignore files.
 
 ### What changed upstream
 
-The [2.1.0 implementation](https://github.com/opengrep/opengrep/blob/v2.1.0/src/targeting/Semgrepignore.ml) replaced the legacy [1.23.0 parser](https://github.com/opengrep/opengrep/blob/v1.23.0/cli/src/semgrep/ignores.py). Reproduced against both pinned engines: it reads `.semgrepignore` files at every depth, implements gitignore syntax (negation and character ranges work, `*` does not cross `/`, no inline comments), reads `:include` with a deprecation notice, and always skips `*.min.js` found while scanning a directory. It ships the same built-in default list as 1.23.0 and applies it only when the project root has no `.semgrepignore` (an empty file also replaces it), but anchors the list at each explicit target. OxGuard scans the root entries as targets (it must never enumerate `node_modules`; Windows pnpm junctions can stall that), so the built-in list never skips `./tests` or `./vendor`: unadapted 2.1.0 newly scans them. Without `--project-root`, outside Git each root target is its own project, so a root `.semgrepignore` is not found at all, and command-line `--exclude` patterns are evaluated relative to each target.
+The [2.1.0 implementation](https://github.com/opengrep/opengrep/blob/v2.1.0/src/targeting/Semgrepignore.ml) replaced the legacy [1.23.0 parser](https://github.com/opengrep/opengrep/blob/v1.23.0/cli/src/semgrep/ignores.py). Reproduced against both pinned engines: it reads `.semgrepignore` files at every depth, implements gitignore syntax (negation and character ranges work, `*` does not cross `/`, no inline comments), reads `:include` with a deprecation notice, and always skips `*.min.js` found while scanning a directory. It ships the same built-in default list as 1.23.0 and applies it only when the project root has no `.semgrepignore` (an empty file also replaces it), but anchors the list at each explicit target. OxGuard scans the root entries as targets (it must never enumerate `node_modules`; Windows pnpm junctions can stall that), so the built-in list never skips `./tests` or `./vendor`: unadapted 2.1.0 newly scans them. Without `--project-root`, outside Git each root target is its own project, so a root `.semgrepignore` is not found at all, and command-line `--exclude` patterns are evaluated relative to each target. Inside Git, the project root is the Git root, so the default-replacing file is the one there, and the built-in list still hides test directories nested below each root entry when only the subproject directory has a `.semgrepignore`.
 
 ### How OxGuard builds the scope
 
-`securityScopeArgs` in `tsguard/security_scope.go` is read-only and produces these arguments, followed by the root entries (never `node_modules` or `.git`) as targets:
+`securityScanArgs` in `tsguard/security_scope.go` produces these arguments, followed by the root entries (never `node_modules` or `.git`) as targets:
 
 | Argument | Why |
 |---|---|
-| `--project-root .` outside Git | One project for every root target, so the root `.semgrepignore` and anchored patterns work; Git projects keep Opengrep's native Git root and `.gitignore` handling |
-| `--exclude` for tsguard exclusions | Built-in directories, `oxguard.toml` `exclude` and `--exclude`; `/path` is anchored at the scan root (translated to the Git-relative path below a Git root), other entries match at any depth, negation is rejected |
+| `--project-root .` outside Git | One project for every root target, so the root `.semgrepignore` works; Git projects keep Opengrep's native Git root and `.gitignore` handling |
+| `--exclude` for tsguard exclusions | Built-in directories, `oxguard.toml` `exclude` and `--exclude`, mapped as described below |
 | `--exclude` for the baseline layer | Always applied, outranks every ignore file |
 | `--exclude` for the test defaults | Only when no `.semgrepignore` exists at the scan root or at the Git root |
+| Extra explicit targets for nested test paths | Only for a Git subproject whose scan directory has a `.semgrepignore` and whose Git root has none (below) |
 | Root-level `*.min.js` files are not targets | Owner-approved exception: minified files are never scanned. Opengrep exempts explicit root files from every exclusion, so this one filter lives in `securityRootTargets` |
 
-Not used: `--force-exclude` (measured: with it, root *files* named like directory entries (`build`, `dist`, `skills`, `.claude`, `.agents`, `.kiro`, `.next`, `coverage`, `CVS`, `.svn`, `.hg`, `_darcs`) and `*_test.go` stop being scanned, a difference from 1.23.0 beyond minified files), `--x-ignore-semgrepignore-files` (internal, "may change or disappear without notice", and it would remove project ignore files), `--semgrepignore-filename` with a generated file (writes into the project), and explicit file lists with batching (2.1.0 has no target-list-file option, and none is needed).
+If every root entry is such a minified file, Opengrep is not started (without targets it would scan the working directory) and the security gate records a clean, complete result with no findings and exit 0.
+
+Not used: `--force-exclude` (measured: with it, root *files* named like directory entries (`build`, `dist`, `skills`, `.claude`, `.agents`, `.kiro`, `.next`, `coverage`, `CVS`, `.svn`, `.hg`, `_darcs`) and `*_test.go` stop being scanned, a difference from 1.23.0 beyond minified files), `--x-ignore-semgrepignore-files` (internal, "may change or disappear without notice", and it would remove project ignore files) and `--semgrepignore-filename` with a generated file (writes into the project).
+
+### tsguard exclusions: unchanged from the shipped version
+
+Main passed every entry E as `--exclude E` to 1.23.0, which matches `**/E` and `**/E/**` (wcmatch). Measured against that engine for each form: leading and trailing slashes never anchored anything, so `/src` excluded `src` and `lib/src`, `/a.ts` excluded `src/a.ts` and `lib/a.ts`, and `a/b`, `/a/b`, `a/b/` and `/a/b/` were the same; `./x`, `!x` and `#x` were literals that matched nothing; root-level files (explicit targets) were never excludable. OxGuard maps every entry to `**/` plus the entry stripped of leading and trailing slashes, and `scripts/compare-opengrep.py` asserts identical file sets for `x`, `/x`, `x/`, `/x/`, `a/b`, `/a/b`, `/a/b/`, `/src`, `src/a.ts`, `/a.ts`, `/lib/src`, `*.snap.ts`, `/*.ts`, `!a.ts`, `./x`, `**/x`, `x/*`, below a Git root, and for root files. Main accepted `!` entries (as literals), so they are accepted. One deliberate difference: an entry that is empty after stripping slashes (`""`, `/`; a trailing comma in `--exclude` is enough) excluded every file under 1.23.0 and silently disabled the gate; it is rejected as invalid configuration.
 
 ### Default-list layers
 
@@ -76,54 +83,120 @@ The 1.23.0 default list ([template](https://github.com/opengrep/opengrep/blob/v1
 | Baseline, always applied | `.git`, `.svn`, `.hg`, `_darcs`, `CVS`, `build/`, `vendor/`, `dist/`, `*.min.js`, `.env/`, `.tox/`, `node_modules/`, `.npm/`, `.yarn/`, `.venv/`, `_opam/`, `_build/`, `_cargo/` | Cannot remove them (negations do not re-include them); it can only add exclusions |
 | Test defaults, replaceable | `test/`, `tests/`, `testsuite/`, `*_test.go` | A `.semgrepignore` at the scan root (1.23.0's rule) or at the Git root (2.1.0's rule), even empty, replaces them |
 
-The reason for the baseline layer: if a short project file such as `docs/` replaced everything, dependencies, vendored code and minified bundles would silently start being scanned. The one intentional difference from 1.23.0 is therefore that projects with a `.semgrepignore` no longer have minified, vendored or build-output files scanned (1.23.0 scanned them once any project file existed): fewer findings, only in non-project code.
+The reason for the baseline layer: if a short project file such as `docs/` replaced everything, dependencies, vendored code and minified bundles would silently start being scanned. The intentional differences from 1.23.0 are therefore that projects with a `.semgrepignore` no longer have vendored or build-output files scanned (1.23.0 scanned them once any project file existed), and that minified files are never scanned, root level included (1.23.0 scanned an explicit root `x.min.js`; a project whose only finding is in such a file now passes). Both reduce findings only in non-project code.
+
+### Git subprojects: nested test paths
+
+When only the subproject's scan directory has a `.semgrepignore` (Git root has none), Opengrep 2.1.0 applies its own test paths below each root entry, hiding `src/tests`, which 1.23.0 scanned. Measured alternatives: `--project-root <scan root>` inside Git treats the directory as a project without version control, so Git-root and nested `.gitignore` files stop applying and ignored files are scanned; negating the built-ins with `--exclude '!tests/'` does not re-include them; `--semgrepignore-filename` cannot name a path. OxGuard therefore restores the paths with explicit targets, and lets Opengrep and Git make every ignore decision:
+
+1. It asks Opengrep which files it would select, with the scan root as the project so the scan-directory file replaces the built-ins (`scan --x-ls --project-root . <same --exclude arguments> <root entries>`). This applies every `.semgrepignore` and every exclusion, never lists `node_modules` (excluded and never a target) and does not follow symlinked directories. `--x-ls` is an internal flag ("may change or disappear without notice"); the engine is pinned and the harness fails if it changes.
+2. Each directory named `test`, `tests` or `testsuite` below a root entry (at any depth) becomes an explicit directory target. Opengrep does not apply its built-ins to the target itself, still applies `.gitignore`, project ignore files and every exclusion inside it, and skips test directories nested in it natively, so targets never overlap and nothing is reported twice (the harness asserts identical finding lists, including a test directory inside a test directory).
+3. Each nested `*_test.go` file becomes an explicit file target. Explicit files bypass every filter, so `git check-ignore` first drops the ones `.gitignore` excludes (it never reports tracked files, like Opengrep's own Git handling); the listing already applied `.semgrepignore` and the exclusions.
+
+Bound: the extra targets are limited to 16,000 bytes of argv on every platform (Windows limits a command line to 32,767 characters, shared with the engine path, patterns and root targets). A larger set fails closed with `invalid_configuration` and the workaround below instead of a partial scan. Failures of the listing or `git check-ignore` fail closed as `analyzer_failure`. Workaround for very large subprojects: an empty `.semgrepignore` at the Git root replaces Opengrep's built-ins natively (row `monorepo.scan-root-file-and-empty-git-root-file`).
+
+Which file wins when both exist: patterns of both are applied (Opengrep reads every `.semgrepignore` from the Git root down) and either one replaces the test defaults; 1.23.0 applied only the scan directory's file.
 
 ### Compatibility matrix
 
-`python3 scripts/compare-opengrep.py <1.23.0> <2.1.0> --markdown` runs every row with both pinned engines (sha256 verified first) and the production argument builder, and fails if a row stops behaving as classified here. 1.23.0 uses the pre-migration invocation (`--exclude <dir>` and root targets). Counts are files Opengrep reports as scanned; every file carries one `eval`, so selected files and findings coincide, and the harness also compares rule ID, file, line, column, diagnostics and exit code. "More scanned" can newly break builds; "less scanned" could hide findings.
+`python3 scripts/compare-opengrep.py <1.23.0> <2.1.0> --update-doc docs/opengrep-2.1-migration.md` regenerates the table below from the measurement. It runs every row with both pinned engines (sha256 verified first) and the production argument builder, and fails if a row stops behaving as classified. 1.23.0 uses the pre-migration invocation (`--exclude <entry>` and root targets). Counts are files Opengrep reports as scanned; every file carries one `eval`, so selected files and findings coincide, and each row compares rule ID, file, line, column, message, severity, diagnostics (type, level, message, path), the full finding list (so duplicates show) and the exit code. "More scanned" can newly break builds; "less scanned" could hide findings; `approved-reduction` is the owner-approved exception that equals the 1.23.0 result minus the listed minified, vendored or build-output files and differs in nothing else (a self-test proves the check fails on drift in any compared field). In the no-`.semgrepignore` case no row differs from 1.23.0 except the approved minified reduction.
 
-| Group | Scenario | 1.23.0 / 2.1.0 files | Result |
-|---|---|---|---|
-| Default scope (no `.semgrepignore`) | Security eval fixtures: `security.clean`, `security.multiple`, `security.dependency_failure_still_sast` | 1/1 each, exits 0/0, 1/1, 1/1 | identical |
-| | Default dirs (`tests/`, `test/`, `testsuite/`, `src/tests/`, `vendor/`, `build/`, `.venv/`, `.tox/`, `.env/`, `_build/`, `*.min.js`, dependencies) | 12/12 | identical |
-| | Git: default, `.gitignore`d untracked file, `.gitignore`d tracked file | 12/12, 10/10, 12/12 | identical |
-| | Custom exclusions at any depth, symlinks (escape through a symlinked directory or file) | 11/11, 12/12 | identical |
-| a. Defaults with a project file | Root `.semgrepignore` with `scripts/` (test dirs scanned in both), empty file, comments only, Git project | 14/14, 15/15, 15/15, 14/14 | identical |
-| | `docs/` only, plus minified, vendored, `.venv`, `.tox`, `.env`, `_build` artifacts | 21/14 | less scanned: artifacts excluded, tests still scanned |
-| | Negations in the project file cannot re-include `vendor/`, `*.min.js` | 22/15 | less scanned (artifacts only) |
-| b. `:include` | `:include .gitignore` (plain and Git), `:include custom.ignore`, `:include` of a directory, `:include` of a missing file | 13/13, 13/13, 14/14, 14/14, 15/15 | identical |
-| | Unknown `:` directive (`:unknown x`) | exit 2 / 14 files | different: 1.23.0 aborts with an error, 2.1.0 ignores the line |
-| c. Typical files | `scripts/` + `docs/`, with and without trailing slash, `*.test.ts`, `**/fixtures/`, `/build`, `/b.ts` + `c.ts`, `src/gen` (inner slash anchors), `src/**/c.ts`, comments and blank lines | 13/13 … 15/15 | identical |
-| | `src/*.ts` | 8/12 | more scanned: `*` no longer crosses `/` (hid `src/deep/c.ts` and `src/gen/`, `src/tests/`, `src/fixtures/` files) |
-| | `docs/ # trailing comment` | 13/14 | more scanned: there is no inline comment, the pattern is a literal |
-| d. Nested files | `src/.semgrepignore` listing `a.ts`, with and without a root file | 12/11, 14/13 | less scanned: `src/a.ts` is now hidden, as the file's author intended |
-| e. Syntax | `src/*.ts` + `!src/b.ts` | 8/13 | more scanned: negation honored (dropped in 1.23.0) |
-| | `src/[a-b].ts` | 15/13 | less scanned: ranges honored (dropped in 1.23.0) |
-| | Trailing spaces, CRLF endings, escaped trailing space, Unicode file names | 14/14, 13/13, 15/15, 15/15 | identical |
-| OxGuard exclusions | `/src` anchored, also from a Git subproject | 5/6 | more scanned: only the scan root's `src` is excluded; 1.23.0 also excluded `lib/src` |
-| | `/a.ts` anchored root file | 11/11 | different: only the root `a.ts` is excluded (1.23.0 excluded `src/a.ts` and scanned the explicit root file) |
-| Root-level files | Root files named like every entry type (`build`, `dist`, `vendor`, `CVS`, `.env`, `skills`, `.claude`, `.agents`, `.kiro`, `.next`, `coverage`, `testsuite`, `.hg`, `.svn`, `_darcs`, `.venv`, `.tox`, `.npm`, `.yarn`, `_opam`, `_build`, `_cargo`, `foo_test.go`, `README.md`, `Makefile`, `a.ts`) with no `.semgrepignore`, scanned by a language-agnostic rule | 31/29 | identical except the two `*.min.js` files: approved-reduction |
-| | `exclude = ["generated.ts", "/a.ts"]` naming root files | 3/3 | identical: explicit root files ignore exclusions in both engines |
-| | `/a.ts` anchored | 11/12 | more scanned: `src/a.ts` is no longer hidden (1.23.0 treated it as any depth) |
-| **Approved reduction** (owner decision, round-3 review) | Root `x.min.js` with an `eval`, with and without a project file; a project whose only finding is in a root `x.min.js` | 13/12, 15/14; 2/1 files, exit 1 / 0 | approved-reduction: minified files are never scanned, root included. The harness gives it its own label and fails if the candidate differs from the baseline by anything else |
-| Monorepo (scan root `packages/app` below the Git root) | No ignore files; `.gitignore` at the Git root (`gen/`) and in the scan directory (`lib/`) | 10/10 | identical: both `.gitignore` files honored, defaults apply |
-| | `.semgrepignore` (`docs/`) only in the scan directory | 12/11 | less scanned: `tests/` and `test/` scanned as in 1.23.0 (OxGuard shim), but `src/tests` stays skipped by Opengrep's native built-ins |
-| | Same, plus an empty `.semgrepignore` at the Git root (the workaround) | 12/12 | identical |
-| | `.semgrepignore` only at the Git root (`scripts/`) | 12/14 | different: the Git-root file is honored (1.23.0 ignored it) and replaces the test defaults |
-| | Files at both levels (`docs/` and `scripts/`) | 14/13 | less scanned: patterns of both files apply, 1.23.0 read only the scan directory's |
-| | Scan root equal to the Git root | 12/12 | identical |
-| | Excluded directory with no read permission | exit 2 / 12 files | different: 1.23.0 refuses to start on an unreadable root entry; 2.1.0 skips the excluded directory and reports unexcluded unreadable paths as scan errors |
+<!-- matrix:start (generated by scripts/compare-opengrep.py --update-doc; do not edit by hand) -->
+81 cases measured with both engines: 6 approved-reduction, 3 different, 62 identical, 7 less scanned, 3 more scanned.
 
-Monorepo shim and its limit: Opengrep 2.1.0 decides whether its built-in default list applies by looking for `.semgrepignore` at the project root, which inside Git is the Git root. OxGuard cannot change that without losing `.gitignore` handling, so it adds what flags allow: the test defaults are not supplied when the scan root has a file, which restores `./tests` and `./test` as in 1.23.0 (the reviewer's reproduction). Measured alternatives: `--project-root <scan root>` inside Git makes Opengrep treat the directory as a project without version control, so Git-root and nested `.gitignore` files (`gen/`, `lib/` above) stop applying and ignored files are scanned; negating the built-ins with `--exclude '!tests/'` does not re-include them; `--semgrepignore-filename` cannot name a path. Remaining difference: with the file only in the scan directory, built-in test paths still skip nested test directories below root entries (`src/tests`). Workaround: add an empty `.semgrepignore` at the Git root (row above). Closing the gap without that file would need either a generated ignore file (written into the project) or OxGuard-side enumeration of nested test directories (a directory walk plus `git check-ignore`), which were rejected as a new parser or project writes. Which file wins when both exist: patterns of both are applied (Opengrep reads every `.semgrepignore` from the Git root down), and either one replaces the test defaults; 1.23.0 applied only the scan directory's file. Upstream marks the `:include` directive deprecated, so a future engine upgrade must re-run the matrix. No common usage tested required more than this shim.
+| Case | Scenario | 1.23.0 files | 2.1.0 files | Exit 1.23.0 / 2.1.0 | Result |
+|---|---|---:|---:|---|---|
+| `fixture.security.clean` |  | 1 | 1 | 0 / 0 | identical |
+| `fixture.security.multiple` |  | 1 | 1 | 1 / 1 | identical |
+| `fixture.security.dependency_failure_still_sast` |  | 1 | 1 | 1 / 1 | identical |
+| `default.scope` |  | 12 | 12 | 1 / 1 | identical |
+| `default.git` |  | 12 | 12 | 1 / 1 | identical |
+| `default.git-gitignored-untracked` |  | 10 | 10 | 1 / 1 | identical |
+| `default.git-gitignored-tracked` |  | 12 | 12 | 1 / 1 | identical |
+| `default.custom-exclude-any-depth` |  | 11 | 11 | 1 / 1 | identical |
+| `default.symlinks` |  | 12 | 12 | 1 / 1 | identical |
+| `approved.root-minified` | owner-approved: 1.23.0 scanned an explicit root x.min.js; minified files are never scanned (only 1.23.0: `x.min.js`) | 13 | 12 | 1 / 1 | approved-reduction |
+| `approved.root-minified-only-finding` | 1.23.0 exits 1 on the minified file alone; the candidate exits 0 (only 1.23.0: `x.min.js`) | 2 | 1 | 1 / 0 | approved-reduction |
+| `approved.root-minified-with-ignore` | (only 1.23.0: `x.min.js`) | 15 | 14 | 1 / 1 | approved-reduction |
+| `default.root-level-entries` | root files named like directory entries stay scanned exactly as in 1.23.0; only minified files differ (only 1.23.0: `a.min.js`, `x.min.js`) | 31 | 29 | 1 / 1 | approved-reduction |
+| `default.root-level-entries-user-exclude` | explicit root files ignore exclusions in both engines (root files cannot be excluded) | 3 | 3 | 1 / 1 | identical |
+| `approved.root-minified-alone` | only a root minified file: no Opengrep run, a clean complete result (1.23.0 exits 1) (only 1.23.0: `x.min.js`) | 1 | 0 | 1 / 0 | approved-reduction |
+| `exclude.map.x` | `x` excludes the same files in both engines | 12 | 12 | 1 / 1 | identical |
+| `exclude.map.slash-x` | `/x` excludes the same files in both engines | 12 | 12 | 1 / 1 | identical |
+| `exclude.map.x-slash` | `x/` excludes the same files in both engines | 12 | 12 | 1 / 1 | identical |
+| `exclude.map.slash-x-slash` | `/x/` excludes the same files in both engines | 12 | 12 | 1 / 1 | identical |
+| `exclude.map.a-b` | `a/b` excludes the same files in both engines | 13 | 13 | 1 / 1 | identical |
+| `exclude.map.slash-a-b` | `/a/b` excludes the same files in both engines | 13 | 13 | 1 / 1 | identical |
+| `exclude.map.slash-a-b-slash` | `/a/b/` excludes the same files in both engines | 13 | 13 | 1 / 1 | identical |
+| `exclude.map.slash-src` | `/src` excludes the same files in both engines | 10 | 10 | 1 / 1 | identical |
+| `exclude.map.src-a-ts` | `src/a.ts` excludes the same files in both engines | 15 | 15 | 1 / 1 | identical |
+| `exclude.map.slash-a-ts` | `/a.ts` excludes the same files in both engines | 14 | 14 | 1 / 1 | identical |
+| `exclude.map.slash-lib-src` | `/lib/src` excludes the same files in both engines | 15 | 15 | 1 / 1 | identical |
+| `exclude.map.glob` | `*.snap.ts` excludes the same files in both engines | 15 | 15 | 1 / 1 | identical |
+| `exclude.map.slash-glob` | `/*.ts` excludes the same files in both engines | 2 | 2 | 1 / 1 | identical |
+| `exclude.map.bang` | `!a.ts` excludes the same files in both engines | 16 | 16 | 1 / 1 | identical |
+| `exclude.map.dot-slash` | `./x` excludes the same files in both engines | 16 | 16 | 1 / 1 | identical |
+| `exclude.map.double-star` | `**/x` excludes the same files in both engines | 12 | 12 | 1 / 1 | identical |
+| `exclude.map.children` | `x/*` excludes the same files in both engines | 12 | 12 | 1 / 1 | identical |
+| `exclude.map.git-subproject-slash-src` | the same mapping below a Git root: no Git-relative translation | 7 | 7 | 1 / 1 | identical |
+| `exclude.map.root-file-not-excludable` | root-level explicit files were never excludable in 1.23.0 and still are not | 14 | 14 | 1 / 1 | identical |
+| `layer.docs-only-ignore` | tests are scanned as in 1.23.0; minified/vendored/build artifacts stay excluded (1.23.0 scanned them once a project file existed) (only 1.23.0: `.env/e.ts`, `.tox/t.ts`, `.venv/v.ts`, `_build/b.ts`, `src/vendor/v.ts`, `src/x.min.js`, `vendor/v.ts`) | 21 | 14 | 1 / 1 | less scanned |
+| `layer.empty-ignore` | an empty project file still releases the test defaults but not the artifacts (only 1.23.0: `.env/e.ts`, `.tox/t.ts`, `.venv/v.ts`, `_build/b.ts`, `src/vendor/v.ts`, `src/x.min.js`, `vendor/v.ts`) | 22 | 15 | 1 / 1 | less scanned |
+| `layer.user-exclude-with-ignore` | tsguard --exclude/config entries apply on top of any project file | 13 | 13 | 1 / 1 | identical |
+| `layer.ignore-cannot-reinclude` | negations cannot re-include the baseline layer (only 1.23.0: `.env/e.ts`, `.tox/t.ts`, `.venv/v.ts`, `_build/b.ts`, `src/vendor/v.ts`, `src/x.min.js`, `vendor/v.ts`) | 22 | 15 | 1 / 1 | less scanned |
+| `exclude.unreadable-excluded-dir` | 1.23.0 refuses to start on an unreadable root entry; 2.1.0 skips the excluded directory (only 2.1.0: `a.ts`, `cache/private/p.ts`, `docs/d.ts`, `lib/l.ts`, `lib/src/y.ts`, `scripts/s.ts`, `src/a.test.ts`, `src/a.ts`, `src/b.ts`, `src/deep/c.ts`, `src/fixtures/f.ts`, `src/gen/g.ts`) | 0 | 12 | 2 / 1 | different |
+| `ignore.root-replaces-defaults` | the test defaults are replaced by the project file in both engines | 14 | 14 | 1 / 1 | identical |
+| `ignore.root-empty` | an empty root file also replaces the defaults | 15 | 15 | 1 / 1 | identical |
+| `ignore.root-comments-only` |  | 15 | 15 | 1 / 1 | identical |
+| `ignore.root-git` |  | 14 | 14 | 1 / 1 | identical |
+| `monorepo.no-ignore-files` | defaults apply; Git-root and scan-directory .gitignore honored | 9 | 9 | 1 / 1 | identical |
+| `monorepo.scan-root-file` | OxGuard restores the test paths Opengrep's built-ins would hide: root entries and nested directories (src/tests) | 11 | 11 | 1 / 1 | identical |
+| `monorepo.scan-root-file-and-empty-git-root-file` | an empty .semgrepignore at the Git root: native replacement, no restoration needed | 11 | 11 | 1 / 1 | identical |
+| `monorepo.git-root-file` | the Git-root file is honored (1.23.0 ignored it) and replaces the test defaults (only 1.23.0: `scripts/s.ts`; only 2.1.0: `src/tests/t.ts`, `test/a.ts`, `tests/a.ts`) | 12 | 14 | 1 / 1 | different |
+| `monorepo.both-files` | patterns of both files apply (1.23.0 read only the scan-root file); both replace the defaults (only 1.23.0: `scripts/s.ts`) | 14 | 13 | 1 / 1 | less scanned |
+| `monorepo.git-root-equals-scan-root` | unchanged when the scan root is the Git root | 12 | 12 | 1 / 1 | identical |
+| `nested-tests.basic` | nested test, tests, testsuite directories and nested *_test.go files are scanned as in 1.23.0 | 14 | 14 | 1 / 1 | identical |
+| `nested-tests.project-ignored-stays-excluded` | a nested test directory and a *_test.go file the project .semgrepignore excludes stay excluded | 14 | 14 | 1 / 1 | identical |
+| `nested-tests.gitignored-stays-excluded` | nested test paths ignored by the Git-root or the scan-directory .gitignore stay excluded | 15 | 15 | 1 / 1 | identical |
+| `nested-tests.deep` | deeply nested directories, test directories inside test directories, nested *_test.go inside them | 17 | 17 | 1 / 1 | identical |
+| `nested-tests.baseline-inside-stays-excluded` | the baseline layer applies inside nested tests (1.23.0 scanned vendor, build and minified files once a project file existed) (only 1.23.0: `src/tests/vendor/v.ts`, `src/tests/x.min.js`) | 16 | 14 | 1 / 1 | approved-reduction |
+| `nested-tests.no-duplicate-reports` | overlapping candidates are reported exactly once: Opengrep skips test directories nested in a target | 16 | 16 | 1 / 1 | identical |
+| `nested-tests.outside-git` | outside Git --project-root already replaces the defaults: no restoration needed | 14 | 14 | 1 / 1 | identical |
+| `include.gitignore` |  | 13 | 13 | 1 / 1 | identical |
+| `include.gitignore-git` |  | 13 | 13 | 1 / 1 | identical |
+| `include.custom-file` |  | 14 | 14 | 1 / 1 | identical |
+| `include.directory` |  | 14 | 14 | 1 / 1 | identical |
+| `include.unknown-directive` | (only 2.1.0: `a.ts`, `cache/private/p.ts`, `docs/d.ts`, `lib/l.ts`, `lib/src/y.ts`, `src/a.test.ts`, `src/a.ts`, `src/b.ts`, `src/deep/c.ts`, `src/fixtures/f.ts`, `src/gen/g.ts`, `src/tests/t.ts`, `test/a.ts`, `tests/a.ts`) | 0 | 14 | 2 / 1 | different |
+| `include.missing-file` |  | 15 | 15 | 1 / 1 | identical |
+| `ignore.scripts-docs` |  | 13 | 13 | 1 / 1 | identical |
+| `ignore.scripts-docs-no-slash` |  | 13 | 13 | 1 / 1 | identical |
+| `ignore.test-suffix` |  | 14 | 14 | 1 / 1 | identical |
+| `ignore.fixtures-globstar` |  | 14 | 14 | 1 / 1 | identical |
+| `ignore.anchored-build` |  | 15 | 15 | 1 / 1 | identical |
+| `ignore.anchored-vs-unanchored` |  | 14 | 14 | 1 / 1 | identical |
+| `ignore.inner-slash-anchors` |  | 14 | 14 | 1 / 1 | identical |
+| `ignore.comments-and-blank-lines` |  | 13 | 13 | 1 / 1 | identical |
+| `ignore.inline-comment` | gitignore has no inline comments: 1.23.0 stripped ` # ...`, 2.1.0 reads a literal pattern (only 2.1.0: `docs/d.ts`) | 13 | 14 | 1 / 1 | more scanned |
+| `ignore.star-crosses-slash` | 1.23.0 fnmatch `*` crossed `/` (hid src/deep/c.ts); gitignore `*` does not (only 2.1.0: `src/deep/c.ts`, `src/fixtures/f.ts`, `src/gen/g.ts`, `src/tests/t.ts`) | 8 | 12 | 1 / 1 | more scanned |
+| `ignore.nested-src` | a nested file is now honored; 1.23.0 read only the cwd file (only 1.23.0: `src/a.ts`) | 12 | 11 | 1 / 1 | less scanned |
+| `ignore.nested-src-with-root` | (only 1.23.0: `src/a.ts`) | 14 | 13 | 1 / 1 | less scanned |
+| `ignore.negation` | negation was silently dropped in 1.23.0 and is honored now (only 2.1.0: `src/b.ts`, `src/deep/c.ts`, `src/fixtures/f.ts`, `src/gen/g.ts`, `src/tests/t.ts`) | 8 | 13 | 1 / 1 | more scanned |
+| `ignore.range` | character ranges were silently dropped in 1.23.0 (only 1.23.0: `src/a.ts`, `src/b.ts`) | 15 | 13 | 1 / 1 | less scanned |
+| `ignore.double-star-middle` |  | 14 | 14 | 1 / 1 | identical |
+| `ignore.trailing-spaces` |  | 14 | 14 | 1 / 1 | identical |
+| `ignore.crlf` |  | 13 | 13 | 1 / 1 | identical |
+| `ignore.escaped-trailing-space` |  | 15 | 15 | 1 / 1 | identical |
+| `ignore.unicode-name` |  | 15 | 15 | 1 / 1 | identical |
+<!-- matrix:end -->
 
 ### What users may notice
 
-Projects without a `.semgrepignore` see no change except exclusion semantics (`/path` anchoring), a tolerant scan when an excluded directory is unreadable, and the approved reduction that minified files, root-level ones included, are never scanned (a project whose only finding was in a root `x.min.js` now passes). Projects with a `.semgrepignore`: nested files are honored (can hide findings); negation and character ranges work (both directions); `*` stays within a directory level; inline comments are not recognised; a Git-root `.semgrepignore` is honored too and, like a scan-directory file, replaces the test defaults (nested test directories below root entries are still skipped by Opengrep unless the Git root has a file); unknown directives are ignored; minified, vendored and build-output files are no longer scanned. To keep an exclusion that no longer comes from a `.semgrepignore`, add it to `oxguard.toml` `exclude` or `--exclude`.
+Projects without a `.semgrepignore` see no change except a tolerant scan when an excluded directory is unreadable, the rejection of empty exclusion entries, and the approved reduction that minified files, root-level ones included, are never scanned. Projects with a `.semgrepignore`: nested files are honored (can hide findings); negation and character ranges work (both directions); `*` stays within a directory level; inline comments are not recognised; a Git-root `.semgrepignore` is honored too and, like a scan-directory file, replaces the test defaults; unknown directives are ignored; vendored and build-output files are no longer scanned once a project file exists. To keep an exclusion that no longer comes from a `.semgrepignore`, add it to `oxguard.toml` `exclude` or `--exclude`.
 
 ## Verification and evidence reuse
 
 The local gate includes `go vet ./...` and `go test ./...` in contract, tsguard and pyguard; eval and harness regression tests; identity-hook and release-document tests; installed npm distribution/capability/maintainability tests; and agent-action scoring with zero failures and zero stale sessions. ZIP rejection tests cover digest mismatch, malicious paths, symlinks, duplicates, missing files, oversized declarations and extracted executable mismatch. A real standalone setup smoke downloads the upstream host asset, validates cache reuse and executes `--version`; CI runs it on Linux, macOS and Windows. Existing `scripts/release-smoke.py archive` and `npm` checks passed on local unpublished archives/tarballs. `install.sh` installed the local checksum-verified archive through a temporary curl transport stub and successfully ran the installed CLI; PowerShell execution is left to Windows/platform verification. Skill files and agent trace hashes were not changed.
 
-Local final results: contract 36 passing tests/subtests, tsguard 166, pyguard 252; the normal Go run skips the opt-in network smoke and the comparison-only helper, which `scripts/compare-opengrep.py` runs. The Node harness (`node --test evals/*.test.cjs evals/python/*.test.cjs evals/p0/*.test.cjs scripts/*.test.cjs tsguard/analysis/change-metrics.test.cjs`) has 92 passes, zero failures and one optional real-Python skip (the CI file list: 86 passes, one skip); required npm distribution has 3/3 passes, installed capability 31/31 (including `security.clean`, `security.multiple` and `security.dependency_failure_still_sast`) and installed maintainability 40/40. Identity hooks pass 6/6 and release documentation 3/3; agent scoring reports 0 fail and 0 stale. Go unit tests of the scope builder cover the default layers (reproducing the 1.23.0 template), project-file replacement of only the test layer, nested files, the monorepo shim (no file, scan-root file, Git-root file, both files, scan root equal to the Git root), Git subproject anchoring, anchored `/src`, invalid exclusions, the root-level minified-file filter (other root files, including ones named `build`/`skills`/`CVS`, stay targets) and that selection writes nothing even into a read-only scan root; the engine behavior (default scope, `.semgrepignore` matrix, unreadable excluded directory, symlink escape, root-level files) is asserted by `scripts/compare-opengrep.py` against both pinned engines. No skill file mentions `.semgrepignore`, so no skill or agent trace changed.
+Local final results: contract 36 passing tests/subtests, tsguard 171, pyguard 252; the normal Go run skips the opt-in network smoke and the comparison-only helper, which `scripts/compare-opengrep.py` runs. The Node harness (`node --test evals/*.test.cjs evals/python/*.test.cjs evals/p0/*.test.cjs scripts/*.test.cjs tsguard/analysis/change-metrics.test.cjs`) has 92 passes, zero failures and one optional real-Python skip (the CI file list: 86 passes, one skip); required npm distribution has 3/3 passes, installed capability 31/31 (including `security.clean`, `security.multiple` and `security.dependency_failure_still_sast`) and installed maintainability 40/40. Identity hooks pass 6/6 and release documentation 3/3; agent scoring reports 0 fail and 0 stale. Go unit tests of the scope builder cover the default layers (reproducing the 1.23.0 template), the exclusion mapping for every slash form and the rejection of empty entries, project-file replacement of only the test layer, nested files, the monorepo cases (no file, scan-root file, Git-root file, both, scan root equal to the Git root), the derivation of nested test targets from an engine listing (nested and deeply nested directories, `*_test.go`, root-level entries left alone, no duplicate targets, `git check-ignore` filtering, fail-closed listing errors and the argv bound), the explicit empty selection and its clean gate record, the root-level minified-file filter (other root files, including ones named `build`/`skills`/`CVS`, stay targets) and that selection writes nothing even into a read-only scan root; the engine behavior (default scope, the `.semgrepignore` matrix, exclusion forms, nested tests, unreadable directories, symlink escape, root-level files) is asserted by `scripts/compare-opengrep.py` against both pinned engines, whose checker has a self-test (`--self-test`, also run at every start) that fails on drift in any compared field. No skill file mentions `.semgrepignore`, so no skill or agent trace changed.
 
 PR #58 reuse is deliberately not claimed. Running its `classify` function on the staged raw diff returns `{ docs_only: false, component: "none" }`, requiring both components. Its classifier permits reuse only for an unambiguous single component. `npm/**` alone is Tsguard-owned under the actual classifier (even native-tools.json); this PR also changes `.github/workflows/npm.yml`, shared `scripts/**`, fixture documentation and root/docs files, so classification requires both components. Both Go component suites are verified locally and CI must produce fresh platform/component evidence. Reuse would require a successful exact-base main push run within 24 hours plus validated artifacts and manifests; the migration does not weaken that requirement.

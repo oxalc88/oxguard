@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,47 +61,44 @@ func TestSecurityDefaultLayersAreTheV123Template(t *testing.T) {
 	}
 }
 
+// The mapping reproduces main's 1.23.0 behavior: leading and trailing slashes
+// never anchored anything (scripts/compare-opengrep.py proves it per form).
 func TestOpengrepExcludePattern(t *testing.T) {
-	cases := []struct {
-		entry, prefix, want string
-		skip, fail          bool
-	}{
-		{entry: "node_modules", want: "**/node_modules"},
-		{entry: "dist", want: "**/dist"},
-		{entry: "cache/private", want: "**/cache/private"},
-		{entry: "./dist", want: "**/dist"},
-		{entry: "**/generated", want: "**/generated"},
-		{entry: "src/", want: "**/src/"},
-		{entry: "*.snap", want: "**/*.snap"},
-		{entry: "/src", want: "/src"},
-		{entry: "/src/generated", want: "/src/generated"},
-		{entry: "//src", want: "/src"},
-		{entry: "/src", prefix: "packages/app/", want: "/packages/app/src"},
-		{entry: "/a b/ü", want: "/a b/ü"},
-		{entry: "", skip: true},
-		{entry: "!keep", fail: true},
-		{entry: "#note", fail: true},
-		{entry: "/", fail: true},
-		{entry: ".", fail: true},
+	cases := map[string]string{
+		"node_modules":  "**/node_modules",
+		"dist":          "**/dist",
+		"cache/private": "**/cache/private",
+		"/src":          "**/src",
+		"src/":          "**/src",
+		"/src/":         "**/src",
+		"//src":         "**/src",
+		"a/b":           "**/a/b",
+		"/a/b":          "**/a/b",
+		"/a/b/":         "**/a/b",
+		"/a.ts":         "**/a.ts",
+		"*.snap":        "**/*.snap",
+		"/*.ts":         "**/*.ts",
+		"**/generated":  "**/generated",
+		"x/**":          "**/x/**",
+		"./dist":        "**/./dist",
+		"!keep":         "**/!keep",
+		"#note":         "**/#note",
+		"/a b/ü":        "**/a b/ü",
 	}
-	for _, c := range cases {
-		got, ok, err := opengrepExcludePattern(c.entry, c.prefix)
-		if c.fail {
-			if err == nil {
-				t.Errorf("%q accepted as %q", c.entry, got)
-			}
-			continue
+	for entry, want := range cases {
+		got, err := opengrepExcludePattern(entry)
+		if err != nil || got != want {
+			t.Errorf("%q = %q, %v; want %q", entry, got, err, want)
 		}
-		if err != nil {
-			t.Errorf("%q: %v", c.entry, err)
-			continue
-		}
-		if c.skip == ok || got != c.want {
-			t.Errorf("%q (prefix %q) = %q,%v; want %q", c.entry, c.prefix, got, ok, c.want)
+	}
+	// 1.23.0 excluded every file for these; silently disabling the gate is rejected.
+	for _, entry := range []string{"", "/", "//"} {
+		if got, err := opengrepExcludePattern(entry); err == nil {
+			t.Errorf("%q accepted as %q", entry, got)
 		}
 	}
 	if runtime.GOOS == "windows" {
-		if got, _, _ := opengrepExcludePattern(`\src\gen`, ""); got != "/src/gen" {
+		if got, _ := opengrepExcludePattern(`\src\gen`); got != "**/src/gen" {
 			t.Errorf("windows separators not normalized: %q", got)
 		}
 	}
@@ -107,10 +106,11 @@ func TestOpengrepExcludePattern(t *testing.T) {
 
 func TestSecurityScopeOutsideGitPinsProjectAndAddsDefaults(t *testing.T) {
 	root := t.TempDir()
-	args, err := securityScopeArgs(root, []string{"dist", "/src"})
+	scope, err := securityScopeArgs(root, []string{"dist", "/src"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	args := scope.args
 	if !reflect.DeepEqual(args[:2], []string{"--project-root", "."}) {
 		t.Fatalf("non-git scan must pin the project root first: %q", args)
 	}
@@ -118,18 +118,27 @@ func TestSecurityScopeOutsideGitPinsProjectAndAddsDefaults(t *testing.T) {
 		t.Fatalf("--force-exclude would drop root files named like directory entries: %q", args)
 	}
 	excludes := excludesOf(args)
-	for _, want := range []string{"**/dist", "/src", "tests/", "vendor/", "*.min.js", "build/", "test/", "node_modules/"} {
+	for _, want := range []string{"**/dist", "**/src", "tests/", "vendor/", "*.min.js", "build/", "test/", "node_modules/"} {
 		if !contains(excludes, want) {
 			t.Errorf("missing exclude %q in %q", want, excludes)
 		}
 	}
-	if contains(excludes, "**//src") {
-		t.Fatalf("anchored exclusion was prefixed: %q", excludes)
+	if scope.restoreNestedTests {
+		t.Fatal("outside Git there is no nested-test gap")
 	}
 }
 
-// A project-root .semgrepignore replaces only the test-path defaults, as it did
-// in 1.23.0, even when the file is empty. The baseline layer (dependencies,
+func scopeOf(t *testing.T, root string, excludes []string) securityScope {
+	t.Helper()
+	scope, err := securityScopeArgs(root, excludes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return scope
+}
+
+// A project-root .semgrepignore replaces only the test-path defaults, as in
+// 1.23.0, even when the file is empty. The baseline layer (dependencies,
 // vendored code, build output, minified bundles) and OxGuard exclusions always
 // apply and cannot be undone by the project file.
 func TestSecurityScopeProjectIgnoreFileReplacesOnlyTestDefaults(t *testing.T) {
@@ -138,16 +147,13 @@ func TestSecurityScopeProjectIgnoreFileReplacesOnlyTestDefaults(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(root, ".semgrepignore"), []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		args, err := securityScopeArgs(root, []string{"dist"})
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := excludesOf(scopeOf(t, root, []string{"dist"}).args)
 		want := append([]string{"**/dist"}, securityBaselineExcludes...)
-		if got := excludesOf(args); !reflect.DeepEqual(got, want) {
+		if !reflect.DeepEqual(got, want) {
 			t.Errorf("%s ignore file: excludes = %q, want exclusions plus baseline %q", name, got, want)
 		}
 		for _, replaced := range securityReplaceableDefaults {
-			if contains(excludesOf(args), replaced) {
+			if contains(got, replaced) {
 				t.Errorf("%s ignore file: %q must be project-replaceable", name, replaced)
 			}
 		}
@@ -157,9 +163,8 @@ func TestSecurityScopeProjectIgnoreFileReplacesOnlyTestDefaults(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(root, ".semgrepignore"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	args, _ := securityScopeArgs(root, nil)
-	if !contains(excludesOf(args), "tests/") {
-		t.Errorf("directory named .semgrepignore replaced defaults: %q", excludesOf(args))
+	if !contains(excludesOf(scopeOf(t, root, nil).args), "tests/") {
+		t.Errorf("directory named .semgrepignore replaced defaults")
 	}
 }
 
@@ -171,58 +176,48 @@ func TestSecurityScopeNestedIgnoreFileDoesNotReplaceDefaults(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "src", ".semgrepignore"), []byte("a.ts\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	args, _ := securityScopeArgs(root, nil)
-	if !contains(excludesOf(args), "tests/") {
-		t.Fatalf("nested ignore file replaced the defaults: %q", excludesOf(args))
+	if !contains(excludesOf(scopeOf(t, root, nil).args), "tests/") {
+		t.Fatal("nested ignore file replaced the defaults")
 	}
 }
 
-func TestSecurityScopeInGitUsesNativeProjectAndAnchorsAtGitRoot(t *testing.T) {
+func TestSecurityScopeInGitKeepsNativeProject(t *testing.T) {
 	root := t.TempDir()
 	gitInit(t, root)
-	args, err := securityScopeArgs(root, []string{"/src"})
-	if err != nil {
-		t.Fatal(err)
+	scope := scopeOf(t, root, []string{"/src"})
+	if contains(scope.args, "--project-root") {
+		t.Fatalf("Git projects keep Opengrep's native Git root and .gitignore handling: %q", scope.args)
 	}
-	if contains(args, "--project-root") {
-		t.Fatalf("Git projects keep Opengrep's native Git root and .gitignore handling: %q", args)
+	// The same mapping everywhere: no anchoring and no Git-relative translation.
+	if !contains(excludesOf(scope.args), "**/src") || !contains(excludesOf(scope.args), "tests/") {
+		t.Fatalf("unexpected excludes %q", excludesOf(scope.args))
 	}
-	if !contains(excludesOf(args), "/src") || !contains(excludesOf(args), "tests/") {
-		t.Fatalf("unexpected excludes %q", excludesOf(args))
-	}
-	// A scan root below the Git root anchors at the Git root.
 	sub := filepath.Join(root, "packages", "app")
 	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	args, err = securityScopeArgs(sub, []string{"/src"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !contains(excludesOf(args), "/packages/app/src") || contains(args, "--project-root") {
-		t.Fatalf("subproject scope = %q", args)
+	subScope := scopeOf(t, sub, []string{"/src"})
+	if !reflect.DeepEqual(excludesOf(subScope.args), excludesOf(scope.args)) || contains(subScope.args, "--project-root") {
+		t.Fatalf("subproject scope = %q", subScope.args)
 	}
 }
 
 // Monorepo subproject: a .semgrepignore at the scan root replaces the test
 // defaults, as in 1.23.0, and so does one at the Git root, as in 2.1.0. The
-// baseline layer applies in every case.
+// baseline layer applies in every case. Only the scan-root-only case needs the
+// nested-test restoration.
 func TestSecurityScopeSubprojectIgnoreFileReplacesTestDefaults(t *testing.T) {
 	requireGit(t)
-	write := func(path string) {
-		if err := os.WriteFile(path, []byte("docs/\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
 	cases := []struct {
-		name             string
-		gitRootFile, sub bool
-		wantTestDefaults bool
+		name                  string
+		gitRootFile, sub      bool
+		wantTestDefaults      bool
+		wantRestoreNestedTest bool
 	}{
-		{"no files: defaults apply", false, false, true},
-		{"scan-root file only", false, true, false},
-		{"git-root file only", true, false, false},
-		{"both files", true, true, false},
+		{"no files: defaults apply", false, false, true, false},
+		{"scan-root file only", false, true, false, true},
+		{"git-root file only", true, false, false, false},
+		{"both files", true, true, false, false},
 	}
 	for _, c := range cases {
 		top := t.TempDir()
@@ -231,49 +226,54 @@ func TestSecurityScopeSubprojectIgnoreFileReplacesTestDefaults(t *testing.T) {
 		if err := os.MkdirAll(sub, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if c.gitRootFile {
-			write(filepath.Join(top, ".semgrepignore"))
+		for path, present := range map[string]bool{filepath.Join(top, ".semgrepignore"): c.gitRootFile, filepath.Join(sub, ".semgrepignore"): c.sub} {
+			if present {
+				if err := os.WriteFile(path, []byte("docs/\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
 		}
-		if c.sub {
-			write(filepath.Join(sub, ".semgrepignore"))
-		}
-		args, err := securityScopeArgs(sub, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		excludes := excludesOf(args)
+		scope := scopeOf(t, sub, nil)
+		excludes := excludesOf(scope.args)
 		if got := contains(excludes, "tests/"); got != c.wantTestDefaults {
 			t.Errorf("%s: test defaults present = %v, want %v (%q)", c.name, got, c.wantTestDefaults, excludes)
 		}
 		if !contains(excludes, "vendor/") || !contains(excludes, "*.min.js") {
 			t.Errorf("%s: baseline layer missing: %q", c.name, excludes)
 		}
-		if contains(args, "--project-root") {
-			t.Errorf("%s: subproject scans must keep the Git root for .gitignore: %q", c.name, args)
+		if contains(scope.args, "--project-root") {
+			t.Errorf("%s: subproject scans must keep the Git root for .gitignore: %q", c.name, scope.args)
+		}
+		if scope.restoreNestedTests != c.wantRestoreNestedTest {
+			t.Errorf("%s: restoreNestedTests = %v, want %v", c.name, scope.restoreNestedTests, c.wantRestoreNestedTest)
 		}
 	}
 }
 
-// When the scan root is the Git root nothing changes: one file, one location.
+// When the scan root is the Git root nothing changes: one file, one location,
+// and the root file is the project file, so there is no nested-test gap.
 func TestSecurityScopeScanRootEqualToGitRoot(t *testing.T) {
 	top := t.TempDir()
 	gitInit(t, top)
-	args, _ := securityScopeArgs(top, nil)
-	if !contains(excludesOf(args), "tests/") {
-		t.Fatalf("defaults missing at the Git root: %q", excludesOf(args))
+	if !contains(excludesOf(scopeOf(t, top, nil).args), "tests/") {
+		t.Fatal("defaults missing at the Git root")
 	}
 	if err := os.WriteFile(filepath.Join(top, ".semgrepignore"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	args, _ = securityScopeArgs(top, nil)
-	if contains(excludesOf(args), "tests/") || !contains(excludesOf(args), "vendor/") {
-		t.Fatalf("root file must replace only the test defaults: %q", excludesOf(args))
+	scope := scopeOf(t, top, nil)
+	if contains(excludesOf(scope.args), "tests/") || !contains(excludesOf(scope.args), "vendor/") || scope.restoreNestedTests {
+		t.Fatalf("root file must replace only the test defaults: %q restore=%v", excludesOf(scope.args), scope.restoreNestedTests)
 	}
 }
 
 func TestSecurityScopeRejectsInvalidExclusions(t *testing.T) {
-	if _, err := securityScopeArgs(t.TempDir(), []string{"!tests"}); err == nil {
-		t.Fatal("negated exclusion accepted")
+	for _, entry := range []string{"", "/"} {
+		_, err := securityScopeArgs(t.TempDir(), []string{entry})
+		var config *scopeConfigError
+		if !errors.As(err, &config) {
+			t.Fatalf("%q: want a configuration error, got %v", entry, err)
+		}
 	}
 }
 
@@ -301,15 +301,15 @@ func TestSecurityScanArgsWriteNothingIntoProject(t *testing.T) {
 		}
 		defer os.Chmod(root, 0o755)
 	}
-	args, err := securityScanArgs(root, defaultExcludes)
+	scan, err := securityScanArgs(root, defaultExcludes, "unused-engine")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if after := list(); !reflect.DeepEqual(before, after) {
 		t.Fatalf("scope selection changed the project: %v -> %v", before, after)
 	}
-	if !contains(args, "."+string(os.PathSeparator)+"src") {
-		t.Fatalf("root targets missing: %q", args)
+	if !contains(scan.args, "."+string(os.PathSeparator)+"src") {
+		t.Fatalf("root targets missing: %q", scan.args)
 	}
 }
 
@@ -320,18 +320,148 @@ func TestSecurityScanArgsKeepRootTargetsAndNeverEnumerateDependencies(t *testing
 			t.Fatal(err)
 		}
 	}
-	args, err := securityScanArgs(root, defaultExcludes)
+	scan, err := securityScanArgs(root, defaultExcludes, "unused-engine")
 	if err != nil {
 		t.Fatal(err)
 	}
+	args := scan.args
 	prefix := "." + string(os.PathSeparator)
-	tail := args[len(args)-2:]
-	if !reflect.DeepEqual(tail, []string{prefix + "--option", prefix + "src"}) {
+	if tail := args[len(args)-2:]; !reflect.DeepEqual(tail, []string{prefix + "--option", prefix + "src"}) {
 		t.Fatalf("targets = %q", tail)
 	}
 	joined := strings.Join(args, "\x00")
 	if strings.Contains(joined, "\x00"+prefix+"node_modules") || strings.Contains(joined, "\x00"+prefix+".git") {
 		t.Fatalf("dependency or VCS directory used as target: %q", args)
+	}
+}
+
+// Only minified root files: nothing to scan, and Opengrep must not be started.
+func TestSecurityScanArgsEmptySelectionIsExplicit(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "x.min.js"), []byte("eval('x')"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "node_modules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	scan, err := securityScanArgs(root, defaultExcludes, "unused-engine")
+	if err != nil || !scan.empty || len(scan.args) != 0 {
+		t.Fatalf("scan = %+v, err = %v; want an explicit empty selection", scan, err)
+	}
+	// A project with no root entries at all keeps its configuration error.
+	if _, err := securityScanArgs(t.TempDir(), defaultExcludes, "unused-engine"); err == nil {
+		t.Fatal("a root with no files must still be reported")
+	}
+}
+
+func TestRecordEmptySecurityScanIsCleanAndComplete(t *testing.T) {
+	result := newRunResult("check")
+	r := &Runner{outputMode: "json", result: result}
+	if code := r.recordEmptySecurityScan(); code != 0 {
+		t.Fatalf("exit = %d", code)
+	}
+	if err := result.Finish(0); err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Findings) != 0 || result.Status != StatusPass || result.Assessment != Complete {
+		t.Fatalf("empty scan result = status %q assessment %q findings %d", result.Status, result.Assessment, len(result.Findings))
+	}
+	if len(result.Gates) != 1 || result.Gates[0].Name != "security" || result.Gates[0].Status != StatusPassed {
+		t.Fatalf("gates = %+v", result.Gates)
+	}
+}
+
+// nestedTestTargets: Opengrep lists the selected files, OxGuard derives targets.
+func TestNestedTestTargets(t *testing.T) {
+	defer func(l func(string, string, []string) ([]string, error), g func(string, []string) (map[string]bool, error)) {
+		listSelectedFiles, gitIgnoredPaths = l, g
+	}(listSelectedFiles, gitIgnoredPaths)
+	var query []string
+	listSelectedFiles = func(engine, root string, args []string) ([]string, error) {
+		query = args
+		return []string{
+			"a_test.go",   // root-level file: already an explicit target
+			"tests/t0.ts", // root entry itself: already a target
+			"src/a.ts",
+			"src/tests/t.ts",
+			"src/tests/deep/tests/n.ts", // nested inside a nested test directory
+			"src/tests/c_test.go",
+			"src/a_test.go",
+			"src/ignored_test.go",
+			"lib/pkg/testsuite/s.ts",
+			"lib/pkg/test/u.ts",
+			"src/tests/b/c.ts",
+			"src/contest/x.ts", // not a test directory name
+		}, nil
+	}
+	gitIgnoredPaths = func(root string, paths []string) (map[string]bool, error) {
+		return map[string]bool{"src/ignored_test.go": true}, nil
+	}
+	targets, err := nestedTestTargets("engine", t.TempDir(), []string{"--exclude", "**/dist"}, []string{"./src", "./lib", "./tests"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := func(s string) string { return "." + string(os.PathSeparator) + filepath.FromSlash(s) }
+	want := []string{p("lib/pkg/test"), p("lib/pkg/testsuite"), p("src/tests"), p("src/tests/deep/tests"), p("src/a_test.go"), p("src/tests/c_test.go")}
+	if !reflect.DeepEqual(targets, want) {
+		t.Fatalf("targets = %q, want %q", targets, want)
+	}
+	seen := map[string]bool{}
+	for _, target := range targets {
+		if seen[target] {
+			t.Fatalf("duplicate target %q", target)
+		}
+		seen[target] = true
+	}
+	// The query makes the scan root the project, passes the exclusions and lists only root entries.
+	wantQuery := []string{"--project-root", ".", "--exclude", "**/dist", "./src", "./lib", "./tests"}
+	if !reflect.DeepEqual(query, wantQuery) {
+		t.Fatalf("query = %q, want %q", query, wantQuery)
+	}
+}
+
+func TestNestedTestTargetsFailClosed(t *testing.T) {
+	defer func(l func(string, string, []string) ([]string, error), g func(string, []string) (map[string]bool, error)) {
+		listSelectedFiles, gitIgnoredPaths = l, g
+	}(listSelectedFiles, gitIgnoredPaths)
+	gitIgnoredPaths = func(string, []string) (map[string]bool, error) { return map[string]bool{}, nil }
+	listSelectedFiles = func(string, string, []string) ([]string, error) { return nil, errors.New("engine failed") }
+	_, err := nestedTestTargets("engine", t.TempDir(), nil, []string{"./src"})
+	var tool *scopeToolError
+	if !errors.As(err, &tool) {
+		t.Fatalf("listing failure must be a tool error: %v", err)
+	}
+	// Too many targets for a bounded argv.
+	listSelectedFiles = func(string, string, []string) ([]string, error) {
+		var files []string
+		for i := 0; i < 1500; i++ {
+			files = append(files, fmt.Sprintf("src/package-%04d/tests/a.ts", i))
+		}
+		return files, nil
+	}
+	_, err = nestedTestTargets("engine", t.TempDir(), nil, []string{"./src"})
+	var config *scopeConfigError
+	if !errors.As(err, &config) || !strings.Contains(err.Error(), "empty .semgrepignore at the Git root") {
+		t.Fatalf("an oversized target list must fail closed with the workaround: %v", err)
+	}
+}
+
+// git check-ignore drops only ignored, untracked files; tracked files stay.
+func TestGitIgnoredPathsUsesGit(t *testing.T) {
+	requireGit(t)
+	root := t.TempDir()
+	gitInit(t, root)
+	for name, content := range map[string]string{".gitignore": "gen_test.go\n", "gen_test.go": "x", "keep_test.go": "x", "a b_test.go": "x"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ignored, err := gitIgnoredPaths(root, []string{"gen_test.go", "keep_test.go", "a b_test.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ignored["gen_test.go"] || ignored["keep_test.go"] || ignored["a b_test.go"] {
+		t.Fatalf("ignored = %v", ignored)
 	}
 }
 
@@ -350,11 +480,11 @@ func TestSecurityScopeComparisonHelper(t *testing.T) {
 		}
 		excludes = append(excludes, more...)
 	}
-	args, err := securityScanArgs(root, excludes)
+	scan, err := securityScanArgs(root, excludes, os.Getenv("OXGUARD_COMPARE_ENGINE"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, _ := json.Marshal(args)
+	data, _ := json.Marshal(map[string]any{"args": scan.args, "empty": scan.empty})
 	if err := os.WriteFile(os.Getenv("OXGUARD_COMPARE_ARGS"), data, 0o600); err != nil {
 		t.Fatal(err)
 	}

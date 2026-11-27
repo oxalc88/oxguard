@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 )
 
@@ -55,71 +58,77 @@ func hasSecurityIgnoreFile(dir string) bool {
 	return err == nil
 }
 
+// scopeConfigError marks a scope problem the user can fix in configuration.
+type scopeConfigError struct{ message string }
+
+func (e *scopeConfigError) Error() string { return e.message }
+
+// scopeToolError marks a failure of Opengrep or Git while listing nested test paths.
+type scopeToolError struct{ err error }
+
+func (e *scopeToolError) Error() string { return e.err.Error() }
+func (e *scopeToolError) Unwrap() error { return e.err }
+
 // gitProject describes the Git work tree that contains the scan root.
 type gitProject struct {
-	top    string // absolute Git work tree root
-	prefix string // scan root relative to top, slash separated, trailing slash, "" at top
+	top string // absolute Git work tree root
 }
 
 // detectGitProject reports the enclosing Git work tree. A missing git binary,
 // no repository or an unsafe repository all mean "not a Git project", which is
 // also how Opengrep classifies the directory.
 func detectGitProject(root string) (gitProject, bool) {
-	cmd := exec.Command("git", "-C", root, "rev-parse", "--show-toplevel", "--show-prefix")
+	cmd := exec.Command("git", "-C", root, "rev-parse", "--show-toplevel")
 	cmd.Env = append(os.Environ(), "LC_ALL=C", "GIT_OPTIONAL_LOCKS=0")
 	out, err := cmd.Output()
 	if err != nil {
 		return gitProject{}, false
 	}
-	lines := strings.Split(strings.TrimRight(string(out), "\r\n"), "\n")
-	if len(lines) < 1 || strings.TrimSpace(lines[0]) == "" {
+	top := strings.TrimRight(string(out), "\r\n")
+	if strings.TrimSpace(top) == "" {
 		return gitProject{}, false
 	}
-	project := gitProject{top: filepath.FromSlash(strings.TrimRight(lines[0], "\r"))}
-	if len(lines) > 1 {
-		project.prefix = strings.TrimRight(lines[1], "\r")
-	}
-	return project, true
+	return gitProject{top: filepath.FromSlash(top)}, true
 }
 
 // opengrepExcludePattern converts one OxGuard exclusion (built-in, oxguard.toml
-// or --exclude) into an Opengrep 2.1.0 --exclude pattern.
+// or --exclude) into an Opengrep 2.1.0 --exclude pattern with exactly the
+// effective meaning the shipped version had under 1.23.0.
 //
-//   - "/path" is anchored at the scan root and matches that path and everything
-//     below it. Inside a Git work tree whose root is above the scan root the
-//     Git-relative prefix is added, because Opengrep anchors at the Git root.
-//   - Any other entry matches at any depth, the 1.23.0 behavior: "dist" and
-//     "cache/private" both match below every directory. Glob syntax is the
-//     gitignore syntax Opengrep documents.
+// 1.23.0 turned every entry E into the wcmatch patterns "**/E" and "**/E/**",
+// so leading and trailing slashes never anchored anything: "/src" excluded
+// "src" and "lib/src", "/a.ts" excluded "src/a.ts", "a/b/" matched "x/a/b" and
+// "/a/b" the same way. The mapping strips leading and trailing slashes and
+// matches at any depth ("**/E"), and the harness verifies it against both
+// engines for each form. Other characters keep their meaning, including a
+// leading "!" or "#" (a literal in 1.23.0, escaped-by-position in a "**/" pattern
+// here) and a "./" prefix (a literal that never matched). Root-level files are
+// explicit targets and were never excludable in 1.23.0 either.
 //
-// Negation ("!") is rejected: an exclusion list must never re-include paths.
-func opengrepExcludePattern(entry, gitPrefix string) (string, bool, error) {
-	if entry == "" {
-		return "", false, nil
-	}
+// An entry that is empty after stripping slashes excluded every file under
+// 1.23.0 (a trailing comma in --exclude was enough); that silently disabled the
+// gate, so it is rejected instead.
+func opengrepExcludePattern(entry string) (string, error) {
 	if runtime.GOOS == "windows" {
 		entry = strings.ReplaceAll(entry, `\`, "/")
 	}
-	for strings.HasPrefix(entry, "./") {
-		entry = entry[2:]
+	trimmed := strings.Trim(entry, "/")
+	if trimmed == "" {
+		return "", &scopeConfigError{fmt.Sprintf("Unsupported exclusion %q: it would exclude every file; name a path", entry)}
 	}
-	if strings.HasPrefix(entry, "!") || strings.HasPrefix(entry, "#") {
-		return "", false, fmt.Errorf("Unsupported exclusion %q: negation and comments are not allowed", entry)
+	if strings.HasPrefix(trimmed, "**/") {
+		return trimmed, nil
 	}
-	if strings.HasPrefix(entry, "/") {
-		rest := strings.TrimLeft(entry, "/")
-		if rest == "" {
-			return "", false, fmt.Errorf("Unsupported exclusion %q: name a path below the scan root", entry)
-		}
-		return "/" + gitPrefix + rest, true, nil
-	}
-	if entry == "." || entry == "./" {
-		return "", false, fmt.Errorf("Unsupported exclusion %q: name a path below the scan root", entry)
-	}
-	if strings.HasPrefix(entry, "**/") {
-		return entry, true, nil
-	}
-	return "**/" + entry, true, nil
+	return "**/" + trimmed, nil
+}
+
+// securityScope is the read-only result of securityScopeArgs.
+type securityScope struct {
+	args []string
+	// restoreNestedTests is set when a .semgrepignore exists at the scan root of
+	// a Git subproject but not at the Git root. Opengrep then still applies its
+	// built-in test paths below each root entry, which 1.23.0 did not.
+	restoreNestedTests bool
 }
 
 // securityScopeArgs returns the Opengrep arguments that define the security
@@ -143,59 +152,210 @@ func opengrepExcludePattern(entry, gitPrefix string) (string, bool, error) {
 //     exists at the scan root or at the project root (the Git root inside a Git
 //     work tree). A project file, even an empty one, replaces them. 1.23.0
 //     looked only at the scan root and Opengrep 2.1.0 only at the project
-//     root; the union keeps both setups working. Opengrep still applies its own
-//     built-in list below root entries when only the scan root has a file, and
-//     no flag can turn that off without losing Git handling (--project-root
-//     disables .gitignore), so such a project should add an empty .semgrepignore
-//     at the Git root.
-func securityScopeArgs(root string, excludes []string) ([]string, error) {
-	var args []string
-	projectRoot, prefix := root, ""
-	if project, ok := detectGitProject(root); ok {
-		projectRoot, prefix = project.top, project.prefix
+//     root; the union keeps both setups working.
+//   - When only the scan root of a Git subproject has the file, Opengrep still
+//     skips nested test directories; restoreNestedTests asks the caller to add
+//     them as explicit targets (see nestedTestTargets).
+func securityScopeArgs(root string, excludes []string) (securityScope, error) {
+	var scope securityScope
+	projectRoot := root
+	project, inGit := detectGitProject(root)
+	if inGit {
+		projectRoot = project.top
 	} else {
-		args = append(args, "--project-root", ".")
+		scope.args = append(scope.args, "--project-root", ".")
 	}
 	seen := map[string]bool{}
 	add := func(pattern string) {
 		if !seen[pattern] {
 			seen[pattern] = true
-			args = append(args, "--exclude", pattern)
+			scope.args = append(scope.args, "--exclude", pattern)
 		}
 	}
 	for _, entry := range excludes {
-		pattern, ok, err := opengrepExcludePattern(entry, prefix)
+		pattern, err := opengrepExcludePattern(entry)
 		if err != nil {
-			return nil, err
+			return securityScope{}, err
 		}
-		if ok {
-			add(pattern)
-		}
+		add(pattern)
 	}
 	for _, pattern := range securityBaselineExcludes {
 		add(pattern)
 	}
-	if !hasSecurityIgnoreFile(projectRoot) && !hasSecurityIgnoreFile(root) {
+	atRoot, atProject := hasSecurityIgnoreFile(root), hasSecurityIgnoreFile(projectRoot)
+	if !atRoot && !atProject {
 		for _, pattern := range securityReplaceableDefaults {
 			add(pattern)
 		}
 	}
-	return args, nil
+	scope.restoreNestedTests = inGit && atRoot && !atProject && !sameDir(root, projectRoot)
+	return scope, nil
 }
 
-// securityScanArgs combines scope arguments and root targets. The helper test
-// used by scripts/compare-opengrep.py calls this production function.
-func securityScanArgs(root string, excludes []string) ([]string, error) {
+func sameDir(a, b string) bool {
+	x, errX := filepath.EvalSymlinks(a)
+	y, errY := filepath.EvalSymlinks(b)
+	if errX != nil || errY != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return x == y
+}
+
+// securityExtraTargetBytes bounds the argv added by nestedTestTargets. Windows
+// limits a command line to 32,767 characters, which also covers the engine
+// path, the exclusion patterns and the root targets; 16,000 bytes of extra
+// targets (an upper bound on UTF-16 units) leaves room for them on every
+// platform, so behavior does not differ by OS.
+const securityExtraTargetBytes = 16000
+
+// listSelectedFiles asks Opengrep which files it selects for args. It is a
+// variable so tests can replace the engine.
+var listSelectedFiles = func(engine, root string, args []string) ([]string, error) {
+	cmd := exec.Command(engine, append([]string{"scan", "--x-ls", "--quiet"}, args...)...) //nolint:gosec
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "OPENGREP_ENABLE_VERSION_CHECK=false")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("Opengrep could not list scan targets: %v: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	var files []string
+	for _, line := range strings.Split(stdout.String(), "\n") {
+		if line = strings.TrimRight(line, "\r"); line != "" {
+			files = append(files, filepath.ToSlash(line))
+		}
+	}
+	return files, nil
+}
+
+// gitIgnoredPaths returns the subset of paths that .gitignore rules exclude.
+// check-ignore reports no tracked file, matching Opengrep's own Git handling.
+var gitIgnoredPaths = func(root string, paths []string) (map[string]bool, error) {
+	ignored := map[string]bool{}
+	if len(paths) == 0 {
+		return ignored, nil
+	}
+	cmd := exec.Command("git", "-C", root, "check-ignore", "-z", "--stdin")
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "GIT_OPTIONAL_LOCKS=0")
+	cmd.Stdin = strings.NewReader(strings.Join(paths, "\x00") + "\x00")
+	out, err := cmd.Output()
+	var exit *exec.ExitError
+	if err != nil && !(errors.As(err, &exit) && exit.ExitCode() == 1) {
+		return nil, fmt.Errorf("git check-ignore failed: %v", err)
+	}
+	for _, p := range strings.Split(string(out), "\x00") {
+		if p != "" {
+			ignored[p] = true
+		}
+	}
+	return ignored, nil
+}
+
+// nestedTestTargets lists explicit targets that restore 1.23.0 behavior for
+// nested test paths when a Git subproject's own .semgrepignore replaced the
+// defaults. Opengrep decides what is selected: it lists the files it would scan
+// with built-ins disabled (--project-root makes the scan root the project, so
+// the scan-root file replaces them) honoring every .semgrepignore and every
+// exclusion; OxGuard only reads the paths.
+//
+//   - A directory named test, tests or testsuite below a root entry becomes an
+//     explicit directory target. Opengrep does not apply its built-ins to the
+//     target itself, still applies .gitignore, project ignore files and every
+//     exclusion inside it, and skips test directories nested in it natively, so
+//     targets never overlap and nothing is reported twice.
+//   - A nested *_test.go file becomes an explicit file target, which bypasses
+//     all filters, so Git first drops files .gitignore excludes (the listing
+//     already applied .semgrepignore and the exclusions).
+//
+// node_modules is never listed: the listing covers only the root targets, and
+// excluded paths are pruned by Opengrep. Symlinked directories are not
+// followed. The result is bounded by securityExtraTargetBytes; a larger set
+// fails closed with a pointer to the workaround.
+func nestedTestTargets(engine, root string, scopeArgs, rootTargets []string) ([]string, error) {
+	query := append([]string{"--project-root", "."}, scopeArgs...)
+	listed, err := listSelectedFiles(engine, root, append(query, rootTargets...))
+	if err != nil {
+		return nil, &scopeToolError{err}
+	}
+	dirs, files := map[string]bool{}, map[string]bool{}
+	for _, path := range listed {
+		segments := strings.Split(path, "/")
+		for i := 1; i < len(segments)-1; i++ {
+			switch segments[i] {
+			case "test", "tests", "testsuite":
+				dirs[strings.Join(segments[:i+1], "/")] = true
+			}
+		}
+		if len(segments) >= 2 && strings.HasSuffix(segments[len(segments)-1], "_test.go") {
+			files[path] = true
+		}
+	}
+	candidates := sortedKeys(files)
+	ignored, err := gitIgnoredPaths(root, candidates)
+	if err != nil {
+		return nil, &scopeToolError{err}
+	}
+	var targets []string
+	for _, dir := range sortedKeys(dirs) {
+		targets = append(targets, "."+string(os.PathSeparator)+filepath.FromSlash(dir))
+	}
+	for _, file := range candidates {
+		if !ignored[file] {
+			targets = append(targets, "."+string(os.PathSeparator)+filepath.FromSlash(file))
+		}
+	}
+	size := 0
+	for _, target := range targets {
+		size += len(target) + 3
+	}
+	if size > securityExtraTargetBytes {
+		return nil, &scopeConfigError{fmt.Sprintf("This Git subproject has too many nested test paths (%d targets) to restore explicitly; add an empty .semgrepignore at the Git root to replace Opengrep's built-in test paths", len(targets))}
+	}
+	return targets, nil
+}
+
+func sortedKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// securityScan is the complete Opengrep scope: flags followed by targets.
+type securityScan struct {
+	args []string
+	// empty is set when every root entry was deliberately filtered (only minified
+	// root files): there is nothing to scan and Opengrep must not be started,
+	// because without targets it would scan the working directory.
+	empty bool
+}
+
+// securityScanArgs combines scope flags and targets. The comparison helper
+// calls this production function.
+func securityScanArgs(root string, excludes []string, engine string) (securityScan, error) {
 	scope, err := securityScopeArgs(root, excludes)
 	if err != nil {
-		return nil, err
+		return securityScan{}, err
 	}
 	// Keep security scans root-wide without asking the scanner to enumerate
 	// node_modules first. Windows pnpm junctions can stall that enumeration
 	// before Opengrep applies its --exclude filters.
 	targets, err := securityRootTargets(root)
 	if err != nil {
-		return nil, err
+		return securityScan{}, err
 	}
-	return append(scope, targets...), nil
+	if len(targets) == 0 {
+		return securityScan{empty: true}, nil
+	}
+	args := append([]string{}, scope.args...)
+	if scope.restoreNestedTests {
+		extra, err := nestedTestTargets(engine, root, scope.args, targets)
+		if err != nil {
+			return securityScan{}, err
+		}
+		targets = append(targets, extra...)
+	}
+	return securityScan{args: append(args, targets...)}, nil
 }
