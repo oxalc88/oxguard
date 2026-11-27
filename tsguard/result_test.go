@@ -165,6 +165,7 @@ func TestAdapters(t *testing.T) {
 		{"FTA failure", "fta", "", "File order.ts has a score of 77.5, which is beyond the score cap of 60, exiting.\n", "tsguard.fta.score_exceeded", "quality", false},
 		{"Biome rule", "biome", `{"diagnostics":[{"category":"lint/suspicious/noExplicitAny","severity":"error","message":"Use a specific type.","location":{"path":"src/order.ts","start":{"line":3,"column":4}}}]}`, "", "lint/suspicious/noExplicitAny", "quality", false},
 		{"Opengrep rule", "opengrep", `{"results":[{"check_id":"rules.eval","path":"src/order.ts","start":{"line":3,"col":5},"extra":{"message":"Avoid eval","severity":"WARNING"}}],"errors":[]}`, "", "rules.eval", "quality", false},
+		{"Opengrep 2.1 invalid rule", "opengrep", `{"version":"2.1.0","results":[],"errors":[{"code":4,"level":"error","type":"InvalidRuleSchemaError","rule_id":"broken","message":"Invalid rule schema at line rule.yaml:2: missing pattern","path":"rule.yaml","spans":[{"file":"rule.yaml","start":{"line":2,"col":3,"offset":9},"end":{"line":2,"col":4,"offset":10}}]}]}`, "", "tsguard.execution.invalid_configuration", "invalid_configuration", false},
 		{"Malformed native JSON", "biome", "broken", "", "tsguard.execution.adapter_failure", "adapter_failure", false},
 		{"Absent schema", "opengrep", "{}", "", "tsguard.execution.adapter_failure", "adapter_failure", true},
 		{"TypeScript missing import is quality", "tsc", "src/order.ts(1,1): error TS2307: Cannot find module 'EAI_AGAIN'.\n", "src/order.ts(1,1): error TS2307: Cannot find module 'EAI_AGAIN'.\n", "TS2307", "quality", false},

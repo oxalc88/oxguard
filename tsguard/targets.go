@@ -326,12 +326,8 @@ func runNpmAudit(r *Runner) int {
 func runOpengrep(r *Runner) int {
 	binaryPath := opengrepBinaryPath(r.root)
 
-	if packagedRuntime() == "" {
-		if err := verifyOpengrepBinary(binaryPath); err != nil {
-			return r.executionFailure("security", "tool_missing", fmt.Sprintf("Trusted Opengrep is unavailable: %v; run tsguard setup", err))
-		}
-	} else if _, err := os.Stat(binaryPath); err != nil {
-		return r.executionFailure("security", "tool_missing", "Bundled Opengrep is missing; reinstall with optional dependencies.")
+	if err := verifyOpengrepBinary(binaryPath); err != nil {
+		return r.executionFailure("security", "tool_missing", fmt.Sprintf("Trusted Opengrep is unavailable: %v; run tsguard setup or reinstall with optional dependencies", err))
 	}
 
 	// Vendor rules from the project store; fall back to p/javascript + p/typescript.

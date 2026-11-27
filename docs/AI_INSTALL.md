@@ -237,12 +237,7 @@ missing documentation version metadata before publication.
 
 - **setup is idempotent** — it adds only what's missing. Re-running it on an
   existing project is safe and produces no diff if everything is already in place.
-- **Opengrep SAST binary** — standalone `tsguard setup` downloads a self-contained
-  binary (~50 MB) into the OS user cache under
-  `oxguard/opengrep/<version>/<os>-<arch>/`, outside the scanned project. Its pinned
-  SHA-256 digest is verified before execution. A missing or untrusted engine blocks
-  security checks. Run `tsguard setup` to repair standalone installations; reinstall
-  npm installations with optional dependencies to restore the package-owned engine.
+- **Opengrep SAST binary** — standalone `tsguard setup` downloads a self-contained v2.1.0 binary (162–176 MB on Unix; Windows downloads a 44 MB ZIP containing a 205 MB executable and six DLLs) into the OS user cache under `oxguard/opengrep/<version>/<os>-<arch>/`, outside the scanned project. Its pinned SHA-256 digest and every required Windows DLL are verified before execution. A missing or untrusted engine blocks security checks. Run `tsguard setup` to repair standalone installations; reinstall npm installations with optional dependencies to restore the package-owned engine.
 - **pyguard's analysis scripts** execute from private temporary copies embedded
   in its binary. `tools/analysis/*.py` contains reference copies only; updating
   those files does not change checks. Update the installed binary for runtime fixes.

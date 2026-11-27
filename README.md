@@ -89,7 +89,7 @@ The current implementation provides three Tsguard levels: **code** (Ultracite/Bi
 | Types | tsc --noEmit | Type errors |
 | Compiler-aware lint | Oxlint/tsgolint, five semantic rules only | Unsafe assignments/assertions and promise misuse; unnecessary conditions are advisory; unsupported native configurations remain incomplete |
 | Coverage | vitest / jest / mocha+c8 / ava+c8 — 80% floor | Untested code paths |
-| Security — static | Opengrep (project-local binary, LGPL) | XSS, `eval()`, path traversal, weak crypto, injection, framework patterns — bandit-class coverage |
+| Security — static | Opengrep (verified engine, LGPL) | XSS, `eval()`, path traversal, weak crypto, injection, framework patterns — bandit-class coverage |
 | Security — CVEs | npm/pnpm/yarn audit + audit-ci | Known vulnerabilities in dependencies |
 | Security — secrets | secretlint | Credentials accidentally committed |
 
@@ -164,12 +164,7 @@ Standalone `tsguard setup` installs project dependencies and a verified SAST eng
 
 - **Secrets** (`secretlint`): added as a npm devDependency by `tsguard setup` → lives in `node_modules`.
 - **CVEs** (PM-native `audit` + `audit-ci`): also npm devDependencies.
-- **SAST** (Opengrep): `tsguard setup` downloads a self-contained binary
-  (~50 MB) into the OS user cache under `oxguard/opengrep/<version>/<os>-<arch>/`,
-  outside the scanned project, and verifies its pinned SHA-256 digest before execution.
-  The binary bundles its own runtime (Nuitka-compiled). A missing or untrusted engine
-  blocks security checks; run `tsguard setup` to install or repair it. npm installations
-  use their package-owned engine; reinstall with optional dependencies if it is missing.
+- **SAST** (Opengrep): `tsguard setup` downloads a self-contained binary (v2.1.0: 162–176 MB on Unix; Windows downloads a 44 MB ZIP with a 205 MB executable and six runtime DLLs) into the OS user cache under `oxguard/opengrep/<version>/<os>-<arch>/`, outside the scanned project, and verifies its pinned SHA-256 digest before execution. Linux uses static binaries for both glibc and musl; Windows keeps its six pinned runtime DLLs beside the executable. A missing or untrusted engine blocks security checks; run `tsguard setup` to install or repair it. npm installations use their package-owned engine; reinstall with optional dependencies if it is missing.
 
 **Failure-policy smells — advisory:** `pyguard structure` reports broad exception handlers that silently return a fallback or exit a loop, plus repeated handler bodies. These findings also run through `audit` and `diagnose`, remain outside `check`, and never change exit code or blocking outcome. Python reports fallback/exit only for bare/`Exception`/`BaseException` handlers (including tuples), ignores `pass` because Ruff S110 covers it, and considers every handler for repetition. Empty `()` and `{}` returns count as fallback; `set()` does not. Repeated-body fingerprints use Python tokens from the handler body only, preserve identifiers and literals, and require at least 12 tokens across three handlers. Parse failures are reported as incomplete structure evidence. See [maintainability rules](docs/maintainability.md) and [metrics](docs/metrics.md).
 
@@ -283,7 +278,7 @@ pyguard and tsguard enforce the same quality goals but reach them with different
   per-function). tsguard combines the first three into a single FTA score per file and adds
   its own native cognitive comparison. See [docs/metrics.md](docs/metrics.md) for what each measures.
 
-- **Security**: pyguard runs Bandit, pip-audit and detect-secrets. Python has no implemented Opengrep `--deep` command; strict flag validation rejects it. tsguard uses Opengrep as its blocking SAST engine through a project-local binary.
+- **Security**: pyguard runs Bandit, pip-audit and detect-secrets. Python has no implemented Opengrep `--deep` command; strict flag validation rejects it. tsguard uses Opengrep as its blocking SAST engine through a verified engine in its npm package or OS user cache.
 
 - **Dead code**: pyguard uses vulture (Python AST). tsguard uses knip (TypeScript-aware,
   also catches unused deps). tsguard additionally runs jscpd for copy-paste detection.

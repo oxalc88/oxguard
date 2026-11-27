@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Upgrade the pinned Opengrep SAST engine from 1.23.0 to 2.1.0 without changing rule sources, blocking policy or enabling interfile analysis. Linux glibc/musl now share statically linked assets; Windows ships the verified upstream ZIP executable plus six individually pinned runtime DLLs. Engines grow to 162–176 MB (Windows executable 205 MB, 44 MB download); allow more package/cache disk space. npm and standalone execution verify all required engine files. See [comparison and compatibility evidence](docs/opengrep-2.1-migration.md).
+
 - Refreshed the PyGuard skill and maintainability docs for structure, explicit-baseline change comparisons and complexity context. Readiness means the complete supported Python scope with deferred capabilities excluded, not full Tsguard parity; cognitive complexity stays advisory above 20. The Python agent trace was re-recorded from scratch against this skill revision; the previous trace is kept in evals/agent-traces/history/python-before-skill-docs.json. (#23 P9 PR 4; D4a, D6a)
 
 ### Added

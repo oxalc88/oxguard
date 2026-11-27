@@ -1,0 +1,85 @@
+{
+  "version": "v2.1.0",
+  "licenseSha256": "20c17d8b8c48a600800dfd14f95d5cb9ff47066a9641ddeab48dc54aec96e331",
+  "platforms": {
+    "linux-x64": {
+      "asset": "opengrep_linux_x86",
+      "sha256": "d6a68a84c01a3d8ee933f60847decf1b4d0fd7791a26833b32b95922baf28974",
+      "size": 161695104,
+      "files": {
+        "opengrep": {
+          "sha256": "d6a68a84c01a3d8ee933f60847decf1b4d0fd7791a26833b32b95922baf28974",
+          "size": 161695104
+        }
+      }
+    },
+    "linux-arm64": {
+      "asset": "opengrep_linux_aarch64",
+      "sha256": "3abfc87d66f208efd143a1b408d489af934cea7d9968ab1f37dca001f9886092",
+      "size": 165911416,
+      "files": {
+        "opengrep": {
+          "sha256": "3abfc87d66f208efd143a1b408d489af934cea7d9968ab1f37dca001f9886092",
+          "size": 165911416
+        }
+      }
+    },
+    "darwin-x64": {
+      "asset": "opengrep_osx_x86",
+      "sha256": "4009b6fa5c45e027835b54837eedf7aa5ea7d778c77a9f98f27cfbc463b2a0da",
+      "size": 167123072,
+      "files": {
+        "opengrep": {
+          "sha256": "4009b6fa5c45e027835b54837eedf7aa5ea7d778c77a9f98f27cfbc463b2a0da",
+          "size": 167123072
+        }
+      }
+    },
+    "darwin-arm64": {
+      "asset": "opengrep_osx_arm64",
+      "sha256": "0beb60121c3f1702c0aee34c0a7ca02599902f16676f54e4a95f317838f19bdd",
+      "size": 175536424,
+      "files": {
+        "opengrep": {
+          "sha256": "0beb60121c3f1702c0aee34c0a7ca02599902f16676f54e4a95f317838f19bdd",
+          "size": 175536424
+        }
+      }
+    },
+    "win32-x64": {
+      "asset": "opengrep_windows_x86.zip",
+      "sha256": "de250811f7209619e4fdafff55e5f13cb24a70c9cb0ea86435c2c92393ea04ab",
+      "size": 44150190,
+      "files": {
+        "libgcc_s_seh-1.dll": {
+          "sha256": "645763b1b6f52c6a755444dfb781e6a606e1fda3061b2a3d9806780bb3dc54b4",
+          "size": 113664
+        },
+        "libgmp-10.dll": {
+          "sha256": "c188e570157c109181e6788c2837fcead79747a7b10209cd82ebf5365787f508",
+          "size": 654867
+        },
+        "libpcre2-8-0.dll": {
+          "sha256": "563cb7436d6eba69b18080557bacaa5f620789a3b7a528a6eb2f8fad485e3dea",
+          "size": 713747
+        },
+        "libstdc++-6.dll": {
+          "sha256": "6244b77e3635c735ec7d463dcd748beef08a7e6facfa6e47e5463f388fa3b178",
+          "size": 2159616
+        },
+        "libwinpthread-1.dll": {
+          "sha256": "fe0259c7c8bf875cce79dc63f7af2c350138e77e60c51cb44d35aaee4d45e3ee",
+          "size": 57875
+        },
+        "libzstd-1.dll": {
+          "sha256": "1838f5de8eeac170af6901addf319c69fa70fad341b4a7b2fc73189bbbfa317b",
+          "size": 729117
+        },
+        "opengrep.exe": {
+          "sha256": "fae553cdfd1badcb30a480ec5c47e3e14355744167bff4303dc45ab436253e7a",
+          "size": 204674378
+        }
+      }
+    }
+  }
+}

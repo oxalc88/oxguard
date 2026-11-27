@@ -92,7 +92,7 @@ Structured modes automatically save full stdout and stderr separately under `nod
 | FTA | Native JSON on success; native first score-cap stderr record on failure; score/threshold finding and measurement |
 | Packaged Biome/Ultracite | Biome JSON diagnostics with all diagnostics enabled, rule/category, severity, file and position |
 | Criticality | TypeScript compiler emits resolved function/method nodes and caller → callee edges; Go deduplicates, ranks and reports |
-| Opengrep | Native JSON results/errors; preserve rule IDs and positions; `--error` continues to make every match blocking |
+| Opengrep 2.1.0 | Native JSON results/errors; preserve rule IDs and positions; `--error` continues to make every match blocking |
 | Coverage | Native Istanbul JSON summary from Vitest/Jest/c8/nyc; global existing thresholds and per-file measurements; Vitest/Jest JSON test failures |
 | Secretlint | Native JSON rule IDs and positions; normalized evidence excludes secret values |
 | Dependency audit | Native npm/pnpm JSON and Yarn classic event advisory IDs as informational findings; native audit-ci policy decision as a separate blocker |
@@ -186,3 +186,5 @@ policy failure is advisory only when every reported advisory is covered by a
 matching review. Ambiguous or indirect-only audit paths stay blocking. Existing
 audit-ci thresholds are unchanged; this review file does not create a general
 allowlist or suppress the full package-manager audit.
+
+Opengrep 2.1.0 retains the existing scan arguments and normalized `check_id`, path, start line/column, message, severity and errors contract. `engine_kind` changes upstream from `OSS` to `Opengrep`; it is not part of the normalized result. Security policy, rule sources and blocking exits are unchanged. See the [migration comparison](../opengrep-2.1-migration.md) for fixture findings and compatibility limits.

@@ -1,3 +1,5 @@
 # Native security contract fixture
 
 The source starts clean. Case overrides add two explicit eval calls or request a synthetic detector input generated only inside the temporary eval project. The generated payload is a repeated alphabet, not a usable private key; no PEM block is stored in the repository. The local Opengrep rule determines the expected rule/location, independently of any public rule feed. Dependency cases override the minimal lock with a nonexistent test package; no dependency is installed. The local advisory provider supplies fixed native records and severity. This fixture evaluates OxGuard normalization and reporting, not production security accuracy.
+
+The Opengrep 1.23.0 → 2.1.0 migration compares this exact rule and corpus with both engines; [measurements](../../../docs/opengrep-2.1-migration.md) record native finding IDs/locations and repeated timing. The known answers remain unchanged.

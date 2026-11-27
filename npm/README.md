@@ -23,8 +23,7 @@ lint, type, test/coverage, FTA, secrets, vulnerability-audit, dead-code and dupl
 analysis tools. The five native packages ship Go and Opengrep binaries and are
 optional dependencies pinned to the exact launcher version, restricted by npm
 `os` and `cpu`: linux-x64, linux-arm64, darwin-x64, darwin-arm64 and win32-x64.
-Linux Go binaries are built with CGO disabled. Linux packages contain glibc and
-musl Opengrep builds; the launcher selects the appropriate engine.
+Linux Go binaries are built with CGO disabled. Opengrep v2.1.0 uses one static Linux binary per architecture for both glibc and musl. Windows packages include the executable and all six pinned runtime DLLs from the upstream ZIP. Native engines are larger than v1.23.0; see the [migration measurements](https://github.com/oxalc88/oxguard/blob/main/docs/opengrep-2.1-migration.md).
 
 There are no installation scripts or install-time binary downloads. The project
 manifest lists the tsguard package; its implementation tools are transitive
